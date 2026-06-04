@@ -185,19 +185,3 @@ this path reports `fixed_fpr_replay.status = "available"`. If
 recomputed per release-safe public group rather than from one global pool. Full
 production score or calibration-group release remains opt-in and must be covered
 by the release review.
-
-## Private Original Attack-Vector Export
-
-For private analysis only, the original malicious attack vectors can be
-exported without modifying the source chunks:
-
-```sh
-python deidentification_release/scripts/export_original_attack_vectors.py \
-  --root /path/to/HostnameCommandInjectionBenchmark \
-  --output /path/to/HostnameCommandInjectionBenchmark/deidentification_release_full/private/original_attack_vectors_deduplicated.csv \
-  --summary /path/to/HostnameCommandInjectionBenchmark/deidentification_release_full/private/original_attack_vectors_deduplicated.summary.json
-```
-
-This export contains raw original attack-vector text and raw model reasons. It
-can reveal private input grouping properties, so it is private-only and must not
-be included in the public de-identified bundle or public audit reports.

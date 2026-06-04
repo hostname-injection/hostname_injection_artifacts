@@ -1,42 +1,15 @@
-Research-Only Licensing (Noncommercial)
-======================================
+Research-Only Noncommercial License Summary
+===========================================
 
-This repository is distributed under a split noncommercial license model.
+This repository is released for research-only noncommercial use.
 
-1) Source code license (noncommercial)
---------------------------------------
-Unless otherwise noted, source code in this repository is licensed under:
+Source code is licensed under the PolyForm Noncommercial License 1.0.0:
+https://polyformproject.org/licenses/noncommercial/1.0.0/
 
-  PolyForm Noncommercial License 1.0.0
-  https://polyformproject.org/licenses/noncommercial/1.0.0/
+Released data, documentation, and model artifacts are licensed under Creative
+Commons Attribution-NonCommercial 4.0 International:
+https://creativecommons.org/licenses/by-nc/4.0/
 
-This includes, by default, files in:
-- /ccd
-- /baselines
-- /scripts
-- /tests
-- build/config files (e.g., Makefile, pyproject.toml, requirements, environment)
-
-2) Data, documentation, and model-artifact license (noncommercial)
-------------------------------------------------------------------
-Dataset files, benchmark assets, model artifacts, and documentation are licensed under:
-
-  Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
-  https://creativecommons.org/licenses/by-nc/4.0/
-  Legal code: https://creativecommons.org/licenses/by-nc/4.0/legalcode
-
-This includes, by default, files in:
-- /hostname_injection_benchmark
-- /caho_model_checkpoint
-- documentation and paper artifacts (e.g., *.md, *.pdf)
-
-3) Commercial use
------------------
-Commercial use is not permitted under these licenses.
-If you need commercial rights, contact the repository maintainers to obtain a
-separate commercial license.
-
-4) Scope and precedence
------------------------
-If a file or subdirectory contains a more specific license notice, that specific
-notice controls for that file/subdirectory.
+Commercial use is not permitted under these licenses. If a file or subdirectory
+contains a more specific license notice, that notice controls for that file or
+subdirectory.

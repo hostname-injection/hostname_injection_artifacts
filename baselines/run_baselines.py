@@ -8,12 +8,12 @@ from typing import Dict, List
 
 import numpy as np
 
-from baselines.dataset import load_user_logins_dataset, train_test_split
+from baselines.dataset import load_benchmark_dataset, train_test_split
 from baselines.downloads import ensure_repos_for_baselines
 from baselines.latency import measure_latency
 from baselines.metrics import classification_metrics
 from baselines.models.registry import BASELINE_SPECS, get_baseline, list_baselines
-from ccd.user_logins import LabelPolicy
+from ccd.benchmark_dataset import BenchmarkLabelMethod
 
 
 def _parse_baselines(arg: str) -> List[str]:
@@ -92,27 +92,19 @@ def main() -> int:
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=Path("hostname_injection_benchmark/user_logins"),
-        help="Path to user_logins CSV directory.",
+        default=Path("HostnameCommandInjectionBenchmark"),
+        help="Benchmark root containing manifest.json. All benchmark families are loaded.",
     )
     parser.add_argument(
-        "--hostname-col",
+        "--label-method",
         type=str,
-        default="USERNAME",
-        help="Column to evaluate for command injection (default USERNAME).",
+        default=BenchmarkLabelMethod.ANY_MALICIOUS_ELSE_BENIGN.value,
+        choices=[p.value for p in BenchmarkLabelMethod],
+        help="How to resolve GPT 5.5 / Claude Opus 4.8 benchmark labels.",
     )
-    parser.add_argument(
-        "--label-policy",
-        type=str,
-        default=LabelPolicy.BOTH_M.value,
-        choices=[p.value for p in LabelPolicy],
-        help="How to combine GPT 5.5 / Claude Opus 4.8 labels.",
-    )
-    parser.add_argument("--min-confidence", type=float, default=None, help="Minimum confidence for both models.")
-    parser.add_argument("--min-sonnet-confidence", type=float, default=None, help="Minimum GPT 5.5 confidence.")
-    parser.add_argument("--min-opus-confidence", type=float, default=None, help="Minimum Claude Opus 4.8 confidence.")
     parser.add_argument("--sample-per-class", type=int, default=None, help="Reservoir sample per class.")
     parser.add_argument("--deduplicate", action="store_true", help="Deduplicate texts before training.")
+    parser.add_argument("--max-rows", type=int, default=None, help="Debug only: limit benchmark rows after manifest order.")
     parser.add_argument("--test-size", type=float, default=0.2, help="Test split fraction.")
     parser.add_argument("--seed", type=int, default=13, help="Random seed.")
 
@@ -167,16 +159,13 @@ def main() -> int:
         except Exception as exc:
             print(f"Failed to download repos: {exc}")
 
-    texts, labels, stats = load_user_logins_dataset(
+    texts, labels, stats = load_benchmark_dataset(
         args.data_dir,
-        hostname_col=args.hostname_col,
-        label_policy=LabelPolicy(args.label_policy),
-        min_confidence=args.min_confidence,
-        min_sonnet_confidence=args.min_sonnet_confidence,
-        min_opus_confidence=args.min_opus_confidence,
+        label_method=BenchmarkLabelMethod(args.label_method),
         sample_per_class=args.sample_per_class,
         deduplicate=args.deduplicate,
         seed=args.seed,
+        max_rows=args.max_rows,
     )
 
     if len(texts) == 0:

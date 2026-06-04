@@ -147,6 +147,7 @@ def test_pairwise_contrastive_loss_misaligned():
 
 def test_supcon_loss_uses_same_sample_views_as_positives():
     np = pytest.importorskip("numpy")
+    pytest.importorskip("torch")
     features = np.array(
         [
             [[1.0, 0.0], [1.0, 0.0]],

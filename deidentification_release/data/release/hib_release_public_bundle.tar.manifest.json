@@ -1,19 +1,18 @@
 {
   "bundle": "hib_release_public_bundle.tar.gz",
-  "sha256": "dc81c2d617ea8e3e3546d8621041dcab695c63464c6ff569fc1f8c2f9d0dfd81",
+  "sha256": "6e723638ccb733827e697c8d6d9890d2a4ae8c4d10846b8b96e9c4614b938fa9",
   "files": {
-    "deidentification_release/README.md": "8c14aa9de996c2c8a876806d495a3a225677cb39bde8913ccacfb74ef04d67fa",
     "deidentification_release/data/release/hib_release.jsonl": "b47f52e0c86086788970ac2810a8dc581297cd38cde2aaf383988b8203dee11a",
     "deidentification_release/data/release/hib_release.schema.json": "1ac0863849c540ba9c1a87af3f940b215864c1997fca85e1c5417a15998be763",
     "deidentification_release/data/release/hib_release.jsonl.sha256": "01d77cc69225b7afe2e68428c35de22638768b7cf88b373b437093381f308ff5",
     "deidentification_release/data/audits/anonymization_audit_report.json": "eb755bb886602288746221eafd287634a6666668f1666918ea97bfe661a43cf9",
     "deidentification_release/data/audits/anonymization_audit_report.md": "828bf5d9be487709bd079c97b2a59184305ee5a6e3ab8b29e56452890054b1c5",
-    "deidentification_release/data/audits/anonymization_shortcut_audit_report.json": "9798abb9a0db36679a17121ddca99b5246312e834c81c89436d4a2a7f0d65fca",
-    "deidentification_release/data/audits/anonymization_shortcut_audit_report.md": "f3d887749844ca5de9ab3128d7253c957afe1aa10a1dbb4bbf90b9217196ac97",
     "deidentification_release/data/audits/nonlinkability_audit_report.json": "0f4b900b8e8820f29787570c87bb1a6b3c0107f21acb0c4e7389baa22d674dcc",
     "deidentification_release/data/audits/nonlinkability_audit_report.md": "b3d2411fa7c8480d704ceeb70749bcb8239fa6b0e7899230510c22081acea5d0",
+    "deidentification_release/data/audits/anonymization_shortcut_audit_report.json": "9798abb9a0db36679a17121ddca99b5246312e834c81c89436d4a2a7f0d65fca",
+    "deidentification_release/data/audits/anonymization_shortcut_audit_report.md": "f3d887749844ca5de9ab3128d7253c957afe1aa10a1dbb4bbf90b9217196ac97",
     "deidentification_release/data/audits/recomputed_public_metrics.json": "67bf0517f3a0e66c792fd02621eb19432761f55d9622621fd186007fff8d2f27",
-    "deidentification_release/data/audits/release_manifest.json": "a1a16a098d96594fb9b213f54e83c13db9ac33cb622fbe12bb6c377f1cd3209e",
+    "deidentification_release/data/audits/release_manifest.json": "71d43c049ad1fcad5146d69ab0a6879183e05d276892c726707f32ecb7f22682",
     "deidentification_release/data/audits/stage_manifests/00_freeze_inputs.json": "b55270be5c4a4fa5ab4638e935b89b1ff849ce48a01e7fcd5abb14d8a954dfa9",
     "deidentification_release/data/audits/stage_manifests/01_field_minimization.json": "553b101a4d423c71b0860ec8ae6f3a1838ba1c47cdc2f54664b9854be6ac32dd",
     "deidentification_release/data/audits/stage_manifests/02_public_row_ids.json": "0a9d070cb215af602170f098ffb5341ae25acdaf029dcb7817af0f0ad5ddf6d8",
@@ -28,11 +27,12 @@
     "deidentification_release/configs/anonymization_policy.public.yaml": "01fdca24af5b9444a6fdf22855834f1aebeb48b5efde2d8dfc1cbface07f1126",
     "deidentification_release/scripts/anonymize_hib_release.py": "752c369d2f28faa7719f85260e7e70f33ca524cdb3b56c3f1b4749fc4ee85fae",
     "deidentification_release/scripts/build_release_bundle.py": "2d37530fe8ee5fe89ff21e493fb5cb1e5c1077c00b01a7592875e021a57dfd3b",
-    "deidentification_release/scripts/hib_deid.py": "776a7c4c40ef0cee39b277f90a87cf6ae20ba9837e4dd6c39f5f0806b73afd03",
+    "deidentification_release/scripts/hib_deid.py": "9693ab687e8cf868afcc410c59b32d60b0c2ae2fae81bd5b864dc2d2d8e0cb32",
     "deidentification_release/scripts/repair_public_release_fields.py": "91e1734944fceb0ca7354cb78c993dc9dbfde62ebdec1a34bbb768134763b088",
     "deidentification_release/scripts/verify_anonymization.py": "32f06784c578a57cf1c3e453a96b024d709cd3a16e614d0a6bf745244a74f218",
     "deidentification_release/scripts/recompute_metrics.py": "1cf1579d902feb260a6e2afab38ce3d327227fb2c021025c2fa9a41500839fd8",
     "deidentification_release/scripts/validate_public_bundle.py": "07b991038cec5056caa73fb0bc40119bd3894d6def111add51cfcb43554db27a",
-    "deidentification_release/scripts/validate_release_gate.py": "40296bd46ff685624285ad7361be28969697d3c371e445c790c8ae76753e0d5f"
+    "deidentification_release/scripts/validate_release_gate.py": "97762e5acbdbe66e1bce8626673a7149aa6f4916b769ff2eac5c0182230b6379",
+    "deidentification_release/README.md": "196a573ef64ee559ffb4e9242cd5b6535a70f1f6beca5ab93282d9bb1e68d635"
   }
 }

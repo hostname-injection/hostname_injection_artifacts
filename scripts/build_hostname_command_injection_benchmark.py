@@ -524,7 +524,7 @@ def write_docs(out_root: Path, manifests: Dict[str, Dict[str, object]], stats: D
                 "## PyTorch Loading",
                 "",
                 "This repository includes `ccd.benchmark_dataset.HostnameCommandInjectionBenchmarkDataset`, a map-style PyTorch-compatible dataset "
-                "for these chunks. It supports selecting `user_logins`, `dns_hostnames`, or both; resolving labels from GPT 5.5, Claude Opus 4.8, or both; "
+                "for these chunks. Training and baseline execution use both `user_logins` and `dns_hostnames`; resolving labels from GPT 5.5, Claude Opus 4.8, or both; "
                 "dropping or retaining unknown labels; returning explanations; and optionally returning full row metadata.",
                 "",
                 "Example:",
@@ -613,12 +613,6 @@ def main() -> None:
     parser.add_argument("--chunk-rows", type=int, default=100_000)
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--keep-build-files", action="store_true")
-    parser.add_argument(
-        "--families",
-        choices=["both", "user_logins", "dns_hostnames"],
-        default="both",
-        help="Build all families or only one family. Single-family builds reuse the existing manifest for the other family.",
-    )
     args = parser.parse_args()
 
     args.output.mkdir(parents=True, exist_ok=True)
@@ -632,40 +626,31 @@ def main() -> None:
                 path.unlink()
     build_dir.mkdir(parents=True, exist_ok=True)
 
-    existing_manifest = {}
-    manifest_path = args.output / "manifest.json"
-    if args.families != "both" and manifest_path.exists():
-        existing_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifests: Dict[str, Dict[str, object]] = {}
+    all_stats: Dict[str, int] = {}
+    user_manifest, user_stats = build_family(
+        out_root=args.output,
+        build_dir=build_dir,
+        family="user_logins",
+        content_type="USERNAME",
+        content_key="USERNAME",
+        paths=sorted(USER_LOGIN_SRC.glob("*.csv")),
+        chunk_rows=args.chunk_rows,
+    )
+    manifests["user_logins"] = user_manifest
+    all_stats.update(user_stats)
 
-    manifests: Dict[str, Dict[str, object]] = dict(existing_manifest.get("datasets", {}))
-    all_stats: Dict[str, int] = dict(existing_manifest.get("build_stats", {}))
-    if args.families in {"both", "user_logins"}:
-        user_manifest, user_stats = build_family(
-            out_root=args.output,
-            build_dir=build_dir,
-            family="user_logins",
-            content_type="USERNAME",
-            content_key="USERNAME",
-            paths=sorted(USER_LOGIN_SRC.glob("*.csv")),
-            chunk_rows=args.chunk_rows,
-        )
-        manifests["user_logins"] = user_manifest
-        all_stats = {k: v for k, v in all_stats.items() if not k.startswith("user_logins.")}
-        all_stats.update(user_stats)
-
-    if args.families in {"both", "dns_hostnames"}:
-        dns_manifest, dns_stats = build_family(
-            out_root=args.output,
-            build_dir=build_dir,
-            family="dns_hostnames",
-            content_type="HOSTNAME",
-            content_key="HOSTNAME",
-            paths=sorted(DNS_SRC.glob("**/*.csv")),
-            chunk_rows=args.chunk_rows,
-        )
-        manifests["dns_hostnames"] = dns_manifest
-        all_stats = {k: v for k, v in all_stats.items() if not k.startswith("dns_hostnames.")}
-        all_stats.update(dns_stats)
+    dns_manifest, dns_stats = build_family(
+        out_root=args.output,
+        build_dir=build_dir,
+        family="dns_hostnames",
+        content_type="HOSTNAME",
+        content_key="HOSTNAME",
+        paths=sorted(DNS_SRC.glob("**/*.csv")),
+        chunk_rows=args.chunk_rows,
+    )
+    manifests["dns_hostnames"] = dns_manifest
+    all_stats.update(dns_stats)
 
     write_docs(args.output, manifests, all_stats)
     if not args.keep_build_files:

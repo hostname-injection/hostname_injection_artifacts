@@ -57,4 +57,4 @@ ccd-explain = "ccd.entrypoints:explain_main"
 ccd-score = "ccd.entrypoints:score_main"
 
 [tool.setuptools]
-packages = ["ccd"]
+packages = ["ccd", "baselines", "baselines.models"]

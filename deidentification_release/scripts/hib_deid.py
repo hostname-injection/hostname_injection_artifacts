@@ -740,7 +740,7 @@ def anonymize_csv(input_private: Path, output_jsonl: Path, audit_dir: Path, conf
         "release_version": config.release_version,
         "private_eval_snapshot_id": f"eval-freeze-{datetime.now(timezone.utc).date().isoformat()}",
         "private_eval_snapshot_sha256": "withheld-private-input-hash",
-        "paper_pdf_sha256": artifact_paper_sha256(),
+        "paper_reference": "not_in_repository",
         "anonymizer_version": ANONYMIZER_VERSION,
         "policy_version": POLICY_VERSION,
         "created_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -795,7 +795,7 @@ def anonymize_csv_files(input_paths: list[Path], output_jsonl: Path, audit_dir: 
         "release_version": config.release_version,
         "private_eval_snapshot_id": f"eval-freeze-{datetime.now(timezone.utc).date().isoformat()}",
         "private_eval_snapshot_sha256": "withheld-private-input-hash",
-        "paper_pdf_sha256": artifact_paper_sha256(),
+        "paper_reference": "not_in_repository",
         "anonymizer_version": ANONYMIZER_VERSION,
         "policy_version": POLICY_VERSION,
         "created_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -2095,17 +2095,6 @@ def file_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
-
-
-def artifact_paper_sha256() -> str:
-    candidates = [
-        Path.cwd() / "IEEE_S_P_Hostnames.pdf",
-        Path(__file__).resolve().parents[2] / "IEEE_S_P_Hostnames.pdf",
-    ]
-    for path in candidates:
-        if path.exists():
-            return file_sha256(path)
-    return "unavailable_in_deid_subpackage"
 
 
 def write_sha256_sidecar(path: Path, target: Path) -> None:

@@ -6,8 +6,6 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, List
 
-from sentence_transformers import SentenceTransformer
-
 from .config import CCDConfig
 from .corpus import (
     filter_hostnames,
@@ -85,6 +83,8 @@ def _require_model_bundle_caho_checkpoint(model, *, purpose: str) -> None:
 
 
 def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_path: Path) -> None:
+    from sentence_transformers import SentenceTransformer
+
     defaults = getattr(args, "_caho_training_defaults", None)
     if defaults:
         warn_if_caho_training_defaults_changed(

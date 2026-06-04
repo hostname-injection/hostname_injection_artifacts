@@ -2,23 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
-from ccd.preprocess import normalize_hostname
-from ccd.user_logins import (
-    DEFAULT_OPUS_COLUMN,
-    DEFAULT_OPUS_CONF_COLUMN,
-    DEFAULT_SONNET_COLUMN,
-    DEFAULT_SONNET_CONF_COLUMN,
-    DEFAULT_USER_LOGINS_COLUMN,
-    LabelPolicy,
-    apply_confidence_filter,
-    iter_user_login_rows,
-    normalize_label,
-    parse_confidence,
-    resolve_label,
+from ccd.benchmark_dataset import (
+    BenchmarkFamily,
+    BenchmarkLabelMethod,
+    BenchmarkTextField,
+    HostnameCommandInjectionBenchmarkDataset,
 )
 
 
@@ -29,50 +21,7 @@ class DatasetStats:
     dropped_rows: int
     benign: int
     malicious: int
-
-
-def iter_labelled_user_logins(
-    user_logins_dir: Path,
-    *,
-    hostname_col: str = DEFAULT_USER_LOGINS_COLUMN,
-    label_policy: LabelPolicy = LabelPolicy.BOTH_M,
-    sonnet_col: str = DEFAULT_SONNET_COLUMN,
-    opus_col: str = DEFAULT_OPUS_COLUMN,
-    sonnet_conf_col: str = DEFAULT_SONNET_CONF_COLUMN,
-    opus_conf_col: str = DEFAULT_OPUS_CONF_COLUMN,
-    min_confidence: Optional[float] = None,
-    min_sonnet_confidence: Optional[float] = None,
-    min_opus_confidence: Optional[float] = None,
-    normalize: bool = True,
-) -> Iterable[Tuple[str, int]]:
-    min_sonnet = min_sonnet_confidence if min_sonnet_confidence is not None else min_confidence
-    min_opus = min_opus_confidence if min_opus_confidence is not None else min_confidence
-
-    for hostname, sonnet, opus, sonnet_conf, opus_conf in iter_user_login_rows(
-        user_logins_dir,
-        hostname_col=hostname_col,
-        sonnet_col=sonnet_col,
-        opus_col=opus_col,
-        sonnet_conf_col=sonnet_conf_col,
-        opus_conf_col=opus_conf_col,
-    ):
-        s_label = normalize_label(sonnet)
-        o_label = normalize_label(opus)
-        s_conf = parse_confidence(sonnet_conf)
-        o_conf = parse_confidence(opus_conf)
-        s_label = apply_confidence_filter(s_label, s_conf, min_sonnet)
-        o_label = apply_confidence_filter(o_label, o_conf, min_opus)
-
-        resolved = resolve_label(s_label, o_label, label_policy)
-        if resolved is None:
-            continue
-
-        text = str(hostname).strip()
-        if not text:
-            continue
-        if normalize:
-            text = normalize_hostname(text)
-        yield text, 1 if resolved == "M" else 0
+    family_rows: Mapping[str, int]
 
 
 def _reservoir_update(samples: List[str], seen: int, candidate: str, k: int, rng: np.random.Generator) -> None:
@@ -84,19 +33,36 @@ def _reservoir_update(samples: List[str], seen: int, candidate: str, k: int, rng
         samples[idx] = candidate
 
 
-def load_user_logins_dataset(
-    user_logins_dir: Path,
+def load_benchmark_dataset(
+    root: Path,
     *,
-    hostname_col: str = DEFAULT_USER_LOGINS_COLUMN,
-    label_policy: LabelPolicy = LabelPolicy.BOTH_M,
-    min_confidence: Optional[float] = None,
-    min_sonnet_confidence: Optional[float] = None,
-    min_opus_confidence: Optional[float] = None,
+    label_method: BenchmarkLabelMethod | str = BenchmarkLabelMethod.ANY_MALICIOUS_ELSE_BENIGN,
     sample_per_class: Optional[int] = None,
     deduplicate: bool = False,
     seed: int = 13,
     normalize: bool = True,
+    max_rows: Optional[int] = None,
 ) -> Tuple[List[str], np.ndarray, DatasetStats]:
+    """Load baseline data from all benchmark families.
+
+    Baselines intentionally mirror the CAHO/CCD contract and use the complete
+    benchmark family set. This helper does not expose a user-logins-only path.
+    """
+
+    dataset = HostnameCommandInjectionBenchmarkDataset(
+        root,
+        family=BenchmarkFamily.BOTH,
+        label_method=label_method,
+        drop_unknown=True,
+        include_explanations=False,
+        include_metadata=False,
+        return_dict=True,
+        text_field=BenchmarkTextField.AUTO,
+        normalize_text=normalize,
+        max_rows=max_rows,
+        cache_chunks=1,
+    )
+
     rng = np.random.default_rng(seed)
     seen_b = 0
     seen_m = 0
@@ -104,49 +70,40 @@ def load_user_logins_dataset(
     samples_m: List[str] = []
     texts: List[str] = []
     labels: List[int] = []
-    seen: set = set()
+    seen: set[str] = set()
 
-    total_rows = 0
-    used_rows = 0
-    dropped_rows = 0
-
-    for text, label in iter_labelled_user_logins(
-        user_logins_dir,
-        hostname_col=hostname_col,
-        label_policy=label_policy,
-        min_confidence=min_confidence,
-        min_sonnet_confidence=min_sonnet_confidence,
-        min_opus_confidence=min_opus_confidence,
-        normalize=normalize,
-    ):
-        total_rows += 1
+    for idx in range(len(dataset)):
+        item = dataset[idx]
+        text = str(item["text"]).strip()
+        label = int(item["label"])
+        if not text or label not in {0, 1}:
+            continue
         if deduplicate:
             if text in seen:
                 continue
             seen.add(text)
-        used_rows += 1
         if sample_per_class is None:
             texts.append(text)
             labels.append(label)
+            continue
+        if label == 0:
+            seen_b += 1
+            _reservoir_update(samples_b, seen_b, text, sample_per_class, rng)
         else:
-            if label == 0:
-                seen_b += 1
-                _reservoir_update(samples_b, seen_b, text, sample_per_class, rng)
-            else:
-                seen_m += 1
-                _reservoir_update(samples_m, seen_m, text, sample_per_class, rng)
+            seen_m += 1
+            _reservoir_update(samples_m, seen_m, text, sample_per_class, rng)
 
     if sample_per_class is not None:
         texts = samples_b + samples_m
         labels = [0] * len(samples_b) + [1] * len(samples_m)
-    dropped_rows = max(total_rows - used_rows, 0)
 
     stats = DatasetStats(
-        total_rows=total_rows,
-        used_rows=used_rows,
-        dropped_rows=dropped_rows,
+        total_rows=dataset.stats.total_rows,
+        used_rows=len(texts),
+        dropped_rows=max(dataset.stats.total_rows - len(texts), 0),
         benign=labels.count(0),
         malicious=labels.count(1),
+        family_rows=dataset.stats.family_rows,
     )
     return texts, np.asarray(labels, dtype=np.int64), stats
 

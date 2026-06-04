@@ -1,8 +1,8 @@
 # Baselines
 
-This folder provides baseline implementations referenced in *IEEE_S_P_Hostnames.pdf*.
+This folder provides baseline implementations used for the hostname injection study.
 The goal is reproducible training + evaluation for a broad set of classical, neural, and
-embedding-based baselines on the `user_logins` dataset.
+embedding-based baselines on the full `HostnameCommandInjectionBenchmark` dataset.
 
 ## Baselines Included
 
@@ -101,6 +101,7 @@ Run a subset (recommended for quick checks):
 
 ```bash
 python -m baselines.run_baselines \
+  --data-dir HostnameCommandInjectionBenchmark \
   --baselines tfidf-logreg-char4,markov-char3,char-cnn \
   --sample-per-class 5000 \
   --output baselines/outputs/results.csv
@@ -109,7 +110,7 @@ python -m baselines.run_baselines \
 Run all baselines (will be slower):
 
 ```bash
-python -m baselines.run_baselines --sample-per-class 10000
+python -m baselines.run_baselines --data-dir HostnameCommandInjectionBenchmark --sample-per-class 10000
 ```
 
 ### Model downloads
@@ -117,10 +118,10 @@ python -m baselines.run_baselines --sample-per-class 10000
 Some baselines require external model downloads (e.g., `urlbert`, `csi`).
 By default these are skipped; pass `--allow-downloads` to enable.
 
-### Dataset column
+### Dataset scope
 
-The default evaluation column for `user_logins` is `USERNAME` (not `HOSTNAME`).
-Override with `--hostname-col` if needed.
+The baseline runner loads all benchmark families from `manifest.json`. It does
+not expose a user-logins-only training path.
 
 ## Outputs
 
@@ -135,4 +136,4 @@ Each row includes precision/recall/F1 and confusion counts for traceability.
 ## License
 
 Baseline code in this folder is covered by the repository's noncommercial code license:
-PolyForm Noncommercial 1.0.0. See `/LICENSE` and `/LICENSE-CODE` at the repository root.
+PolyForm Noncommercial 1.0.0. See `/LICENSE` at the repository root.

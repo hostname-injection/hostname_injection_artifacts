@@ -1,164 +1,99 @@
-# Contrastive Cone Divergence (CCD)
+# Contrastive Cone Divergence
 
-Official reference implementation of **Contrastive Cone Divergence (CCD)** from the paper
-*When Hostnames Become Code: Detecting Persisted Hostname Injection at Production Scale*.
+Reference implementation for the CAHO and CCD pipeline used in *When
+Hostnames Become Code: Detecting Persisted Hostname Injection at Production
+Scale*.
 
-This repository provides:
-- CAHO (Class‑Aware Hostname Obfuscation) augmentation and training utilities.
-- Cone partitioning + multi‑probe LSH retrieval.
-- Cone sketches and cross‑entropy scoring (GLRT / Eq. 1).
-- Benign and malicious priors.
-- Split‑conformal calibration for fixed‑FPR global and tenant/window grouped
-  thresholds.
-- Optional finite-edit decision-stability helpers and search utilities.
-- Method-contract accounting for Table 1 and Appendix C CCD/CAHO assumptions.
-- Paper-claim coverage accounting for contributions, figures, tables,
-  formal claims, and appendices.
-- Headline paper-claim accounting for abstract/conclusion numeric anchors.
-- HIB de-identification, public-bundle validation, and replay metric utilities.
-- HIB dataset-profile aggregate accounting for source, label, split, and
-  verified-positive profile claims.
-- Evaluation-unit and reproducibility-boundary accounting for Table 2 and
-  Appendix E/Table 11.
-- Source-code reachability accounting for the paper's static-analysis scope
-  check.
-- Public-scope taxonomy accounting that keeps public anchors separate from HIB
-  training and production positives.
-- Live-overlap aggregate accounting for CCD-vs-Regex/WAF reviewed items.
-- Table 8 sink-evidence accounting for controlled metadata-to-code replay
-  traces.
-- Paper metric-table aggregate accounting for baseline, ablation, and mimicry
-  claims.
-- Stability, drift, family-holdout, and public-real scope aggregate accounting.
-- Production latency and throughput aggregate accounting for Figure 5.
-- Local latency smoke benchmarking for the encoder and CCD scoring kernel.
-- A one-command release-safe paper claim check runner.
+This repository is intentionally kept as a lean ML research-code artifact. It
+contains the source package, training and evaluation scripts, baseline models,
+small smoke-test inputs, tests, and the de-identified public-release tooling.
+It does not include pretrained models.
 
-For evaluator-facing setup, badge scope, and paper-claim mapping, start with
-`BADGE_READINESS.md` and `ARTIFACT_EVALUATION.md`.
+A reviewer-viewable de-identified dataslice is available here:
+https://drive.google.com/drive/folders/1KeKZyIXIqZvEJ4tZAWxE9h4gPoinZCWt?usp=drive_link
 
-A reviewer-viewable dataslice is available at
-https://drive.google.com/drive/folders/1KeKZyIXIqZvEJ4tZAWxE9h4gPoinZCWt?usp=drive_link.
+The dataslice and checked-in HIB sample are de-identified. They preserve the
+public replay schema and safety checks, but they are not the original private
+evaluation rows. CAHO and CCD runs on de-identified data should therefore be
+expected to have data shift relative to the original evaluation set used for
+the reported paper results.
 
-Data-shift note: the reviewer dataslice and released HIB sample are
-de-identified. They preserve the public replay accounting and safety checks,
-but they are not the original private evaluation rows, so CAHO and CCD runs on
-the de-identified data should be expected to have some data shift compared to
-the original evaluation set used for the paper's reported results.
+## What Is Included
 
-`ARTIFACT_MANIFEST.json` is the machine-readable map from paper claims to files,
-commands, expected outcomes, release gates, and remaining external publication
-items. Check it with:
+- `ccd/`: CAHO augmentation/training, CCD priors, cone scoring, calibration,
+  benign-prior refresh, explanation, and certification logic.
+- `scripts/`: training, scoring, benchmark, validation, and smoke-test entry
+  points.
+- `baselines/`: classical, neural, and embedding baseline implementations.
+- `deidentification_release/`: public HIB sample, schema, bundle validation,
+  non-linkability checks, and release metric replay.
+- `examples/`: tiny inputs used by the smoke test.
+- `tests/`: unit and integration tests for the runnable code paths.
+
+## Installation
+
+The conda setup script creates a `ccd` environment and installs the local
+package in editable mode:
 
 ```bash
-python scripts/audit_artifact_readiness.py
+bash scripts/install_conda.sh
+conda activate ccd
 ```
 
-That audit checks the manifest, required files, public release gates,
-privacy/portability wording, and absence of common web-tracking scripts. The
-stricter final-publication gate is expected to fail until DOI URLs and external
-full-replay artifacts are staged:
+You can also create the environment directly:
 
 ```bash
-python scripts/audit_artifact_readiness.py --strict-final
+conda env create -f environment.yml
+conda activate ccd
+python -m pip install -e .
 ```
 
-For IEEE S&P packaging-script submission, start from `metadata.template.toml`.
-It includes the claim text, commands, resource notes, provenance/ethics pointers,
-and explicit URL placeholders that must be replaced with the final anonymous
-submission or DOI-backed artifact URLs.
+GradCache is required for replay-scale pairwise CAHO training. This README does
+not duplicate GradCache installation instructions; use the upstream repository:
+https://github.com/luyug/GradCache
 
-To build a clean archive for DOI deposition after local checks pass:
+## Smoke Test
 
-```bash
-python scripts/build_artifact_archive.py
-```
-
-## Artifact Smoke Test
-
-After installation, run the end-to-end smoke path:
+Run the end-to-end smoke path after installation:
 
 ```bash
 python scripts/run_artifact_smoke.py
 ```
 
-For a faster detector and bundle gate check without running `pytest`:
+For a faster check that skips the full pytest suite:
 
 ```bash
 python scripts/run_artifact_smoke.py --skip-tests
 ```
 
-The smoke path first trains a temporary CAHO encoder from `examples/`, then
-trains a CCD prior bundle with that checkpoint, calibrates global and grouped
-thresholds into a self-contained model bundle, refreshes `P_B` plus
-global/grouped thresholds from a clean benign window, scores and certifies
-sample hostnames from that refreshed bundle with grouped thresholds, emits
-explanations, encodes hostnames with the trained temporary CAHO checkpoint, and validates the
-checked-in de-identified HIB sample bundle from both the repository and an
-extracted archive copy. It also recomputes public replay metrics for the sample
-release. The sample bundle is deliberately small; the paper-scale 200.3M-row
-replay requires the separate full HIB-Real de-identified release.
+The smoke test trains a temporary CAHO checkpoint from `examples/`, trains CCD
+priors with that checkpoint, calibrates thresholds, refreshes `P_B`, scores and
+certifies sample hostnames, emits explanations, evaluates CAHO embeddings, and
+validates the de-identified HIB sample bundle.
 
-## Release-Safe Paper Claim Check Runner
+## Required Pipeline Order
 
-To run the release-safe paper claim surface in one pass:
+Reviewer-facing execution should follow the same order as the method:
 
-```bash
-python scripts/run_artifact_claim_checks.py
-```
+1. Train CAHO on the available benign and malicious training data.
+2. Train CCD priors with the trained CAHO checkpoint.
+3. Calibrate the global or grouped fixed-FPR threshold.
+4. Refresh `P_B` only from clean benign windows when modeling drift.
+5. Score, explain, or certify from the calibrated CCD model bundle.
 
-This runs the readiness audit, aggregate recomputation scripts, headline-claim
-audit, and checked-in public sample fixed-FPR replay metrics without private
-data. It emits one JSON report with per-check commands, timing, summaries, and
-failures.
+There is no supported path for training, scoring, calibrating, refreshing, or
+certifying CCD without a trained CAHO checkpoint. The repository also does not
+provide a user-logins-only CAHO or CCD training path; training is expected to
+use all available benchmark families.
 
-## Installation (Conda)
+## CAHO Training
 
-Use the provided install script to set up a fresh environment:
+All CAHO training entry points default to the shipped paper recipe:
+`--epochs 20 --lr 1e-4 --weight-decay 1e-2 --seed 13`. The training scripts
+warn when result-affecting settings are changed; results should be expected to
+differ from the reported CAHO/CCD results when defaults are changed.
 
-```bash
-bash scripts/install_conda.sh
-```
-
-This creates a `ccd` conda environment, installs dependencies, then installs
-the local package in editable mode.
-
-You can also use the provided `environment.yml`:
-
-```bash
-conda env create -f environment.yml
-conda activate ccd
-```
-
-### GradCache
-
-GradCache is required for replay-scale pairwise CAHO training. It is not on
-conda or PyPI; when you are not using the provided setup script or
-`environment.yml`, follow the upstream installation guidance in the GradCache
-repository: https://github.com/luyug/GradCache.
-
-If you prefer manual steps:
-
-```bash
-conda create -y -n ccd python=3.11
-conda activate ccd
-conda install -y -c conda-forge -c pytorch \
-  numpy scipy pytorch sentence-transformers idna pytest sentencepiece scikit-learn
-python -m pip install -e .
-```
-
-## Quick Start
-
-### 1) Train / fine‑tune CAHO encoder
-
-```bash
-ccd train-caho \
-  --benign data/benign.txt \
-  --malicious data/malicious.csv \
-  --out caho_encoder
-```
-
-For weighted hostname augmentations and two-view contrastive training, use:
+Small file-based training:
 
 ```bash
 ccd train-caho \
@@ -169,41 +104,24 @@ ccd train-caho \
   --augmenter weighted
 ```
 
-CAHO training entry points default to the paper optimizer recipe:
-`--lr 1e-4 --weight-decay 1e-2 --epochs 20`.
-
-For replay-scale pairwise CAHO training, run the GradCache path:
+Full corpus training requires both malicious corpus sources and fails closed if
+either is missing or empty:
 
 ```bash
-ccd train-caho \
-  --benign data/benign.txt \
-  --malicious data/malicious.csv \
+ccd train-caho-corpus \
+  --benign-dir txt_corpus/benign \
+  --malicious-jsonl-dir filtered_corpus \
+  --malicious-txt-dir txt_corpus/varied \
   --out caho_encoder \
   --loss contrastive \
   --augmenter weighted \
   --grad-cache \
   --batch-size 49152 \
-  --grad-cache-chunk-size 8192
+  --grad-cache-chunk-size 8192 \
+  --epochs 20
 ```
 
-The deployed-style benchmark trainer with the binary auxiliary head is exposed
-by `scripts/train_benchmark_caho_binary.py`; it trains the same two-view CAHO
-path with supervised orbit contrastive loss, explicit AdamW weight decay, and
-an L2-normalized binary classifier head over both CAHO views. Its defaults
-target a 94 GB CUDA card for the actual non-GradCache objective
-(`batch_size=16384`) while retaining the Appendix C optimizer recipe
-(`lr=1e-4`, weight decay `1e-2`, 20 epochs). Pass `--batch-size 256`
-when you need the literal Appendix C batch-size setting. For a local
-parser/training-loop smoke on
-commodity hardware, use `--device cpu --max-rows ... --max-steps ...`; use
-`--require-cuda` when replaying a GPU training run and you want CPU fallback to
-fail closed. This binary-head trainer intentionally rejects `--grad-cache`
-because the Appendix C objective requires supervised orbit labels inside the
-contrastive loss; use the regular pairwise CAHO trainers for GradCache CAHO
-runs.
-
-For paper-style model selection, pass a validation-only benchmark root and
-select the checkpoint by validation TPR at the target false-positive rate:
+For the benchmark trainer with the supervised binary auxiliary head:
 
 ```bash
 python scripts/train_benchmark_caho_binary.py \
@@ -211,73 +129,16 @@ python scripts/train_benchmark_caho_binary.py \
   --validation-root HostnameCommandInjectionBenchmark/validation \
   --validation-target-fpr 1e-4 \
   --restore-best-validation \
-  --out out/caho_model_checkpoint
+  --out caho_encoder
 ```
 
-The validation history records the benign-only split-conformal threshold,
-clipped order-statistic rank, strict `score > threshold` decision rule, score
-source (`binary_auxiliary_head_sigmoid`), and score view
-(`canonical_view1_only`) used for the fixed-FPR checkpoint comparison. When
-`--restore-best-validation` is set, the trainer restores the encoder and
-binary head from the best validation epoch before saving.
+The 94 GB CUDA defaults are `batch_size=16384` for the actual non-GradCache
+objective and `batch_size=49152` with `grad_cache_chunk_size=8192` for the
+GradCache path.
 
-All CAHO training entry points accept `--seed` and default to `13`; benchmark
-training reports record the seed so augmentation/order replay is explicit.
+## CCD Training
 
-### Replicating The Full Corpus Training Script
-
-If you have the JSONL/TXT corpora used in the updated script, you can replicate it via:
-
-Both malicious corpus sources are required for the full-corpus path; omitting
-either source is treated as partial-data training and fails closed.
-
-```bash
-ccd train-caho-corpus \
-  --benign-dir ../txt_corpus/benign \
-  --malicious-jsonl-dir ../filtered_corpus \
-  --malicious-txt-dir ../txt_corpus/varied \
-  --out ../models/contrastive_sentence_transformer \
-  --loss contrastive \
-  --augmenter weighted \
-  --contrastive-loss learnable \
-  --grad-cache \
-  --grad-cache-chunk-size 8192 \
-  --batch-size 49152 \
-  --epochs 20 \
-  --num-workers 1 \
-  --save-best \
-  --no-save-final \
-  --resume \
-  --device auto \
-  --empty-cache \
-  --no-normalize
-```
-
-Or use the wrapper script:
-
-```bash
-python scripts/train_caho_corpus.py \
-  --benign-dir ../txt_corpus/benign \
-  --malicious-jsonl-dir ../filtered_corpus \
-  --malicious-txt-dir ../txt_corpus/varied \
-  --out ../models/contrastive_sentence_transformer \
-  --loss contrastive \
-  --augmenter weighted \
-  --contrastive-loss learnable \
-  --grad-cache \
-  --grad-cache-chunk-size 8192 \
-  --batch-size 49152 \
-  --epochs 20 \
-  --num-workers 1 \
-  --save-best \
-  --no-save-final \
-  --resume \
-  --device auto \
-  --empty-cache \
-  --no-normalize
-```
-
-### 2) Build priors + cone partition
+Train CCD priors only after CAHO training:
 
 ```bash
 ccd train-priors \
@@ -287,320 +148,12 @@ ccd train-priors \
   --output ccd_model.npz
 ```
 
-For reviewer-facing runs, CAHO and CCD should be trained from the full available
-benign and malicious training splits. The artifact does not provide a
-user-logins-only CAHO or CCD training command.
+`train-priors` requires `--encoder` to point to a trained CAHO checkpoint. It
+does not fall back to an implicit base encoder.
 
-### 3) Score hostnames
+## Calibration
 
-```bash
-ccd score \
-  --model ccd_model.npz \
-  --input data/queries.txt \
-  --output scores.csv
-```
-
-`scores.csv` records the threshold used for each row, the CCD score, and the
-strict-threshold prediction. With `--groups`, the row threshold is the resolved
-tenant/window threshold; otherwise it is the global model, calibration-file, or
-CLI threshold.
-
-For maximum throughput, you can use fast approximate scoring (hard-cone). This may reduce
-accuracy; use only when you need the extra throughput:
-
-```bash
-ccd score \
-  --model ccd_model.npz \
-  --input data/queries.txt \
-  --output scores.csv \
-  --approximate
-```
-
-## Baselines
-
-The `baselines/` folder implements classical + neural baselines referenced in
-`IEEE_S_P_Hostnames.pdf` and provides accuracy + latency analysis.
-
-Quick start:
-
-```bash
-python -m baselines.run_baselines --list
-python -m baselines.run_baselines \
-  --baselines tfidf-logreg-char4,markov-char3,char-cnn \
-  --sample-per-class 5000 \
-  --output baselines/outputs/results.csv
-```
-
-Some baselines (e.g., `urlbert`, `csi`) download external models. By default they are
-skipped; pass `--allow-downloads` to enable. See `baselines/README.md` for full
-dependency and usage notes. For the complete optional baseline dependency set,
-run `python -m pip install -e '.[baselines]'` or
-`python -m pip install -r baselines/requirements.txt`.
-
-## Source-Reachability Scope Check
-
-The paper's 50-repo CodeQL/Semgrep comparison is a scope check for
-second-order telemetry paths, separate from HIB replay accuracy. The
-release-safe aggregate accounting is checked with:
-
-```bash
-python scripts/recompute_source_reachability_metrics.py
-```
-
-See `source_reachability/README.md` for the JSONL format used when full
-public-corpus finding labels are staged.
-
-## Paper Headline Claim Check
-
-The headline-claim audit recomputes the paper's most visible numeric anchors
-from release-safe aggregate artifacts: replay scale, CCD fixed-FPR recall,
-latency and throughput, live-overlap added value, label totals,
-decision-stability coverage, source/public scope, and hostile-mimicry ranges.
-
-```bash
-python scripts/recompute_paper_headline_claims.py
-```
-
-See `paper_headline_claims/README.md`.
-
-## Paper Claim Coverage Check
-
-The paper-coverage matrix maps named paper surfaces to artifact evidence:
-five contributions, Eq. 1, Proposition 5.1, Lemma C.1, Figures 1-7,
-Tables 1-12, and Appendices A-F. Recompute it with:
-
-```bash
-python scripts/recompute_paper_claim_coverage.py
-```
-
-This check verifies that each item references existing files, aligns with a
-manifest claim, and keeps full-data or production-private dependencies marked
-as external completion items. See `paper_claim_coverage/README.md`.
-
-## Method Contract Check
-
-Table 1 and Appendix C define the CCD decision contract, frozen configuration
-surface, edit-manifest scope, and CAHO training assumptions. Recompute the
-release-safe method-contract checks with:
-
-```bash
-python scripts/recompute_method_contracts.py
-```
-
-This validates Eq. 1 score-path availability, exact full-axis scanning for the
-deployed top-R cone sketch that bypasses LSH by default for
-calibration/certification, fixed-FPR global and tenant/window
-grouped calibration defaults, 4096-cone/top-8 CCD configuration, E1-E12
-finite-edit coverage, deterministic certificate closure, calibrated-margin
-certificates with deterministic enumeration fallback, CAHO two-view supervised
-orbit contrastive training plus an L2-normalized binary head with explicit
-AdamW weight decay, benign-only `(P_B, tau_alpha)` refresh, and model bundle
-persistence plus validation for config, cone axes, priors, and global/grouped
-calibrated thresholds. See `method_contracts/README.md`.
-
-## Public-Scope Taxonomy Check
-
-Public reports and public anchors test taxonomy scope; they are not counted as
-HIB training or production positives. Recompute the release-safe aggregate
-accounting with:
-
-```bash
-python scripts/recompute_public_scope_metrics.py
-```
-
-See `public_scope/README.md` for the JSONL format used when individual
-public-report labels are staged.
-
-## HIB Dataset-Profile Check
-
-Appendix B and Tables 3, 4, and 9 report source, label, split, and
-verified-positive profile denominators for the 200,339,886-row HIB production
-replay. Recompute the release-safe aggregate accounting with:
-
-```bash
-python scripts/recompute_hib_profile_metrics.py
-```
-
-This validates the published aggregate rows and derives consistency checks such
-as resolved replay denominator, positive prevalence, source percentages, quality
-repair rate, and largest verified-positive family share. Row-level reproduction
-still requires the full HIB-Real release described in `ARTIFACT_EVALUATION.md`.
-
-## Evaluation Accounting Check
-
-Table 2 defines the denominator vocabulary used throughout the evaluation, and
-Appendix E/Table 11 defines what is released or recomputable versus withheld.
-Recompute the release-safe accounting with:
-
-```bash
-python scripts/recompute_evaluation_accounting.py
-```
-
-This confirms unresolved marker-like strings are excluded from resolved replay
-denominators, validates the released-versus-withheld boundary, and checks that
-the manifest still lists the external completion items needed for Table 11.
-See `evaluation_accounting/README.md`.
-
-## Live-Overlap Aggregate Check
-
-The live/shadow comparison is released as aggregate accounting and masked
-summaries, not raw live streams. Recompute the Table 7 overlap accounting with:
-
-```bash
-python scripts/recompute_live_overlap_metrics.py
-```
-
-See `live_overlap/README.md` for the JSONL format used when masked live labels
-are staged.
-
-## Sink-Evidence Aggregate Check
-
-Table 8 reports controlled replay evidence for audited metadata-to-code paths,
-not production-compromise claims. Recompute the release-safe accounting with:
-
-```bash
-python scripts/recompute_sink_evidence_metrics.py
-```
-
-This validates the three controlled matching-sink replay cases, requires
-parser/persistence/consumer/effect/detector-boundary fields, checks that CCD
-fired before downstream consumption, and confirms that side effects are blocked
-or restricted to researcher-controlled endpoints. See `sink_evidence/README.md`.
-
-## Paper Metric-Table Checks
-
-Tables 5, 6, 10, and 12 plus Appendix F synthetic-real summaries are
-represented as release-safe aggregate accounting:
-
-```bash
-python scripts/recompute_paper_metric_tables.py
-```
-
-This validates the published aggregate rows and derives consistency checks such
-as CCD's Table 5 TPR lead, LLM checkpoint coverage, the largest ablation drop,
-and the weakest hostile-mimicry cell. See `paper_metric_tables/README.md`.
-
-## Stability And Scope Checks
-
-Figure 6, Figure 7, and Section 8.3 report finite-edit stability,
-family-holdout/depth, drift-refresh, and public-real scope checks. Recompute the
-release-safe aggregate accounting with:
-
-```bash
-python scripts/recompute_stability_scope_metrics.py
-```
-
-This validates the published aggregate values and explicitly records that
-decision-stability certificates are scoped to the frozen normalizer, cone
-sketch, score path, threshold, and edit manifest, not downstream sink safety.
-Certificate JSON also records the strict `score > threshold` decision rule and
-the score-path constants used by the certificate.
-See `stability_scope/README.md`.
-
-## Production-Latency Aggregates
-
-Figure 5 and the Table 5 latency columns report production full-path latency,
-throughput, and scoring-kernel timing. Recompute the release-safe aggregate
-accounting with:
-
-```bash
-python scripts/recompute_production_latency_metrics.py
-```
-
-This validates the published production aggregate values and the boundary that
-the local latency smoke exercises code paths but is not expected to reproduce
-production hardware numbers. See `production_latency/README.md`.
-
-## Convenience Commands
-
-This repo includes a `Makefile` plus a few CLI entry points to make demos and reviews easy.
-
-### Make targets
-
-```bash
-make diagnose
-make explain MODEL=ccd_model.npz INPUT=data/queries.txt
-make score MODEL=ccd_model.npz INPUT=data/queries.txt OUTPUT=out/scores.csv
-```
-
-Variables you can override: `MODEL`, `INPUT`, `OUTPUT`, `CHECKPOINT`, `BATCH`.
-
-### Entry points
-
-These are installed with the package:
-
-```bash
-ccd-diagnose --checkpoint caho_encoder --batch-size 256
-ccd-explain --model ccd_model.npz --input data/queries.txt --top-k 3
-ccd-score --model ccd_model.npz --input data/queries.txt --output out/scores.csv
-```
-
-## Diagnostics
-
-Use diagnostics to confirm which device is being used (GPU, MPS, CPU) and to measure
-encoder throughput:
-
-```bash
-ccd-diagnose --checkpoint caho_encoder --batch-size 256 --num-samples 2048
-```
-
-For an evaluator-facing latency smoke over the configured CAHO encoder and the
-CCD cone-scoring kernel:
-
-```bash
-python scripts/benchmark_artifact_latency.py --checkpoint caho_encoder --num-samples 64 --repeats 1 --warmup 0
-```
-
-This is hardware-dependent. It exercises the artifact paths but does not assert
-the paper's production p95/p99/p99.9 or 0.60 ms amortized latency numbers on an
-arbitrary evaluator machine.
-
-## Explainability
-
-To inspect *why* a hostname was scored as malicious or benign, use `ccd-explain` to get the
-top contributing cones and priors:
-
-```bash
-ccd-explain --model ccd_model.npz --input data/queries.txt --top-k 3 --output out/explanations.json
-```
-
-The output includes:
-- Per-hostname score and prediction.
-- The top-k cone indices, similarities, and weights.
-- Benign/malicious log-prior contributions for each cone.
-
-If you want a smaller accuracy hit than hard-cone, try a small top-k:
-
-```bash
-ccd score \
-  --model ccd_model.npz \
-  --input data/queries.txt \
-  --output scores.csv \
-  --approximate-k 4
-```
-
-### Evaluate / Encode With CAHO Encoder
-
-To encode hostnames using the trained CAHO checkpoint:
-
-```bash
-ccd eval-caho \
-  --model caho_encoder \
-  --input data/queries.txt \
-  --output embeddings.npz
-```
-
-You can also write CSV embeddings:
-
-```bash
-ccd eval-caho \
-  --model caho_encoder \
-  --input data/queries.txt \
-  --output embeddings.csv \
-  --format csv
-```
-
-### 4) Calibrate a fixed‑FPR threshold
+Calibrate the fixed-FPR threshold on benign calibration data:
 
 ```bash
 ccd calibrate \
@@ -611,15 +164,8 @@ ccd calibrate \
   --alpha 1e-4
 ```
 
-`calibration.json` records the calibrated threshold, the clipped split-conformal
-order-statistic rank, the strict `score > threshold` decision rule, and the score
-path. The optional `--save-model` output embeds global or grouped thresholds in a
-model bundle, so later `score` and `certify` commands can use the frozen
-threshold without a separate calibration file. Calibration fails closed if any
-benign calibration score or loaded threshold is non-finite.
-
-To calibrate per tenant/window while preserving a global fallback threshold,
-pass one group id per benign calibration row:
+For tenant/window grouped thresholds, pass one non-empty group id per benign
+calibration row:
 
 ```bash
 ccd calibrate \
@@ -627,46 +173,17 @@ ccd calibrate \
   --benign data/benign_calibration.txt \
   --groups data/benign_calibration_groups.txt \
   --output calibration.json \
+  --save-model ccd_model.calibrated.npz \
   --alpha 1e-4
 ```
 
-At scoring or certification time, pass the matching query group file. Add
-`--require-group-thresholds` if every query must have an explicit grouped
-threshold in `calibration.json` or the saved model bundle. The same `--groups`
-file can be supplied to `ccd-explain` so explanation rows use and record the
-same tenant/window threshold as scoring. The Python `CCDModel.predict(...)`
-API accepts the same `calibration_groups` and `missing_group_threshold`
-arguments for model-level tenant/window decisions. Group files must contain one
-non-empty group id per non-empty hostname row; empty group ids are rejected
-instead of falling back to the global threshold.
+The calibration output records the split-conformal order-statistic rank, score
+path, threshold source, and the strict `score > threshold` decision rule.
 
-If you intend to use `--approximate` at inference time, calibrate with it as well:
+## Benign-Prior Refresh
 
-```bash
-ccd calibrate \
-  --model ccd_model.npz \
-  --benign data/benign_calibration.txt \
-  --output calibration.json \
-  --alpha 1e-4 \
-  --approximate
-```
-
-Likewise, if you use `--approximate-k`, calibrate with the same value:
-
-```bash
-ccd calibrate \
-  --model ccd_model.npz \
-  --benign data/benign_calibration.txt \
-  --output calibration.json \
-  --alpha 1e-4 \
-  --approximate-k 4
-```
-
-### 5) Refresh the benign reference without retraining
-
-For benign-only drift refresh, update `P_B` and recalibrate `tau_alpha` while
-leaving the encoder, cone axes, scoring configuration, and malicious priors
-fixed:
+Refresh only the benign reference distribution and thresholds from a clean
+benign window:
 
 ```bash
 ccd refresh-benign \
@@ -678,96 +195,125 @@ ccd refresh-benign \
   --alpha 1e-4
 ```
 
-`refresh.json` records the old threshold, new global/grouped thresholds, score
-path, and the refresh scope. The intended contract is narrow: `P_B` and
-`tau_alpha` move; `P_M`, the CAHO encoder, cone partition, and score path stay
-frozen. Omit `--groups` for a global-only refresh only when the input model is
-not already carrying grouped thresholds. If the input model has tenant/window
-grouped thresholds, `ccd refresh-benign` requires replacement `--groups` and
-fails closed unless `--drop-grouped-thresholds` is passed to explicitly discard
-those grouped thresholds. Refresh is transactional: if recalibration or grouped
-threshold validation fails, the in-memory model keeps the previous `P_B`,
-global threshold, and grouped thresholds.
+This updates `P_B` and `tau_alpha`; `P_M`, CAHO, cone axes, scoring
+configuration, and the score path remain fixed. The refresh is transactional:
+if recalibration or grouped-threshold validation fails, the previous model
+state remains unchanged.
+
+## Scoring And Explanation
+
+Score hostnames with a calibrated or refreshed model bundle:
+
+```bash
+ccd score \
+  --model ccd_model.refreshed.npz \
+  --input data/queries.txt \
+  --groups data/query_groups.txt \
+  --output scores.csv \
+  --require-group-thresholds
+```
+
+Explain CCD decisions:
+
+```bash
+ccd explain \
+  --model ccd_model.refreshed.npz \
+  --input data/queries.txt \
+  --groups data/query_groups.txt \
+  --output explanations.json \
+  --top-k 3
+```
+
+The outputs include the resolved threshold, threshold source, score, strict
+prediction, and top contributing cones and priors.
+
+## Certification
+
+Certification uses the calibrated threshold and the frozen edit manifest:
+
+```bash
+ccd certify \
+  --model ccd_model.refreshed.npz \
+  --input data/queries.txt \
+  --groups data/query_groups.txt \
+  --output certificates.json \
+  --require-group-thresholds
+```
+
+Certificates are scoped to the frozen normalizer, cone sketch, score path,
+threshold, and edit manifest. Inputs fail closed on invalid thresholds, invalid
+edit-ball limits, non-finite bounds, or missing required group thresholds.
+
+## Baselines
+
+List and run baselines over the full benchmark root:
+
+```bash
+python -m baselines.run_baselines --list
+python -m baselines.run_baselines \
+  --data-dir HostnameCommandInjectionBenchmark \
+  --baselines tfidf-logreg-char4,markov-char3,char-cnn \
+  --sample-per-class 5000 \
+  --output baselines/outputs/results.csv
+```
+
+Some baselines require external downloads. They are skipped unless
+`--allow-downloads` is passed. See `baselines/README.md` for details.
+
+## De-Identification Release Checks
+
+Validate the checked-in public HIB sample bundle:
+
+```bash
+python deidentification_release/scripts/validate_public_bundle.py \
+  --bundle deidentification_release/data/release/hib_release_public_bundle.tar.gz
+python deidentification_release/scripts/validate_release_gate.py \
+  --release deidentification_release/data/release/hib_release.jsonl
+python deidentification_release/scripts/recompute_metrics.py \
+  --release deidentification_release/data/release/hib_release.jsonl
+```
+
+Public reports intentionally do not disclose whether duplicate raw hostnames
+or raw-hostname grouping conditions existed in the private input.
+
+## Useful Commands
+
+```bash
+make test
+make artifact-smoke
+make diagnose CHECKPOINT=caho_encoder BATCH=256
+make score MODEL=ccd_model.refreshed.npz INPUT=data/queries.txt OUTPUT=out/scores.csv
+make artifact-latency CHECKPOINT=caho_encoder
+```
+
+Installed console entry points:
+
+```bash
+ccd-diagnose --checkpoint caho_encoder --batch-size 256
+ccd-score --model ccd_model.refreshed.npz --input data/queries.txt --output out/scores.csv
+ccd-explain --model ccd_model.refreshed.npz --input data/queries.txt --output out/explanations.json
+```
 
 ## Data Formats
 
-- `benign.txt`: one hostname per line.
-- `malicious.csv`: standard CSV with `hostname,family` columns (header optional);
-  quote fields that contain commas or other CSV metacharacters.
+- `benign.txt`: one benign hostname per line.
+- `malicious.csv`: CSV with `hostname,family` columns.
 - `queries.txt`: one hostname per line.
+- Group files: one non-empty group id per corresponding hostname row.
 
-## Configuration
+## Notes
 
-The CCD configuration is a JSON file that maps to `CCDConfig`:
-
-```json
-{
-  "encoder": {"model_name": "caho_encoder", "device": "cpu"},
-  "cone": {"dim": 384, "num_cones": 4096, "active_cones": 8, "temperature": 10.0},
-  "prior": {"smoothing": 1e-6},
-  "calibration": {"alpha": 1e-4},
-  "scoring": {"effective_count": 1.0, "mixture_weights": {}}
-}
-```
-
-Pass this file via `--config` to `train-priors` and still provide the trained
-CAHO checkpoint with `--encoder`; reviewer-facing CCD training and scoring
-commands require a trained CAHO checkpoint path rather than an implicit base
-encoder.
-
-## Library Usage
-
-```python
-from ccd.io import load_model
-
-model = load_model("ccd_model.npz")
-scores = model.score(["example.com"], normalize=True)
-```
-
-## Notes on Fidelity
-
-- Cone sketching and likelihood-ratio scoring follow Eq. (1) in the paper:
-  `S(q) = log sum_k pi_k exp(n0 * (H(q; P_B) - H(q; P_M,k)))`.
-- Prior training rejects empty classes, malformed cone axes, invalid smoothing
-  floors, and non-finite, zero-norm, or dimension-incompatible embeddings.
-- CCD scoring and explanation paths reject non-finite, zero-norm, or
-  dimension-incompatible embeddings before applying the deployed score path.
-- The deployed normalizer decodes valid UTF-8 percent runs before Unicode/IDNA
-  normalization, while retaining a byte-residue fallback for malformed runs.
-  Certificate output includes a per-row normalization trace for URL-like
-  scheme/userinfo/port/path/query/fragment segmentation and decode changes.
-- Benign drift refresh is implemented as a narrow `(P_B, tau_alpha)` update;
-  `P_M`, cone axes, encoder config, and scoring config remain fixed. Refresh
-  windows must contain finite embeddings before `P_B` or thresholds are
-  updated.
-- CCD model bundles and in-memory detectors fail closed on mismatched cone
-  configuration, non-unit or shape-incompatible cone axes, malformed prior
-  arrays, invalid effective counts, bad thresholds, and mixture weights that do
-  not match the serialized malicious priors before scoring or certification.
-- The edit model E1–E12 is implemented in `ccd/edit_model.py`; emitted
-  stability certificates can use calibrated-margin bounds and otherwise use
-  deterministic finite-edit closure. Certification inputs fail closed on
-  non-finite thresholds, invalid bounds, and invalid edit-ball limits before
-  scoring.
-- The CAHO augmentation sets match the paper’s benign/malicious design.
-- Public de-identification reports intentionally do not disclose whether
-  private/raw hostnames were duplicated; private-origin grouping checks are used
-  only as fail-closed validation gates.
-
-## Project Layout
-
-- `ccd/` core library
-- `scripts/` convenience scripts (mirrors CLI)
-- `baselines/` replay baselines
-- `deidentification_release/` HIB public-release pipeline and checked sample
-- `examples/` tiny smoke-test inputs
-- `ARTIFACT_EVALUATION.md` paper-claim and badge guide
+- CCD scoring follows the Eq. (1) likelihood-ratio score path implemented in
+  `ccd/scoring.py`.
+- Model loading, scoring, explanation, calibration, refresh, and certification
+  reject malformed priors, bad cone axes, non-finite embeddings, invalid
+  thresholds, and incompatible score-path configuration.
+- `ccd refresh-benign` is deliberately narrow: only `P_B` and calibrated
+  thresholds move.
+- The edit model E1-E12 is implemented in `ccd/edit_model.py`.
 
 ## License
 
-This repository is released under a research-only noncommercial split license:
-
-- Code: PolyForm Noncommercial License 1.0.0 (`/LICENSE-CODE`)
-- Data, docs, and model artifacts: CC BY-NC 4.0 (`/LICENSE-ARTIFACTS`)
-
-See `/LICENSE` for scope details and precedence rules.
+This repository is released for research-only noncommercial use. Source code is
+licensed under PolyForm Noncommercial 1.0.0; released data, documentation, and
+model artifacts are licensed under CC BY-NC 4.0. See `LICENSE` for scope.
