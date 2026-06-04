@@ -237,6 +237,7 @@ ccd certify \
   --input data/queries.txt \
   --groups data/query_groups.txt \
   --output certificates.json \
+  --radius 1 \
   --require-group-thresholds
 ```
 
@@ -268,9 +269,12 @@ Validate the checked-in public HIB sample bundle:
 python deidentification_release/scripts/validate_public_bundle.py \
   --bundle deidentification_release/data/release/hib_release_public_bundle.tar.gz
 python deidentification_release/scripts/validate_release_gate.py \
-  --release deidentification_release/data/release/hib_release.jsonl
+  --public-release deidentification_release/data/release/hib_release.jsonl \
+  --audit-dir deidentification_release/data/audits \
+  --bundle deidentification_release/data/release/hib_release_public_bundle.tar.gz \
+  --count-rows
 python deidentification_release/scripts/recompute_metrics.py \
-  --release deidentification_release/data/release/hib_release.jsonl
+  --public-release deidentification_release/data/release/hib_release.jsonl
 ```
 
 Public reports intentionally do not disclose whether duplicate raw hostnames
