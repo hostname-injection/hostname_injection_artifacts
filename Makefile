@@ -1,5 +1,6 @@
 SHELL := /bin/sh
 
+PYTHON ?= python3
 MODEL ?= ccd_model.npz
 INPUT ?= data/input.txt
 OUTPUT ?= out/scores.csv
@@ -21,28 +22,28 @@ help:
 	@echo "  train-caho-corpus Train CAHO encoder from corpus"
 	@echo "  baselines         Run baseline sweep (BASELINES=$(BASELINES), BASELINE_SAMPLE=$(BASELINE_SAMPLE))"
 	@echo ""
-	@echo "Variables: MODEL, INPUT, OUTPUT, CHECKPOINT, BATCH, BASELINES, BASELINE_SAMPLE"
+	@echo "Variables: PYTHON, MODEL, INPUT, OUTPUT, CHECKPOINT, BATCH, BASELINES, BASELINE_SAMPLE"
 
 diagnose:
-	python -m ccd.diagnostics --checkpoint $(CHECKPOINT) --batch-size $(BATCH)
+	$(PYTHON) -m ccd.diagnostics --checkpoint $(CHECKPOINT) --batch-size $(BATCH)
 
 explain:
-	python -m ccd.explain --model $(MODEL) --input $(INPUT)
+	$(PYTHON) -m ccd.explain --model $(MODEL) --input $(INPUT)
 
 score:
-	python -m ccd.score_cli --model $(MODEL) --input $(INPUT) --output $(OUTPUT) --batch-size $(BATCH)
+	$(PYTHON) -m ccd.score_cli --model $(MODEL) --input $(INPUT) --output $(OUTPUT) --batch-size $(BATCH)
 
 test:
-	pytest
+	$(PYTHON) -m pytest
 
 artifact-smoke:
-	python scripts/run_artifact_smoke.py
+	$(PYTHON) scripts/run_artifact_smoke.py
 
 artifact-latency:
-	python scripts/benchmark_artifact_latency.py --checkpoint $(CHECKPOINT)
+	$(PYTHON) scripts/benchmark_artifact_latency.py --checkpoint $(CHECKPOINT)
 
 train-caho-corpus:
-	python -m ccd.cli train-caho-corpus --benign-dir txt_corpus/benign --malicious-jsonl-dir filtered_corpus --malicious-txt-dir txt_corpus/varied --out out/caho_model_checkpoint
+	$(PYTHON) -m ccd.cli train-caho-corpus --benign-dir txt_corpus/benign --malicious-jsonl-dir filtered_corpus --malicious-txt-dir txt_corpus/varied --out out/caho_model_checkpoint
 
 baselines:
-	python -m baselines.run_baselines --baselines $(BASELINES) --sample-per-class $(BASELINE_SAMPLE)
+	$(PYTHON) -m baselines.run_baselines --baselines $(BASELINES) --sample-per-class $(BASELINE_SAMPLE)

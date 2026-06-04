@@ -18,7 +18,9 @@ from ccd.train import (
 
 def _build_command(args) -> list[str]:
     cmd = [
-        "ccd",
+        sys.executable,
+        "-m",
+        "ccd.cli",
         "train-caho-corpus",
         "--benign-dir",
         args.benign_dir,
