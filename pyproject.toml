@@ -25,18 +25,6 @@ dependencies = [
   "GradCache @ git+https://github.com/luyug/GradCache.git",
 ]
 
-[project.optional-dependencies]
-test = [
-  "pytest>=7.4",
-]
-dev = [
-  "pytest>=7.4",
-  "sentencepiece>=0.1.99",
-  "ruff>=0.4.0",
-  "black>=24.0",
-  "mypy>=1.6",
-]
-
 [project.scripts]
 ccd = "ccd.cli:main"
 ccd-diagnose = "ccd.entrypoints:diagnose_main"

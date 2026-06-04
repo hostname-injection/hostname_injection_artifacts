@@ -1,1 +1,2 @@
--e .[test]
+-e .
+pytest>=7.4

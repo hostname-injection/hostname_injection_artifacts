@@ -69,23 +69,22 @@ def test_pyproject_exports_reviewer_console_scripts_and_packages():
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     scripts = pyproject["project"]["scripts"]
     packages = set(pyproject["tool"]["setuptools"]["packages"])
-    extras = pyproject["project"]["optional-dependencies"]
 
     assert pyproject["project"]["requires-python"] == ">=3.11"
     assert "Programming Language :: Python :: 3.11" in pyproject["project"]["classifiers"]
     assert "license" not in pyproject["project"]
     assert all("License ::" not in classifier for classifier in pyproject["project"]["classifiers"])
+    assert "optional-dependencies" not in pyproject["project"]
     assert {"ccd", "ccd-diagnose", "ccd-explain", "ccd-score"}.issubset(scripts)
     assert packages == {"ccd"}
-    assert "test" in extras
-    assert "artifact" not in extras
 
 
-def test_requirements_installs_test_extra_without_stale_artifact_extra():
+def test_requirements_install_package_and_pytest_without_extras():
     requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
 
-    assert "-e .[test]" in requirements
-    assert ".[artifact]" not in requirements
+    assert "-e ." in requirements
+    assert "pytest>=7.4" in requirements
+    assert ".[" not in requirements
 
 
 def test_reviewer_repo_has_no_standalone_license_file():
