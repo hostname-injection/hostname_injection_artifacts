@@ -20,6 +20,7 @@ from .cone import ConePartition
 from .encoder import CahoEncoder, require_model_uses_trained_caho_checkpoint, require_trained_caho_checkpoint
 from .augment import CAHOAugmenter, AugmentConfig, WeightedAugmentConfig
 from .edit_model import EditModel
+from .explain import add_explain_arguments, run as run_explain
 from .preprocess import normalize_hostname, normalization_trace
 from .priors import build_benign_prior, build_malicious_priors
 from .train import (
@@ -724,6 +725,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     score.add_argument("--no-normalize", action="store_true")
     score.set_defaults(func=cmd_score)
+
+    explain = sub.add_parser("explain", help="Explain CCD predictions")
+    add_explain_arguments(explain)
+    explain.set_defaults(func=run_explain)
 
     calibrate = sub.add_parser("calibrate", help="Calibrate a fixed-FPR threshold")
     calibrate.add_argument("--model", required=True, type=Path)

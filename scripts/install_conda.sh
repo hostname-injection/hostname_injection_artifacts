@@ -23,8 +23,7 @@ conda install -y -c conda-forge -c pytorch \
   sentence-transformers \
   idna \
   pytest \
-  sentencepiece \
-  scikit-learn
+  sentencepiece
 
 # GradCache is required for replay-scale pairwise CAHO training.
 python -m pip install "GradCache @ git+https://github.com/luyug/GradCache.git"

@@ -6,10 +6,8 @@ INPUT ?= data/input.txt
 OUTPUT ?= out/scores.csv
 CHECKPOINT ?= caho_encoder
 BATCH ?= 128
-BASELINES ?=
-BASELINE_SAMPLE ?= 5000
 
-.PHONY: help diagnose explain score test artifact-smoke artifact-latency train-caho-corpus baselines
+.PHONY: help diagnose explain score test artifact-smoke artifact-latency train-caho-corpus
 
 help:
 	@echo "Targets:"
@@ -20,9 +18,8 @@ help:
 	@echo "  artifact-smoke    Run evaluator smoke test"
 	@echo "  artifact-latency  Run local hardware-dependent latency smoke benchmark"
 	@echo "  train-caho-corpus Train CAHO encoder from corpus"
-	@echo "  baselines         Run baseline sweep (BASELINES=$(BASELINES), BASELINE_SAMPLE=$(BASELINE_SAMPLE))"
 	@echo ""
-	@echo "Variables: PYTHON, MODEL, INPUT, OUTPUT, CHECKPOINT, BATCH, BASELINES, BASELINE_SAMPLE"
+	@echo "Variables: PYTHON, MODEL, INPUT, OUTPUT, CHECKPOINT, BATCH"
 
 diagnose:
 	$(PYTHON) -m ccd.diagnostics --checkpoint $(CHECKPOINT) --batch-size $(BATCH)
@@ -44,6 +41,3 @@ artifact-latency:
 
 train-caho-corpus:
 	$(PYTHON) -m ccd.cli train-caho-corpus --benign-dir txt_corpus/benign --malicious-jsonl-dir filtered_corpus --malicious-txt-dir txt_corpus/varied --out out/caho_model_checkpoint
-
-baselines:
-	$(PYTHON) -m baselines.run_baselines --baselines $(BASELINES) --sample-per-class $(BASELINE_SAMPLE)

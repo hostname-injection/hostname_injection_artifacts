@@ -524,7 +524,7 @@ def write_docs(out_root: Path, manifests: Dict[str, Dict[str, object]], stats: D
                 "## PyTorch Loading",
                 "",
                 "This repository includes `ccd.benchmark_dataset.HostnameCommandInjectionBenchmarkDataset`, a map-style PyTorch-compatible dataset "
-                "for these chunks. Training and baseline execution use both `user_logins` and `dns_hostnames`; resolving labels from GPT 5.5, Claude Opus 4.8, or both; "
+                "for these chunks. Training and evaluation use both `user_logins` and `dns_hostnames`; resolving labels from GPT 5.5, Claude Opus 4.8, or both; "
                 "dropping or retaining unknown labels; returning explanations; and optionally returning full row metadata.",
                 "",
                 "Example:",

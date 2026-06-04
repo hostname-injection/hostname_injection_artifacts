@@ -18,8 +18,7 @@ def read_lines(path: Path) -> List[str]:
     return read_nonempty_lines(path)
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Explain CCD predictions.")
+def add_explain_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("--model", required=True, type=Path, help="CCD .npz model bundle")
     parser.add_argument("--input", required=True, type=Path, help="Input file of hostnames (one per line)")
     parser.add_argument("--output", type=Path, default=None, help="Optional JSON output path")
@@ -39,10 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Explain CCD predictions.")
+    return add_explain_arguments(parser)
 
+
+def run(args: argparse.Namespace) -> int:
     model = load_model(args.model)
     require_model_uses_trained_caho_checkpoint(model, purpose="ccd-explain")
     hostnames = read_lines(args.input)
@@ -118,6 +119,12 @@ def main() -> int:
 
     print(json.dumps(payload, indent=2))
     return 0
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    return run(args)
 
 
 if __name__ == "__main__":

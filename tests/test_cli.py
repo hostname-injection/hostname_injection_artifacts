@@ -147,6 +147,30 @@ def test_score_parser_smoke():
     assert str(args.groups) == "groups.txt"
 
 
+def test_explain_parser_smoke():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "explain",
+            "--model",
+            "ccd_model.npz",
+            "--input",
+            "queries.txt",
+            "--output",
+            "explanations.json",
+            "--groups",
+            "groups.txt",
+            "--require-group-thresholds",
+            "--top-k",
+            "3",
+        ]
+    )
+    assert args.command == "explain"
+    assert str(args.groups) == "groups.txt"
+    assert args.require_group_thresholds is True
+    assert args.top_k == 3
+
+
 def test_read_malicious_csv_preserves_quoted_raw_hostname_fields(tmp_path):
     path = tmp_path / "malicious.csv"
     path.write_text('hostname,family\n"cmd,one""two.example",cmd\n', encoding="utf-8")

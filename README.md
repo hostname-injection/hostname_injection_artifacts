@@ -5,14 +5,14 @@ Hostnames Become Code: Detecting Persisted Hostname Injection at Production
 Scale*.
 
 This repository is intentionally kept as a lean ML research-code artifact. It
-contains the source package, training and evaluation scripts, baseline models,
-small smoke-test inputs, tests, and the de-identified public-release tooling.
-It does not include pretrained models.
+contains the CAHO/CCD source package, training and evaluation scripts, small
+smoke-test inputs, tests, and the de-identified public-release tooling. It
+does not include pretrained models.
 
-A reviewer-viewable de-identified dataslice is available here:
+A reviewer-viewable de-identified data slice is available here:
 https://drive.google.com/drive/folders/1KeKZyIXIqZvEJ4tZAWxE9h4gPoinZCWt?usp=drive_link
 
-The dataslice and checked-in HIB sample are de-identified. They preserve the
+The data slice and checked-in HIB sample are de-identified. They preserve the
 public replay schema and safety checks, but they are not the original private
 evaluation rows. CAHO and CCD runs on de-identified data should therefore be
 expected to have data shift relative to the original evaluation set used for
@@ -24,7 +24,6 @@ the reported paper results.
   benign-prior refresh, explanation, and certification logic.
 - `scripts/`: training, scoring, benchmark, validation, and smoke-test entry
   points.
-- `baselines/`: classical, neural, and embedding baseline implementations.
 - `deidentification_release/`: public HIB sample, schema, bundle validation,
   non-linkability checks, and release metric replay.
 - `examples/`: tiny inputs used by the smoke test.
@@ -62,7 +61,7 @@ Paper-scale CAHO training is a GPU workload. The shipped defaults target a
 single CUDA GPU with 94 GB of VRAM; lower-memory machines should reduce batch
 sizes only for debugging, and the training scripts will warn that changed
 settings should be expected to produce different results. Full replay-scale
-training and evaluation require the external de-identified dataslice or full
+training and evaluation require the external de-identified data slice or full
 release rather than the tiny checked-in smoke inputs.
 
 ## Smoke Test
@@ -97,12 +96,12 @@ python scripts/run_artifact_smoke.py --skip-tests
 The test suite covers CAHO augmentation and training defaults, GradCache hooks,
 CCD prior construction, cone scoring, split-conformal calibration, grouped
 thresholds, benign-only `P_B` refresh, explanation output, finite-edit
-certification, CLI CAHO-first gates, baseline loading, and de-identification
-release gates. The smoke command is the scaled-down executable path through
-CAHO training, CCD training, calibration, `P_B` refresh, scoring, explanation,
-certification, CAHO embedding export, and public release validation. For
-paper-scale reproduction, run the same pipeline on the reviewer dataslice or
-full de-identified release rather than on the checked-in `examples/` inputs.
+certification, CLI CAHO-first gates, and de-identification release gates. The
+smoke command is the scaled-down executable path through CAHO training, CCD
+training, calibration, `P_B` refresh, scoring, explanation, certification,
+CAHO embedding export, and public release validation. For paper-scale
+reproduction, run the same pipeline on the reviewer data slice or full
+de-identified release rather than on the checked-in `examples/` inputs.
 
 ## Required Pipeline Order
 
@@ -277,22 +276,6 @@ ccd certify \
 Certificates are scoped to the frozen normalizer, cone sketch, score path,
 threshold, and edit manifest. Inputs fail closed on invalid thresholds, invalid
 edit-ball limits, non-finite bounds, or missing required group thresholds.
-
-## Baselines
-
-List and run baselines over the full benchmark root:
-
-```bash
-python -m baselines.run_baselines --list
-python -m baselines.run_baselines \
-  --data-dir HostnameCommandInjectionBenchmark \
-  --baselines tfidf-logreg-char4,markov-char3,char-cnn \
-  --sample-per-class 5000 \
-  --output baselines/outputs/results.csv
-```
-
-Some baselines require external downloads. They are skipped unless
-`--allow-downloads` is passed. See `baselines/README.md` for details.
 
 ## De-Identification Release Checks
 

@@ -74,7 +74,7 @@ def test_pyproject_exports_reviewer_console_scripts_and_packages():
     assert pyproject["project"]["requires-python"] == ">=3.11"
     assert "Programming Language :: Python :: 3.11" in pyproject["project"]["classifiers"]
     assert {"ccd", "ccd-diagnose", "ccd-explain", "ccd-score"}.issubset(scripts)
-    assert {"ccd", "baselines", "baselines.models"}.issubset(packages)
+    assert packages == {"ccd"}
     assert "test" in extras
     assert "artifact" not in extras
 
