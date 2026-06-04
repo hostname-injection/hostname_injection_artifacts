@@ -69,6 +69,16 @@ def test_pyproject_exports_reviewer_console_scripts_and_packages():
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     scripts = pyproject["project"]["scripts"]
     packages = set(pyproject["tool"]["setuptools"]["packages"])
+    extras = pyproject["project"]["optional-dependencies"]
 
     assert {"ccd", "ccd-diagnose", "ccd-explain", "ccd-score"}.issubset(scripts)
     assert {"ccd", "baselines", "baselines.models"}.issubset(packages)
+    assert "test" in extras
+    assert "artifact" not in extras
+
+
+def test_requirements_installs_test_extra_without_stale_artifact_extra():
+    requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+
+    assert "-e .[test]" in requirements
+    assert ".[artifact]" not in requirements
