@@ -90,3 +90,8 @@ def test_requirements_installs_test_extra_without_stale_artifact_extra():
 
 def test_reviewer_repo_has_no_standalone_license_file():
     assert not (ROOT / "LICENSE").exists()
+
+
+def test_reviewer_repo_omits_redundant_and_private_example_docs():
+    assert not (ROOT / "examples" / "README.md").exists()
+    assert not (ROOT / "deidentification_release" / "configs" / "anonymization_policy.private.example.yaml").exists()
