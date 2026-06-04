@@ -1,4 +1,5 @@
 import sys
+import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -62,3 +63,12 @@ def test_train_caho_corpus_wrapper_uses_current_interpreter():
 
     assert cmd[:3] == [sys.executable, "-m", "ccd.cli"]
     assert "train-caho-corpus" in cmd
+
+
+def test_pyproject_exports_reviewer_console_scripts_and_packages():
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    scripts = pyproject["project"]["scripts"]
+    packages = set(pyproject["tool"]["setuptools"]["packages"])
+
+    assert {"ccd", "ccd-diagnose", "ccd-explain", "ccd-score"}.issubset(scripts)
+    assert {"ccd", "baselines", "baselines.models"}.issubset(packages)

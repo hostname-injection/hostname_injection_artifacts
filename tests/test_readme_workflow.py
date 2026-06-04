@@ -29,3 +29,22 @@ def test_root_readme_states_runtime_requirements_and_scaled_smoke_scope():
     assert "94 GB of VRAM" in readme
     assert "small `examples/` smoke path" in readme
     assert "different results" in readme
+
+
+def test_root_readme_maps_reviewer_evidence_to_method_surfaces():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    normalized = " ".join(readme.split())
+
+    assert "## Reviewer Evidence" in readme
+    assert "make test" in readme
+    assert "python scripts/run_artifact_smoke.py --skip-tests" in readme
+    for phrase in [
+        "CAHO augmentation",
+        "GradCache hooks",
+        "split-conformal calibration",
+        "benign-only `P_B` refresh",
+        "finite-edit certification",
+        "CLI CAHO-first gates",
+        "de-identification release gates",
+    ]:
+        assert phrase in normalized

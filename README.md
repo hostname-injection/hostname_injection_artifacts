@@ -84,6 +84,26 @@ priors with that checkpoint, calibrates thresholds, refreshes `P_B`, scores and
 certifies sample hostnames, emits explanations, evaluates CAHO embeddings, and
 validates the de-identified HIB sample bundle.
 
+## Reviewer Evidence
+
+Use these commands to exercise the implementation surfaces that correspond to
+the main method claims:
+
+```bash
+make test
+python scripts/run_artifact_smoke.py --skip-tests
+```
+
+The test suite covers CAHO augmentation and training defaults, GradCache hooks,
+CCD prior construction, cone scoring, split-conformal calibration, grouped
+thresholds, benign-only `P_B` refresh, explanation output, finite-edit
+certification, CLI CAHO-first gates, baseline loading, and de-identification
+release gates. The smoke command is the scaled-down executable path through
+CAHO training, CCD training, calibration, `P_B` refresh, scoring, explanation,
+certification, CAHO embedding export, and public release validation. For
+paper-scale reproduction, run the same pipeline on the reviewer dataslice or
+full de-identified release rather than on the checked-in `examples/` inputs.
+
 ## Required Pipeline Order
 
 Reviewer-facing execution should follow the same order as the method:
