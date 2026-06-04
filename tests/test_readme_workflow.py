@@ -19,3 +19,13 @@ def test_root_readme_certification_example_includes_radius():
     snippet = readme[start:end]
 
     assert "--radius 1" in snippet
+
+
+def test_root_readme_states_runtime_requirements_and_scaled_smoke_scope():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "## Runtime Requirements" in readme
+    assert "Python 3.11" in readme
+    assert "94 GB of VRAM" in readme
+    assert "small `examples/` smoke path" in readme
+    assert "different results" in readme

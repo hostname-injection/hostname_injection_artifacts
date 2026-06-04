@@ -52,6 +52,19 @@ GradCache is required for replay-scale pairwise CAHO training. This README does
 not duplicate GradCache installation instructions; use the upstream repository:
 https://github.com/luyug/GradCache
 
+## Runtime Requirements
+
+Use Python 3.11 with the dependencies in `environment.yml`. The unit tests,
+de-identification validators, and the small `examples/` smoke path are designed
+to run on a normal CPU machine after the Python dependencies are installed.
+
+Paper-scale CAHO training is a GPU workload. The shipped defaults target a
+single CUDA GPU with 94 GB of VRAM; lower-memory machines should reduce batch
+sizes only for debugging, and the training scripts will warn that changed
+settings should be expected to produce different results. Full replay-scale
+training and evaluation require the external de-identified dataslice or full
+release rather than the tiny checked-in smoke inputs.
+
 ## Smoke Test
 
 Run the end-to-end smoke path after installation:
