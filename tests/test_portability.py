@@ -73,6 +73,8 @@ def test_pyproject_exports_reviewer_console_scripts_and_packages():
 
     assert pyproject["project"]["requires-python"] == ">=3.11"
     assert "Programming Language :: Python :: 3.11" in pyproject["project"]["classifiers"]
+    assert "license" not in pyproject["project"]
+    assert all("License ::" not in classifier for classifier in pyproject["project"]["classifiers"])
     assert {"ccd", "ccd-diagnose", "ccd-explain", "ccd-score"}.issubset(scripts)
     assert packages == {"ccd"}
     assert "test" in extras
@@ -84,3 +86,7 @@ def test_requirements_installs_test_extra_without_stale_artifact_extra():
 
     assert "-e .[test]" in requirements
     assert ".[artifact]" not in requirements
+
+
+def test_reviewer_repo_has_no_standalone_license_file():
+    assert not (ROOT / "LICENSE").exists()

@@ -8,12 +8,10 @@ version = "0.1.0"
 description = "Anonymous reference implementation of Contrastive Cone Divergence (CCD)."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { file = "LICENSE" }
 keywords = ["security", "hostname", "anomaly-detection", "contrastive-learning", "ccd"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
-  "License :: Other/Proprietary License",
   "Operating System :: OS Independent",
 ]
 

@@ -331,9 +331,3 @@ ccd-explain --model ccd_model.refreshed.npz --input data/queries.txt --output ou
 - `ccd refresh-benign` is deliberately narrow: only `P_B` and calibrated
   thresholds move.
 - The edit model E1-E12 is implemented in `ccd/edit_model.py`.
-
-## License
-
-This repository is released for research-only noncommercial use. Source code is
-licensed under PolyForm Noncommercial 1.0.0; released data, documentation, and
-model artifacts are licensed under CC BY-NC 4.0. See `LICENSE` for scope.
