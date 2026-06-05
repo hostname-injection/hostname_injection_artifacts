@@ -547,6 +547,39 @@ def test_refresh_benign_saves_updated_model_bundle(tmp_path, monkeypatch):
     assert report["input"]["num_hostnames"] == 3
 
 
+def test_refresh_benign_rejects_uncalibrated_model_bundle_before_encoding(tmp_path, monkeypatch):
+    benign = tmp_path / "benign_window.txt"
+    benign.write_text("alpha.example\n", encoding="utf-8")
+    refreshed_model = tmp_path / "refreshed.npz"
+
+    class FailingEncoder:
+        def encode(self, hostnames, **kwargs):
+            raise AssertionError("refresh should not encode without an embedded calibrated threshold")
+
+    class FailingModel:
+        threshold = None
+        grouped_thresholds = None
+        encoder = FailingEncoder()
+
+    monkeypatch.setattr(cli_module, "load_model", lambda _path: FailingModel())
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "refresh-benign",
+            "--model",
+            "model.npz",
+            "--benign",
+            str(benign),
+            "--output",
+            str(refreshed_model),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="requires a calibrated model bundle"):
+        args.func(args)
+
+
 def test_certify_parser_smoke():
     parser = build_parser()
     args = parser.parse_args(

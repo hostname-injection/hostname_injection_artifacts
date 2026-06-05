@@ -235,7 +235,8 @@ ccd refresh-benign \
 This updates `P_B` and `tau_alpha`; `P_M`, CAHO, cone axes, scoring
 configuration, and the score path remain fixed. The refresh is transactional:
 if recalibration or grouped-threshold validation fails, the previous model
-state remains unchanged.
+state remains unchanged. The input model must already contain an embedded
+calibrated threshold.
 
 ## Scoring And Explanation
 

@@ -391,6 +391,7 @@ def cmd_calibrate(args: argparse.Namespace) -> None:
 def cmd_refresh_benign(args: argparse.Namespace) -> None:
     model = load_model(args.model)
     _require_model_bundle_caho_checkpoint(model, purpose="ccd refresh-benign")
+    require_calibrated_threshold(model, purpose="ccd refresh-benign")
     hostnames = _read_lines(args.benign)
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]
