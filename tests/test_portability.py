@@ -93,4 +93,18 @@ def test_reviewer_repo_has_no_standalone_license_file():
 
 def test_reviewer_repo_omits_redundant_and_private_example_docs():
     assert not (ROOT / "examples" / "README.md").exists()
+    assert not (ROOT / "deidentification_release" / "README.md").exists()
     assert not (ROOT / "deidentification_release" / "configs" / "anonymization_policy.private.example.yaml").exists()
+
+
+def test_reviewer_repo_keeps_only_required_markdown_files():
+    markdown_files = {
+        path.relative_to(ROOT).as_posix()
+        for path in ROOT.rglob("*.md")
+        if ".git" not in path.parts and ".pytest_cache" not in path.parts
+    }
+
+    assert markdown_files == {
+        "README.md",
+        "deidentification_release/data/audits/release_data_card.md",
+    }
