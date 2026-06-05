@@ -4,7 +4,6 @@
   "policy_version": "non-linkable-release-policy-v1.0",
   "production_scores_released": false,
   "public_outputs": [
-    "regex_waf_flag",
     "ccd_score_bin",
     "ccd_flag",
     "ccd_score_public",

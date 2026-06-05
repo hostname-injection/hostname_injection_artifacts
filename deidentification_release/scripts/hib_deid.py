@@ -597,16 +597,13 @@ def optional_public_calibration_group(row: Mapping[str, str]) -> str | None:
 
 
 def public_detector_outputs(row: Mapping[str, str], raw_artifact: str) -> dict[str, Any]:
+    del raw_artifact
     score = optional_public_float(row, ("PUBLIC_CCD_SCORE", "CCD_SCORE_PUBLIC", "CCD_PUBLIC_SCORE"))
     ccd_flag = optional_public_bool(row, ("PUBLIC_CCD_FLAG", "CCD_FLAG_PUBLIC", "CCD_PUBLIC_FLAG"))
-    regex_flag = optional_public_bool(row, ("PUBLIC_REGEX_WAF_FLAG", "REGEX_WAF_FLAG_PUBLIC", "REGEX_WAF_FLAG"))
     calibration_group = optional_public_calibration_group(row)
     outputs: dict[str, Any] = {
         "ccd_score_bin": "public_score" if score is not None else "not_recomputed",
         "ccd_flag": ccd_flag,
-        "regex_waf_flag": regex_flag
-        if regex_flag is not None
-        else bool(re.search(r"(\$\{|`|\$\(|;|&&|\|\||\bselect\b|--)", raw_artifact, flags=re.I)),
     }
     if score is not None:
         outputs["ccd_score_public"] = score
@@ -1479,7 +1476,7 @@ def write_stage_manifests(audit_dir: Path, private_rows: list[dict[str, str]], p
                 **common,
                 "stage": "detector_output_publication",
                 "production_scores_released": False,
-                "public_outputs": ["regex_waf_flag", "ccd_score_bin", "ccd_flag", "ccd_score_public", "public_calibration_group"],
+                "public_outputs": ["ccd_score_bin", "ccd_flag", "ccd_score_public", "public_calibration_group"],
                 "ccd_score_bin_policy": "not_recomputed unless reviewed public CCD scores are provided",
                 "status": "complete",
             },
@@ -1619,7 +1616,7 @@ def write_streaming_stage_manifests(
                 **common,
                 "stage": "detector_output_publication",
                 "production_scores_released": False,
-                "public_outputs": ["regex_waf_flag", "ccd_score_bin", "ccd_flag", "ccd_score_public", "public_calibration_group"],
+                "public_outputs": ["ccd_score_bin", "ccd_flag", "ccd_score_public", "public_calibration_group"],
                 "ccd_score_bin_policy": "not_recomputed unless reviewed public CCD scores are provided",
                 "status": "complete",
             },
@@ -2056,7 +2053,7 @@ Private-origin grouping checks are fail-closed verification gates. They may be u
 
 ## What the Release Supports
 
-The release supports row-level replay of the benchmark task: loading released artifacts, applying the public canonicalizer, recomputing detector outputs where configured, and reproducing TPR/FPR and overlap metrics under the published split and threshold protocol.
+The release supports row-level replay of the benchmark task: loading released artifacts, applying the public canonicalizer, recomputing CCD outputs where configured, and reproducing CCD TPR/FPR under the published split and threshold protocol.
 
 ## What the Release Does Not Support
 

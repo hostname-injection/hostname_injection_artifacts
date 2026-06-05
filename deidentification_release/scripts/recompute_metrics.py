@@ -61,7 +61,6 @@ def compute_metrics(
     by_evidence_tier: Counter[Any] = Counter()
     by_sink_family: Counter[Any] = Counter()
     ccd_flags: Counter[str] = Counter()
-    regex_flags: Counter[str] = Counter()
     ccd_score_bins: Counter[str] = Counter()
     calibration_groups: Counter[str] = Counter()
 
@@ -78,14 +77,6 @@ def compute_metrics(
 
     ccd_flag_metrics = new_confusion()
     ccd_score_metrics = new_confusion()
-    regex_metrics = new_confusion()
-    overlap = {
-        "overall": new_overlap(),
-        "resolved": new_overlap(),
-        "positives": new_overlap(),
-        "negatives": new_overlap(),
-        "by_label": {},
-    }
     effective_ccd_sources: Counter[str] = Counter()
 
     for row in iter_jsonl(path):
@@ -125,23 +116,13 @@ def compute_metrics(
                     metric_negative_rows += 1
 
         ccd_flag = as_bool(outputs.get("ccd_flag"))
-        regex_flag = as_bool(outputs.get("regex_waf_flag"))
         ccd_flags[str(ccd_flag)] += 1
-        regex_flags[str(regex_flag)] += 1
         ccd_score_bins[str(outputs.get("ccd_score_bin"))] += 1
         calibration_groups[str(calibration_group)] += 1
 
         update_confusion(
             ccd_flag_metrics,
             ccd_flag,
-            is_positive=is_positive,
-            is_negative=is_negative,
-            is_unresolved=is_unresolved,
-            is_calibration=split == "calibration",
-        )
-        update_confusion(
-            regex_metrics,
-            regex_flag,
             is_positive=is_positive,
             is_negative=is_negative,
             is_unresolved=is_unresolved,
@@ -160,21 +141,11 @@ def compute_metrics(
             is_calibration=split == "calibration",
         )
 
-        effective_ccd_flag, source = effective_detector_flag(ccd_flag, score_flag)
+        _effective_ccd_flag, source = effective_ccd_flag(ccd_flag, score_flag)
         effective_ccd_sources[source] += 1
-        update_overlap(overlap["overall"], effective_ccd_flag, regex_flag)
-        if not is_unresolved:
-            update_overlap(overlap["resolved"], effective_ccd_flag, regex_flag)
-        if is_positive:
-            update_overlap(overlap["positives"], effective_ccd_flag, regex_flag)
-        if is_negative:
-            update_overlap(overlap["negatives"], effective_ccd_flag, regex_flag)
-        label_overlap = overlap["by_label"].setdefault(label, new_overlap())
-        update_overlap(label_overlap, effective_ccd_flag, regex_flag)
 
     finalize_confusion(ccd_flag_metrics)
     finalize_confusion(ccd_score_metrics)
-    finalize_confusion(regex_metrics)
 
     if use_grouped_thresholds:
         threshold_source = "recomputed_from_public_grouped_calibration_scores"
@@ -241,16 +212,11 @@ def compute_metrics(
             "ccd_tpr": ccd_flag_metrics["tpr"],
             "ccd_fpr": ccd_flag_metrics["fpr"],
             "ccd_flag_metrics": ccd_flag_metrics,
-            "regex_waf_tpr": regex_metrics["tpr"],
-            "regex_waf_fpr": regex_metrics["fpr"],
-            "regex_waf_metrics": regex_metrics,
         },
-        "detector_overlap": {
+        "ccd_output_counts": {
             "ccd_flag_counts": dict(ccd_flags),
             "ccd_score_bin_counts": dict(ccd_score_bins),
-            "regex_waf_flag_counts": dict(regex_flags),
             "effective_ccd_flag_sources": dict(effective_ccd_sources),
-            **overlap,
         },
         "public_anchor_replay_checks": {
             "included": False,
@@ -398,31 +364,7 @@ def finalize_confusion(metrics: dict[str, Any]) -> None:
     metrics["fpr"] = rate(metrics["fp"], metrics["fp"] + metrics["tn"])
 
 
-def new_overlap() -> dict[str, int]:
-    return {
-        "rows_with_both_predictions": 0,
-        "ccd_true_regex_true": 0,
-        "ccd_true_regex_false": 0,
-        "ccd_false_regex_true": 0,
-        "ccd_false_regex_false": 0,
-    }
-
-
-def update_overlap(metrics: dict[str, int], ccd_flag: bool | None, regex_flag: bool | None) -> None:
-    if ccd_flag is None or regex_flag is None:
-        return
-    metrics["rows_with_both_predictions"] += 1
-    if ccd_flag and regex_flag:
-        metrics["ccd_true_regex_true"] += 1
-    elif ccd_flag and not regex_flag:
-        metrics["ccd_true_regex_false"] += 1
-    elif not ccd_flag and regex_flag:
-        metrics["ccd_false_regex_true"] += 1
-    else:
-        metrics["ccd_false_regex_false"] += 1
-
-
-def effective_detector_flag(released_flag: bool | None, score_flag: bool | None) -> tuple[bool | None, str]:
+def effective_ccd_flag(released_flag: bool | None, score_flag: bool | None) -> tuple[bool | None, str]:
     if released_flag is not None:
         return released_flag, "released_ccd_flag"
     if score_flag is not None:
@@ -437,7 +379,7 @@ def rate(num: int, den: int) -> float | None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Recompute public HIB release row counts, fixed-FPR metrics, and detector overlap.")
+    parser = argparse.ArgumentParser(description="Recompute public HIB release row counts and fixed-FPR CCD metrics.")
     parser.add_argument("--public-release", type=Path, required=True)
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--alpha", type=float, default=1e-4, help="Fixed-FPR target used for split-conformal threshold replay.")

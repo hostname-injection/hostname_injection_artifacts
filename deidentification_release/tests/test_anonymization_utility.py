@@ -103,7 +103,6 @@ def test_optional_public_detector_scores_are_replayable(tmp_path: Path) -> None:
             "CONTENT_TYPE": "HOSTNAME",
             "PUBLIC_CCD_SCORE": "0.95" if i >= 4 else f"0.{i + 1}",
             "PUBLIC_CCD_FLAG": "true" if i >= 4 else "false",
-            "PUBLIC_REGEX_WAF_FLAG": "true",
             "PUBLIC_CALIBRATION_GROUP": "public_group_a" if i % 2 == 0 else "public_group_b",
         }
         for i in range(8)
@@ -120,6 +119,7 @@ def test_optional_public_detector_scores_are_replayable(tmp_path: Path) -> None:
     assert all("ccd_score_public" in row["detector_outputs"] for row in public_rows)
     assert all(row["detector_outputs"].get("public_calibration_group") in {"public_group_a", "public_group_b"} for row in public_rows)
     assert any(row["detector_outputs"]["ccd_flag"] is True for row in public_rows)
+    assert all(set(row["detector_outputs"]) <= {"ccd_score_bin", "ccd_flag", "ccd_score_public", "public_calibration_group"} for row in public_rows)
 
 
 def test_public_calibration_group_rejects_tenant_identifying_terms(tmp_path: Path) -> None:
@@ -250,7 +250,7 @@ def test_repair_row_preserves_label_and_recomputes_public_fields() -> None:
         "obfuscation_family": "none",
         "released_length_bucket": "16-31",
         "character_class_mask": "aaaa",
-        "detector_outputs": {"ccd_score_bin": "not_recomputed", "ccd_flag": None, "regex_waf_flag": True},
+        "detector_outputs": {"ccd_score_bin": "not_recomputed", "ccd_flag": None},
         "row_integrity_hash": "old",
     }
 
@@ -282,7 +282,7 @@ def test_repair_writes_schema_and_sha256_sidecar(tmp_path: Path) -> None:
         "obfuscation_family": "none",
         "released_length_bucket": "16-31",
         "character_class_mask": "aaaa",
-        "detector_outputs": {"ccd_score_bin": "not_recomputed", "ccd_flag": None, "regex_waf_flag": True},
+        "detector_outputs": {"ccd_score_bin": "not_recomputed", "ccd_flag": None},
         "row_integrity_hash": "old",
     }
     input_jsonl.write_text(json.dumps(row) + "\n", encoding="utf-8")

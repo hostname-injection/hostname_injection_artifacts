@@ -21,13 +21,11 @@ def _row(
     label: str,
     ccd_score: float | None,
     ccd_flag: bool | None,
-    regex_flag: bool,
     calibration_group: str | None = None,
 ) -> dict:
     outputs = {
         "ccd_flag": ccd_flag,
         "ccd_score_bin": "public_score" if ccd_score is not None else "not_recomputed",
-        "regex_waf_flag": regex_flag,
     }
     if ccd_score is not None:
         outputs["ccd_score"] = ccd_score
@@ -56,14 +54,14 @@ def test_recompute_metrics_replays_conformal_threshold_and_excludes_calibration_
     _write_jsonl(
         release,
         [
-            _row("cal-1", split="calibration", label="resolved_benign", ccd_score=0.1, ccd_flag=False, regex_flag=False),
-            _row("cal-2", split="calibration", label="resolved_benign", ccd_score=0.2, ccd_flag=False, regex_flag=False),
-            _row("cal-3", split="calibration", label="resolved_benign", ccd_score=0.3, ccd_flag=False, regex_flag=False),
-            _row("pos-1", split="test", label="verified_executable_semantics", ccd_score=0.5, ccd_flag=True, regex_flag=False),
-            _row("pos-2", split="test", label="verified_executable_semantics", ccd_score=0.2, ccd_flag=False, regex_flag=True),
-            _row("neg-1", split="test", label="resolved_benign", ccd_score=0.4, ccd_flag=True, regex_flag=True),
-            _row("neg-2", split="test", label="resolved_benign", ccd_score=0.1, ccd_flag=False, regex_flag=False),
-            _row("unk-1", split="test", label="unresolved", ccd_score=0.9, ccd_flag=True, regex_flag=True),
+            _row("cal-1", split="calibration", label="resolved_benign", ccd_score=0.1, ccd_flag=False),
+            _row("cal-2", split="calibration", label="resolved_benign", ccd_score=0.2, ccd_flag=False),
+            _row("cal-3", split="calibration", label="resolved_benign", ccd_score=0.3, ccd_flag=False),
+            _row("pos-1", split="test", label="verified_executable_semantics", ccd_score=0.5, ccd_flag=True),
+            _row("pos-2", split="test", label="verified_executable_semantics", ccd_score=0.2, ccd_flag=False),
+            _row("neg-1", split="test", label="resolved_benign", ccd_score=0.4, ccd_flag=True),
+            _row("neg-2", split="test", label="resolved_benign", ccd_score=0.1, ccd_flag=False),
+            _row("unk-1", split="test", label="unresolved", ccd_score=0.9, ccd_flag=True),
         ],
     )
 
@@ -81,9 +79,7 @@ def test_recompute_metrics_replays_conformal_threshold_and_excludes_calibration_
     assert metrics["fixed_fpr_replay"]["tpr"] == 0.5
     assert metrics["fixed_fpr_replay"]["fpr"] == 0.5
     assert metrics["resolved_row_replay"]["ccd_flag_metrics"]["tpr"] == 0.5
-    assert metrics["resolved_row_replay"]["regex_waf_metrics"]["fpr"] == 0.5
-    assert metrics["detector_overlap"]["resolved"]["rows_with_both_predictions"] == 7
-    assert metrics["detector_overlap"]["positives"]["ccd_true_regex_false"] == 1
+    assert metrics["ccd_output_counts"]["effective_ccd_flag_sources"]["released_ccd_flag"] == 8
 
 
 def test_recompute_metrics_reports_missing_public_scores(tmp_path: Path) -> None:
@@ -91,8 +87,8 @@ def test_recompute_metrics_reports_missing_public_scores(tmp_path: Path) -> None
     _write_jsonl(
         release,
         [
-            _row("cal-1", split="calibration", label="resolved_benign", ccd_score=None, ccd_flag=None, regex_flag=False),
-            _row("neg-1", split="test", label="resolved_benign", ccd_score=None, ccd_flag=None, regex_flag=False),
+            _row("cal-1", split="calibration", label="resolved_benign", ccd_score=None, ccd_flag=None),
+            _row("neg-1", split="test", label="resolved_benign", ccd_score=None, ccd_flag=None),
         ],
     )
 
@@ -109,14 +105,14 @@ def test_recompute_metrics_replays_grouped_public_calibration_thresholds(tmp_pat
     _write_jsonl(
         release,
         [
-            _row("g1-cal-1", split="calibration", label="resolved_benign", ccd_score=0.1, ccd_flag=False, regex_flag=False, calibration_group="public_g1"),
-            _row("g1-cal-2", split="calibration", label="resolved_benign", ccd_score=0.2, ccd_flag=False, regex_flag=False, calibration_group="public_g1"),
-            _row("g2-cal-1", split="calibration", label="resolved_benign", ccd_score=0.8, ccd_flag=False, regex_flag=False, calibration_group="public_g2"),
-            _row("g2-cal-2", split="calibration", label="resolved_benign", ccd_score=0.9, ccd_flag=False, regex_flag=False, calibration_group="public_g2"),
-            _row("g1-pos", split="test", label="verified_executable_semantics", ccd_score=0.3, ccd_flag=True, regex_flag=False, calibration_group="public_g1"),
-            _row("g1-neg", split="test", label="resolved_benign", ccd_score=0.3, ccd_flag=True, regex_flag=False, calibration_group="public_g1"),
-            _row("g2-pos", split="test", label="verified_executable_semantics", ccd_score=0.85, ccd_flag=False, regex_flag=False, calibration_group="public_g2"),
-            _row("g2-neg", split="test", label="resolved_benign", ccd_score=0.85, ccd_flag=False, regex_flag=False, calibration_group="public_g2"),
+            _row("g1-cal-1", split="calibration", label="resolved_benign", ccd_score=0.1, ccd_flag=False, calibration_group="public_g1"),
+            _row("g1-cal-2", split="calibration", label="resolved_benign", ccd_score=0.2, ccd_flag=False, calibration_group="public_g1"),
+            _row("g2-cal-1", split="calibration", label="resolved_benign", ccd_score=0.8, ccd_flag=False, calibration_group="public_g2"),
+            _row("g2-cal-2", split="calibration", label="resolved_benign", ccd_score=0.9, ccd_flag=False, calibration_group="public_g2"),
+            _row("g1-pos", split="test", label="verified_executable_semantics", ccd_score=0.3, ccd_flag=True, calibration_group="public_g1"),
+            _row("g1-neg", split="test", label="resolved_benign", ccd_score=0.3, ccd_flag=True, calibration_group="public_g1"),
+            _row("g2-pos", split="test", label="verified_executable_semantics", ccd_score=0.85, ccd_flag=False, calibration_group="public_g2"),
+            _row("g2-neg", split="test", label="resolved_benign", ccd_score=0.85, ccd_flag=False, calibration_group="public_g2"),
         ],
     )
 
@@ -140,8 +136,8 @@ def test_recompute_metrics_cli_writes_output(tmp_path: Path) -> None:
     _write_jsonl(
         release,
         [
-            _row("cal-1", split="calibration", label="resolved_benign", ccd_score=0.1, ccd_flag=False, regex_flag=False),
-            _row("neg-1", split="test", label="resolved_benign", ccd_score=0.2, ccd_flag=True, regex_flag=False),
+            _row("cal-1", split="calibration", label="resolved_benign", ccd_score=0.1, ccd_flag=False),
+            _row("neg-1", split="test", label="resolved_benign", ccd_score=0.2, ccd_flag=True),
         ],
     )
 

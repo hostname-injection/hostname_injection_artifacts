@@ -10,7 +10,7 @@ Private-origin grouping checks are fail-closed verification gates. They may be u
 
 ## What the Release Supports
 
-The release supports row-level replay of the benchmark task: loading released artifacts, applying the public canonicalizer, recomputing detector outputs where configured, and reproducing TPR/FPR and overlap metrics under the published split and threshold protocol.
+The release supports row-level replay of the benchmark task: loading released artifacts, applying the public canonicalizer, recomputing CCD outputs where configured, and reproducing CCD TPR/FPR under the published split and threshold protocol.
 
 ## What the Release Does Not Support
 

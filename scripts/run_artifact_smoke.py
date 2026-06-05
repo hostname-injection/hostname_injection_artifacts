@@ -119,7 +119,7 @@ def main() -> int:
             env=deid_env(),
         )
         metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
-        if metrics.get("n_rows") != 150 or "fixed_fpr_replay" not in metrics or "detector_overlap" not in metrics:
+        if metrics.get("n_rows") != 150 or "fixed_fpr_replay" not in metrics or "ccd_output_counts" not in metrics:
             raise RuntimeError("unexpected recomputed public metrics output")
         fixed_fpr = metrics["fixed_fpr_replay"]
         calibration = metrics.get("calibration", {})

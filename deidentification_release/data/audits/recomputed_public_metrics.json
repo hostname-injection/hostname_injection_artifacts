@@ -61,23 +61,7 @@
     "threshold": 0.58,
     "threshold_source": "recomputed_from_public_grouped_calibration_scores"
   },
-  "detector_overlap": {
-    "by_label": {
-      "resolved_benign": {
-        "ccd_false_regex_false": 76,
-        "ccd_false_regex_true": 18,
-        "ccd_true_regex_false": 4,
-        "ccd_true_regex_true": 2,
-        "rows_with_both_predictions": 100
-      },
-      "verified_executable_semantics": {
-        "ccd_false_regex_false": 1,
-        "ccd_false_regex_true": 3,
-        "ccd_true_regex_false": 15,
-        "ccd_true_regex_true": 31,
-        "rows_with_both_predictions": 50
-      }
-    },
+  "ccd_output_counts": {
     "ccd_flag_counts": {
       "False": 98,
       "True": 52
@@ -87,38 +71,6 @@
     },
     "effective_ccd_flag_sources": {
       "released_ccd_flag": 150
-    },
-    "negatives": {
-      "ccd_false_regex_false": 76,
-      "ccd_false_regex_true": 18,
-      "ccd_true_regex_false": 4,
-      "ccd_true_regex_true": 2,
-      "rows_with_both_predictions": 100
-    },
-    "overall": {
-      "ccd_false_regex_false": 77,
-      "ccd_false_regex_true": 21,
-      "ccd_true_regex_false": 19,
-      "ccd_true_regex_true": 33,
-      "rows_with_both_predictions": 150
-    },
-    "positives": {
-      "ccd_false_regex_false": 1,
-      "ccd_false_regex_true": 3,
-      "ccd_true_regex_false": 15,
-      "ccd_true_regex_true": 31,
-      "rows_with_both_predictions": 50
-    },
-    "regex_waf_flag_counts": {
-      "False": 96,
-      "True": 54
-    },
-    "resolved": {
-      "ccd_false_regex_false": 77,
-      "ccd_false_regex_true": 21,
-      "ccd_true_regex_false": 19,
-      "ccd_true_regex_true": 33,
-      "rows_with_both_predictions": 150
     }
   },
   "fixed_fpr_replay": {
@@ -189,21 +141,7 @@
     "metric_negative_rows": 91,
     "metric_positive_rows": 45,
     "negative_rows": 100,
-    "positive_rows": 50,
-    "regex_waf_fpr": 0.18681318681318682,
-    "regex_waf_metrics": {
-      "fn": 14,
-      "fp": 17,
-      "fpr": 0.18681318681318682,
-      "metric_negative_rows_with_predictions": 91,
-      "metric_positive_rows_with_predictions": 45,
-      "metric_rows_with_predictions": 136,
-      "rows_with_predictions": 150,
-      "tn": 74,
-      "tp": 31,
-      "tpr": 0.6888888888888889
-    },
-    "regex_waf_tpr": 0.6888888888888889
+    "positive_rows": 50
   },
   "resolved_rows": 150,
   "unresolved_rows": 0

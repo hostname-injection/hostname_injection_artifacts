@@ -225,7 +225,7 @@ def validate_audits(audit_dir: Path, release_rows: int | None, failures: list[st
             require(isinstance(metrics.get("label_accounting"), dict), "recomputed metrics missing label accounting", failures)
             require(isinstance(metrics.get("calibration"), dict), "recomputed metrics missing calibration accounting", failures)
             require(isinstance(metrics.get("fixed_fpr_replay"), dict), "recomputed metrics missing fixed-FPR replay block", failures)
-            require(isinstance(metrics.get("detector_overlap"), dict), "recomputed metrics missing detector-overlap block", failures)
+            require(isinstance(metrics.get("ccd_output_counts"), dict), "recomputed metrics missing CCD output counts block", failures)
             label_accounting = metrics.get("label_accounting", {})
             fixed_fpr = metrics.get("fixed_fpr_replay", {})
             if isinstance(label_accounting, dict):
