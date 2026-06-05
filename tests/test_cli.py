@@ -200,6 +200,23 @@ def test_calibrate_parser_smoke():
     assert str(args.save_model) == "calibrated_model.npz"
 
 
+def test_calibrate_parser_requires_saved_model_bundle():
+    parser = build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "calibrate",
+                "--model",
+                "ccd_model.npz",
+                "--benign",
+                "benign.txt",
+                "--output",
+                "calibration.json",
+            ]
+        )
+
+
 def test_calibrate_can_embed_threshold_in_model_bundle(tmp_path, monkeypatch):
     benign = tmp_path / "benign.txt"
     benign.write_text("alpha.example\nbeta.example\n")

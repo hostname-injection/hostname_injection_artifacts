@@ -55,4 +55,5 @@ def test_root_readme_requires_embedded_calibrated_threshold_for_downstream_comma
     normalized = " ".join(readme.split())
 
     assert "ccd calibrate --save-model" in normalized
+    assert "`--save-model` is required" in normalized
     assert "do not accept ad hoc threshold or calibration-file overrides" in normalized

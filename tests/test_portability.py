@@ -3,6 +3,9 @@ import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+import scripts.calibrate as calibrate_script
 import scripts.train_caho_corpus as train_caho_corpus
 
 
@@ -63,6 +66,22 @@ def test_train_caho_corpus_wrapper_uses_current_interpreter():
 
     assert cmd[:3] == [sys.executable, "-m", "ccd.cli"]
     assert "train-caho-corpus" in cmd
+
+
+def test_standalone_calibrate_script_requires_saved_model_bundle():
+    parser = calibrate_script.build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "--model",
+                "ccd_model.npz",
+                "--benign",
+                "benign.txt",
+                "--output",
+                "calibration.json",
+            ]
+        )
 
 
 def test_pyproject_exports_reviewer_console_scripts_and_packages():

@@ -16,7 +16,7 @@ def read_lines(path: Path):
     return read_nonempty_lines(path)
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, type=Path)
     parser.add_argument("--benign", required=True, type=Path)
@@ -25,12 +25,17 @@ def main() -> None:
     parser.add_argument(
         "--save-model",
         type=Path,
-        default=None,
-        help="Optional path for a model bundle with the calibrated threshold embedded.",
+        required=True,
+        help="Path for the calibrated model bundle with the calibrated threshold embedded.",
     )
     parser.add_argument("--alpha", type=float, default=None)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--no-normalize", action="store_true", help="Skip hostname normalization")
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
 
     model = load_model(args.model)
@@ -61,18 +66,17 @@ def main() -> None:
         },
     }
     args.output.write_text(json.dumps(output, indent=2))
-    if args.save_model:
-        save_model(
-            args.save_model,
-            ModelBundle(
-                axes=model.cones.axes,
-                benign_prior=model.benign_prior,
-                malicious_priors=model.malicious_priors,
-                config=model.config,
-                threshold=threshold,
-                grouped_thresholds=grouped_thresholds or None,
-            ),
-        )
+    save_model(
+        args.save_model,
+        ModelBundle(
+            axes=model.cones.axes,
+            benign_prior=model.benign_prior,
+            malicious_priors=model.malicious_priors,
+            config=model.config,
+            threshold=threshold,
+            grouped_thresholds=grouped_thresholds or None,
+        ),
+    )
     print(f"Wrote calibration to {args.output}")
 
 

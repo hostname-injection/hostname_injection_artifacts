@@ -374,18 +374,17 @@ def cmd_calibrate(args: argparse.Namespace) -> None:
         },
     }
     args.output.write_text(json.dumps(output, indent=2))
-    if args.save_model:
-        save_model(
-            args.save_model,
-            ModelBundle(
-                axes=model.cones.axes,
-                benign_prior=model.benign_prior,
-                malicious_priors=model.malicious_priors,
-                config=model.config,
-                threshold=threshold,
-                grouped_thresholds=grouped_thresholds or None,
-            ),
-        )
+    save_model(
+        args.save_model,
+        ModelBundle(
+            axes=model.cones.axes,
+            benign_prior=model.benign_prior,
+            malicious_priors=model.malicious_priors,
+            config=model.config,
+            threshold=threshold,
+            grouped_thresholds=grouped_thresholds or None,
+        ),
+    )
     print(f"Wrote calibration to {args.output}")
 
 
@@ -716,8 +715,8 @@ def build_parser() -> argparse.ArgumentParser:
     calibrate.add_argument(
         "--save-model",
         type=Path,
-        default=None,
-        help="Optional path for a model bundle with the calibrated threshold embedded.",
+        required=True,
+        help="Path for the calibrated model bundle with the calibrated threshold embedded.",
     )
     calibrate.add_argument("--alpha", type=float, default=None)
     calibrate.add_argument("--batch-size", type=int, default=64)

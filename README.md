@@ -214,6 +214,8 @@ ccd calibrate \
 
 The calibration output records the split-conformal order-statistic rank, score
 path, threshold source, and the strict `score > threshold` decision rule.
+`--save-model` is required so later commands consume the same embedded
+threshold and grouped-threshold state.
 
 ## Benign-Prior Refresh
 
