@@ -48,3 +48,11 @@ def test_root_readme_maps_reviewer_evidence_to_method_surfaces():
         "de-identification release gates",
     ]:
         assert phrase in normalized
+
+
+def test_root_readme_requires_embedded_calibrated_threshold_for_downstream_commands():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    normalized = " ".join(readme.split())
+
+    assert "ccd calibrate --save-model" in normalized
+    assert "do not accept ad hoc threshold or calibration-file overrides" in normalized

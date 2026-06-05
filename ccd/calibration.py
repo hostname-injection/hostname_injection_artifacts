@@ -30,6 +30,16 @@ def coerce_finite_threshold(value: float | int | str, *, name: str = "threshold"
     return threshold
 
 
+def require_calibrated_threshold(model: Any, *, purpose: str) -> float:
+    """Return the embedded calibrated threshold required for reviewer-facing use."""
+    if getattr(model, "threshold", None) is None:
+        raise ValueError(
+            f"{purpose} requires a calibrated model bundle with an embedded threshold; "
+            "run `ccd calibrate --save-model ...` first"
+        )
+    return coerce_finite_threshold(model.threshold, name="model bundle threshold")
+
+
 def calibration_order_statistic_rank(n: int, alpha: float) -> int:
     if n <= 0:
         raise ValueError("n must be positive")

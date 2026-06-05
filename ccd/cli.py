@@ -42,7 +42,7 @@ from .train import (
 import numpy as np
 from .calibration import (
     calibrate_thresholds_by_group,
-    coerce_finite_threshold,
+    require_calibrated_threshold,
     split_conformal_threshold_metadata,
     threshold_for_group,
 )
@@ -301,14 +301,8 @@ def cmd_score(args: argparse.Namespace) -> None:
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]
     groups = _read_parallel_lines(args.groups, len(hostnames), field_name="groups") if args.groups else None
-    threshold = coerce_finite_threshold(
-        args.threshold if args.threshold is not None else (model.threshold if model.threshold is not None else 0.0)
-    )
+    threshold = require_calibrated_threshold(model, purpose="ccd score")
     grouped_thresholds = getattr(model, "grouped_thresholds", None)
-    if args.calibration:
-        calib = json.loads(args.calibration.read_text())
-        threshold = coerce_finite_threshold(calib.get("threshold", threshold))
-        grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
 
     scores = model.score(
         hostnames,
@@ -441,24 +435,10 @@ def cmd_certify(args: argparse.Namespace) -> None:
     model = load_model(args.model)
     _require_model_bundle_caho_checkpoint(model, purpose="ccd certify")
     hostnames = _read_lines(args.input)
-    threshold = coerce_finite_threshold(
-        args.threshold if args.threshold is not None else (model.threshold if model.threshold is not None else 0.0)
-    )
-    threshold_source = (
-        "cli_threshold"
-        if args.threshold is not None
-        else ("model_bundle_threshold" if model.threshold is not None else "default_zero_threshold")
-    )
+    threshold = require_calibrated_threshold(model, purpose="ccd certify")
+    threshold_source = "model_bundle_threshold"
     grouped_thresholds = getattr(model, "grouped_thresholds", None)
     grouped_thresholds_source = "model_bundle_grouped_thresholds" if grouped_thresholds else "none"
-    if args.calibration:
-        calib = json.loads(args.calibration.read_text())
-        if "threshold" in calib:
-            threshold = coerce_finite_threshold(calib["threshold"])
-            threshold_source = "calibration_file_threshold"
-        if "grouped_thresholds" in calib:
-            grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
-            grouped_thresholds_source = "calibration_file_grouped_thresholds" if grouped_thresholds else "none"
     groups = _read_parallel_lines(args.groups, len(hostnames), field_name="groups") if args.groups else None
 
     edit_model = None
@@ -703,8 +683,6 @@ def build_parser() -> argparse.ArgumentParser:
     score.add_argument("--model", required=True, type=Path)
     score.add_argument("--input", required=True, type=Path)
     score.add_argument("--output", required=True, type=Path)
-    score.add_argument("--threshold", type=float, default=None)
-    score.add_argument("--calibration", type=Path, default=None, help="JSON file from `ccd calibrate`")
     score.add_argument("--groups", type=Path, default=None, help="Optional one-calibration-group-per-input-row file.")
     score.add_argument(
         "--require-group-thresholds",
@@ -796,8 +774,6 @@ def build_parser() -> argparse.ArgumentParser:
     certify.add_argument("--input", required=True, type=Path)
     certify.add_argument("--output", required=True, type=Path)
     certify.add_argument("--radius", type=int, required=True)
-    certify.add_argument("--threshold", type=float, default=None)
-    certify.add_argument("--calibration", type=Path, default=None, help="JSON file from `ccd calibrate`")
     certify.add_argument("--groups", type=Path, default=None, help="Optional one-calibration-group-per-input-row file.")
     certify.add_argument(
         "--require-group-thresholds",

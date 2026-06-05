@@ -117,6 +117,9 @@ There is no supported path for training, scoring, calibrating, refreshing, or
 certifying CCD without a trained CAHO checkpoint. The repository also does not
 provide a user-logins-only CAHO or CCD training path; training is expected to
 use all available benchmark families.
+Scoring, explanation, and certification require the calibrated threshold to be
+embedded in the model bundle by `ccd calibrate --save-model`; they do not accept
+ad hoc threshold or calibration-file overrides.
 
 ## CAHO Training
 

@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import List
 
-from .calibration import SPLIT_CONFORMAL_DECISION_RULE, coerce_finite_threshold
+from .calibration import SPLIT_CONFORMAL_DECISION_RULE, require_calibrated_threshold
 from .encoder import require_model_uses_trained_caho_checkpoint
 from .io import load_model
 from .line_io import read_nonempty_lines, read_parallel_lines
@@ -22,8 +22,6 @@ def add_explain_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     parser.add_argument("--model", required=True, type=Path, help="CCD .npz model bundle")
     parser.add_argument("--input", required=True, type=Path, help="Input file of hostnames (one per line)")
     parser.add_argument("--output", type=Path, default=None, help="Optional JSON output path")
-    parser.add_argument("--threshold", type=float, default=None)
-    parser.add_argument("--calibration", type=Path, default=None, help="JSON file from `ccd calibrate`")
     parser.add_argument("--groups", type=Path, default=None, help="Optional one-calibration-group-per-input-row file.")
     parser.add_argument(
         "--require-group-thresholds",
@@ -50,21 +48,10 @@ def run(args: argparse.Namespace) -> int:
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]
     groups = read_parallel_lines(args.groups, len(hostnames), "groups") if args.groups else None
-    threshold_source = "model_bundle_threshold" if model.threshold is not None else "default_zero_threshold"
-    if args.threshold is not None:
-        model.threshold = coerce_finite_threshold(args.threshold)
-        threshold_source = "cli_threshold"
+    threshold = require_calibrated_threshold(model, purpose="ccd-explain")
+    threshold_source = "model_bundle_threshold"
     grouped_thresholds = getattr(model, "grouped_thresholds", None)
     grouped_thresholds_source = "model_bundle_grouped_thresholds" if grouped_thresholds else "none"
-    if args.calibration:
-        calib = json.loads(args.calibration.read_text())
-        if "threshold" in calib:
-            model.threshold = coerce_finite_threshold(calib["threshold"])
-            threshold_source = "calibration_file_threshold"
-        if "grouped_thresholds" in calib:
-            model.grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
-            grouped_thresholds = model.grouped_thresholds
-            grouped_thresholds_source = "calibration_file_grouped_thresholds" if grouped_thresholds else "none"
 
     explanations = model.explain(
         hostnames,
@@ -91,7 +78,7 @@ def run(args: argparse.Namespace) -> int:
         "model": str(args.model),
         "count": len(explanations),
         "top_k": args.top_k,
-        "threshold": coerce_finite_threshold(model.threshold if model.threshold is not None else 0.0),
+        "threshold": threshold,
         "threshold_source": threshold_source,
         "grouped_thresholds_source": grouped_thresholds_source,
         "grouped_thresholds_used": groups is not None,

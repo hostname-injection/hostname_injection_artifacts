@@ -266,57 +266,24 @@ def test_calibrate_can_embed_threshold_in_model_bundle(tmp_path, monkeypatch):
     assert payload["score_path"]["normalized_inputs"] is False
 
 
-def test_score_applies_grouped_thresholds(tmp_path, monkeypatch):
-    queries = tmp_path / "queries.txt"
-    queries.write_text("alpha.example\nbeta.example\n", encoding="utf-8")
-    groups = tmp_path / "groups.txt"
-    groups.write_text("tenant-a\ntenant-b\n", encoding="utf-8")
-    calibration = tmp_path / "calibration.json"
-    calibration.write_text(
-        json.dumps(
-            {
-                "threshold": 0.5,
-                "grouped_thresholds": {
-                    "tenant-a": {"threshold": 0.7},
-                    "tenant-b": {"threshold": 0.4},
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    output = tmp_path / "scores.csv"
-
-    dummy_model = SimpleNamespace(
-        threshold=None,
-        grouped_thresholds=None,
-        score=lambda hostnames, **_kwargs: np.array([0.6, 0.6], dtype=np.float32),
-    )
-    monkeypatch.setattr(cli_module, "load_model", lambda _path: dummy_model)
-
+def test_score_parser_rejects_threshold_and_calibration_overrides():
     parser = build_parser()
-    args = parser.parse_args(
-        [
-            "score",
-            "--model",
-            "model.npz",
-            "--input",
-            str(queries),
-            "--output",
-            str(output),
-            "--calibration",
-            str(calibration),
-            "--groups",
-            str(groups),
-            "--require-group-thresholds",
-            "--no-normalize",
-        ]
-    )
-    args.func(args)
 
-    lines = output.read_text(encoding="utf-8").splitlines()
-    assert lines[0] == "hostname,calibration_group,threshold,score,prediction"
-    assert lines[1].endswith("tenant-a,0.700000,0.600000,0")
-    assert lines[2].endswith("tenant-b,0.400000,0.600000,1")
+    base = ["score", "--model", "model.npz", "--input", "queries.txt", "--output", "scores.csv"]
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--threshold", "0.5"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--calibration", "calibration.json"])
+
+
+def test_explain_parser_rejects_threshold_and_calibration_overrides():
+    parser = build_parser()
+
+    base = ["explain", "--model", "model.npz", "--input", "queries.txt", "--output", "explanations.json"]
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--threshold", "0.5"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--calibration", "calibration.json"])
 
 
 def test_score_csv_preserves_raw_artifact_commas(tmp_path, monkeypatch):
@@ -351,19 +318,17 @@ def test_score_csv_preserves_raw_artifact_commas(tmp_path, monkeypatch):
     assert rows == [["hostname", "threshold", "score", "prediction"], ["alpha,one.example", "0.500000", "0.600000", "1"]]
 
 
-def test_score_rejects_non_finite_calibration_threshold_before_scoring(tmp_path, monkeypatch):
+def test_score_rejects_uncalibrated_model_bundle_before_scoring(tmp_path, monkeypatch):
     queries = tmp_path / "queries.txt"
     queries.write_text("alpha.example\n", encoding="utf-8")
-    calibration = tmp_path / "calibration.json"
-    calibration.write_text('{"threshold": NaN}', encoding="utf-8")
     output = tmp_path / "scores.csv"
 
     class FailingModel:
-        threshold = 0.5
+        threshold = None
         grouped_thresholds = None
 
         def score(self, hostnames, **_kwargs):
-            raise AssertionError("score should not run with invalid calibration threshold")
+            raise AssertionError("score should not run without an embedded calibrated threshold")
 
     monkeypatch.setattr(cli_module, "load_model", lambda _path: FailingModel())
 
@@ -377,11 +342,39 @@ def test_score_rejects_non_finite_calibration_threshold_before_scoring(tmp_path,
             str(queries),
             "--output",
             str(output),
-            "--calibration",
-            str(calibration),
         ]
     )
-    with pytest.raises(ValueError, match="threshold.*finite"):
+    with pytest.raises(ValueError, match="requires a calibrated model bundle"):
+        args.func(args)
+
+
+def test_score_rejects_non_finite_model_bundle_threshold_before_scoring(tmp_path, monkeypatch):
+    queries = tmp_path / "queries.txt"
+    queries.write_text("alpha.example\n", encoding="utf-8")
+    output = tmp_path / "scores.csv"
+
+    class FailingModel:
+        threshold = float("nan")
+        grouped_thresholds = None
+
+        def score(self, hostnames, **_kwargs):
+            raise AssertionError("score should not run with invalid model threshold")
+
+    monkeypatch.setattr(cli_module, "load_model", lambda _path: FailingModel())
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "score",
+            "--model",
+            "model.npz",
+            "--input",
+            str(queries),
+            "--output",
+            str(output),
+        ]
+    )
+    with pytest.raises(ValueError, match="model bundle threshold.*finite"):
         args.func(args)
 
 
@@ -569,6 +562,48 @@ def test_certify_parser_smoke():
     assert args.cert_method == "combined"
     assert args.sketch_lipschitz == 0.1
     assert args.embedding_rotation_bound == 0.2
+
+
+def test_certify_parser_rejects_threshold_and_calibration_overrides():
+    parser = build_parser()
+
+    base = ["certify", "--model", "model.npz", "--input", "queries.txt", "--output", "certificates.json", "--radius", "1"]
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--threshold", "0.5"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--calibration", "calibration.json"])
+
+
+def test_certify_rejects_uncalibrated_model_bundle_before_certifying(tmp_path, monkeypatch):
+    input_path = tmp_path / "queries.txt"
+    input_path.write_text("alpha.example\n", encoding="utf-8")
+    output_path = tmp_path / "certificates.json"
+
+    class FailingModel:
+        threshold = None
+        grouped_thresholds = None
+
+        def certify(self, hostname, **kwargs):
+            raise AssertionError("certify should not run without an embedded calibrated threshold")
+
+    monkeypatch.setattr(cli_module, "load_model", lambda _path: FailingModel())
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "certify",
+            "--model",
+            "model.npz",
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--radius",
+            "1",
+        ]
+    )
+    with pytest.raises(ValueError, match="requires a calibrated model bundle"):
+        args.func(args)
 
 
 def test_certify_writes_scope_and_combined_method_args(tmp_path, monkeypatch):

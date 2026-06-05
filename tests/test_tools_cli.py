@@ -127,19 +127,17 @@ def test_score_cli_preserves_raw_artifact_commas(tmp_path, monkeypatch):
     assert rows == [["hostname", "threshold", "score", "prediction"], ["alpha,one.example", "0.500000", "0.600000", "1"]]
 
 
-def test_score_cli_rejects_non_finite_calibration_threshold_before_scoring(tmp_path, monkeypatch):
+def test_score_cli_rejects_uncalibrated_model_bundle_before_scoring(tmp_path, monkeypatch):
     input_path = tmp_path / "input.txt"
-    calibration_path = tmp_path / "calibration.json"
     output_path = tmp_path / "out.csv"
     input_path.write_text("alpha.example\n", encoding="utf-8")
-    calibration_path.write_text('{"threshold": NaN}', encoding="utf-8")
 
     class FailingModel:
-        threshold = 0.5
+        threshold = None
         grouped_thresholds = None
 
         def score(self, hostnames, **kwargs):
-            raise AssertionError("score should not run with invalid calibration threshold")
+            raise AssertionError("score should not run without an embedded calibrated threshold")
 
     monkeypatch.setattr(score_cli, "load_model", lambda _: FailingModel())
     monkeypatch.setattr(
@@ -153,12 +151,41 @@ def test_score_cli_rejects_non_finite_calibration_threshold_before_scoring(tmp_p
             str(input_path),
             "--output",
             str(output_path),
-            "--calibration",
-            str(calibration_path),
         ],
     )
 
-    with pytest.raises(ValueError, match="threshold.*finite"):
+    with pytest.raises(ValueError, match="requires a calibrated model bundle"):
+        score_cli.main()
+
+
+def test_score_cli_rejects_non_finite_model_bundle_threshold_before_scoring(tmp_path, monkeypatch):
+    input_path = tmp_path / "input.txt"
+    output_path = tmp_path / "out.csv"
+    input_path.write_text("alpha.example\n", encoding="utf-8")
+
+    class FailingModel:
+        threshold = float("nan")
+        grouped_thresholds = None
+
+        def score(self, hostnames, **kwargs):
+            raise AssertionError("score should not run with invalid model threshold")
+
+    monkeypatch.setattr(score_cli, "load_model", lambda _: FailingModel())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ccd-score",
+            "--model",
+            "model.npz",
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="model bundle threshold.*finite"):
         score_cli.main()
 
 
@@ -275,19 +302,17 @@ def test_explain_cli_outputs_json(tmp_path, monkeypatch):
     assert data["explanations"][0]["threshold_source"] == "model_bundle_grouped_thresholds"
 
 
-def test_explain_cli_rejects_non_finite_calibration_threshold_before_explaining(tmp_path, monkeypatch):
+def test_explain_cli_rejects_non_finite_model_bundle_threshold_before_explaining(tmp_path, monkeypatch):
     input_path = tmp_path / "input.txt"
-    calibration_path = tmp_path / "calibration.json"
     output_path = tmp_path / "explain.json"
     input_path.write_text("alpha.example\n", encoding="utf-8")
-    calibration_path.write_text('{"threshold": NaN}', encoding="utf-8")
 
     class FailingModel:
-        threshold = 0.5
+        threshold = float("nan")
         grouped_thresholds = None
 
         def explain(self, hostnames, **kwargs):
-            raise AssertionError("explain should not run with invalid calibration threshold")
+            raise AssertionError("explain should not run with invalid model threshold")
 
     monkeypatch.setattr(explain, "load_model", lambda _: FailingModel())
     monkeypatch.setattr(
@@ -301,12 +326,41 @@ def test_explain_cli_rejects_non_finite_calibration_threshold_before_explaining(
             str(input_path),
             "--output",
             str(output_path),
-            "--calibration",
-            str(calibration_path),
         ],
     )
 
-    with pytest.raises(ValueError, match="threshold.*finite"):
+    with pytest.raises(ValueError, match="model bundle threshold.*finite"):
+        explain.main()
+
+
+def test_explain_cli_rejects_uncalibrated_model_bundle_before_explaining(tmp_path, monkeypatch):
+    input_path = tmp_path / "input.txt"
+    output_path = tmp_path / "explain.json"
+    input_path.write_text("alpha.example\n", encoding="utf-8")
+
+    class FailingModel:
+        threshold = None
+        grouped_thresholds = None
+
+        def explain(self, hostnames, **kwargs):
+            raise AssertionError("explain should not run without an embedded calibrated threshold")
+
+    monkeypatch.setattr(explain, "load_model", lambda _: FailingModel())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ccd-explain",
+            "--model",
+            "model.npz",
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="requires a calibrated model bundle"):
         explain.main()
 
 

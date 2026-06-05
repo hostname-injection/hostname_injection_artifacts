@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
 import numpy as np
 
-from .calibration import coerce_finite_threshold, threshold_for_group
+from .calibration import require_calibrated_threshold, threshold_for_group
 from .csv_io import write_score_csv
 from .encoder import require_model_uses_trained_caho_checkpoint
 from .io import load_model
@@ -25,8 +24,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", required=True, type=Path)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--threshold", type=float, default=None)
-    parser.add_argument("--calibration", type=Path, default=None, help="JSON file from calibrate")
     parser.add_argument("--groups", type=Path, default=None, help="Optional one-calibration-group-per-input-row file.")
     parser.add_argument(
         "--require-group-thresholds",
@@ -51,14 +48,8 @@ def main() -> int:
         hostnames = [normalize_hostname(h) for h in hostnames]
     groups = read_parallel_lines(args.groups, len(hostnames), "groups") if args.groups else None
 
-    threshold = coerce_finite_threshold(
-        args.threshold if args.threshold is not None else (model.threshold if model.threshold is not None else 0.0)
-    )
+    threshold = require_calibrated_threshold(model, purpose="ccd-score")
     grouped_thresholds = getattr(model, "grouped_thresholds", None)
-    if args.calibration:
-        calib = json.loads(args.calibration.read_text())
-        threshold = coerce_finite_threshold(calib.get("threshold", threshold))
-        grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
 
     scores = model.score(
         hostnames,
