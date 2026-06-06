@@ -1,3 +1,4 @@
+import sys
 from types import SimpleNamespace
 
 import random
@@ -8,7 +9,6 @@ from ccd.augment import AugmentConfig, CAHOAugmenter, WeightedAugmentConfig
 from ccd.train import (
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHODataset,
-    CAHOTrainer,
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_WEIGHT_DECAY,
     CAHO_TRAINING_SETTING_FIELDS,
@@ -16,8 +16,8 @@ from ccd.train import (
     Sample,
     caho_training_default_deviations,
     pairwise_contrastive_loss,
+    orbit_labels_from_families,
     split_input_fn,
-    supcon_loss,
     supervised_orbit_contrastive_loss,
     warn_if_caho_training_defaults_changed,
 )
@@ -82,21 +82,23 @@ def test_caho_dataset_seed_replays_augmented_views():
     assert first[0] != second[0]
 
 
+def test_orbit_labels_keep_benign_unique_and_group_positive_families():
+    labels = orbit_labels_from_families([None, "cmd", "cmd", "sql", None])
+
+    assert labels[1] == labels[2]
+    assert labels[1] != labels[3]
+    assert labels[0] not in {labels[1], labels[3], labels[4]}
+    assert labels[4] not in {labels[1], labels[3]}
+
+
 def test_caho_trainers_default_to_paper_optimizer_recipe():
-    supcon_trainer = CAHOTrainer(object())
     contrastive_trainer = ContrastiveTrainer(object())
 
-    assert supcon_trainer.lr == CAHO_DEFAULT_LR == 1e-4
-    assert supcon_trainer.weight_decay == CAHO_DEFAULT_WEIGHT_DECAY == 1e-2
-    assert contrastive_trainer.lr == CAHO_DEFAULT_LR
+    assert contrastive_trainer.lr == CAHO_DEFAULT_LR == 1e-4
     assert contrastive_trainer.weight_decay == CAHO_DEFAULT_WEIGHT_DECAY
 
 
 def test_caho_trainers_reject_invalid_optimizer_hyperparameters():
-    with pytest.raises(ValueError, match="lr"):
-        CAHOTrainer(object(), lr=0.0)
-    with pytest.raises(ValueError, match="weight_decay"):
-        CAHOTrainer(object(), weight_decay=-0.01)
     with pytest.raises(ValueError, match="lr"):
         ContrastiveTrainer(object(), lr=float("nan"))
     with pytest.raises(ValueError, match="weight_decay"):
@@ -151,20 +153,6 @@ def test_pairwise_contrastive_loss_misaligned():
     assert loss.item() > 1.0
 
 
-def test_supcon_loss_uses_same_sample_views_as_positives():
-    np = pytest.importorskip("numpy")
-    pytest.importorskip("torch")
-    features = np.array(
-        [
-            [[1.0, 0.0], [1.0, 0.0]],
-            [[0.0, 1.0], [0.0, 1.0]],
-        ],
-        dtype=np.float32,
-    )
-
-    assert supcon_loss(features, [0, 1], temperature=0.1) < 0.01
-
-
 def test_supervised_orbit_contrastive_loss_backpropagates():
     torch = pytest.importorskip("torch")
     embeddings1 = torch.eye(3, requires_grad=True)
@@ -177,3 +165,44 @@ def test_supervised_orbit_contrastive_loss_backpropagates():
     assert loss.item() >= 0.0
     assert embeddings1.grad is not None
     assert embeddings2.grad is not None
+
+
+def test_contrastive_trainer_grad_cache_receives_orbit_labels(monkeypatch):
+    torch = pytest.importorskip("torch")
+    captured = {}
+
+    class FakeGradCache:
+        def __init__(self, **kwargs):
+            captured["loss_fn"] = kwargs["loss_fn"]
+
+        def __call__(self, *model_inputs, **loss_kwargs):
+            captured["model_inputs"] = model_inputs
+            captured["labels"] = list(loss_kwargs["labels"])
+            return torch.tensor(0.0)
+
+    monkeypatch.setitem(sys.modules, "grad_cache", SimpleNamespace(GradCache=FakeGradCache))
+
+    model = torch.nn.Linear(1, 1)
+    dataset = [
+        ("safe.example", "www.safe.example", None),
+        ("evil.example", "www.evil.example", "cmd"),
+        ("evil2.example", "www.evil2.example", "cmd"),
+    ]
+    trainer = ContrastiveTrainer(
+        model,
+        batch_size=3,
+        temperature=0.1,
+        lr=1e-2,
+        scheduler="none",
+        min_lr=0.0,
+        use_grad_cache=True,
+        grad_cache_chunk_size=2,
+        num_workers=0,
+        loss_mode="fixed",
+    )
+
+    trainer.fit(dataset, epochs=1)
+
+    assert captured["model_inputs"][0] == ["safe.example", "evil.example", "evil2.example"]
+    assert captured["labels"][1] == captured["labels"][2]
+    assert captured["labels"][0] != captured["labels"][1]

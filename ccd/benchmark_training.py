@@ -366,7 +366,7 @@ class BenchmarkContrastiveTrainer:
             for v1, v2, labels in loader:
                 optim.zero_grad()
                 if gc_module is not None:
-                    loss_t = gc_module(v1, v2)
+                    loss_t = gc_module(v1, v2, labels=labels)
                 else:
                     e1 = self._embed_view(v1)
                     e2 = self._embed_view(v2)

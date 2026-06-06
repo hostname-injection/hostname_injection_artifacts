@@ -92,6 +92,20 @@ def test_train_caho_defaults_match_paper_recipe():
                 "--grad-cache",
             ]
         )
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "train-caho",
+                "--benign",
+                "benign.txt",
+                "--malicious",
+                "malicious.csv",
+                "--out",
+                "caho_encoder",
+                "--loss",
+                "unsupported",
+            ]
+        )
 
 
 def test_train_caho_corpus_rejects_grad_cache_toggles():
@@ -111,6 +125,8 @@ def test_train_caho_corpus_rejects_grad_cache_toggles():
         parser.parse_args([*base, "--no-grad-cache"])
     with pytest.raises(SystemExit):
         parser.parse_args([*base, "--grad-cache"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--loss", "unsupported"])
 
 
 def test_train_user_logins_command_is_not_available():

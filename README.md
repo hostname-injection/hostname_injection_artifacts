@@ -47,7 +47,7 @@ conda activate ccd
 python -m pip install -e .
 ```
 
-GradCache is required for replay-scale pairwise CAHO training. This README does
+GradCache is required for replay-scale CAHO training. This README does
 not duplicate GradCache installation instructions; use the upstream repository:
 https://github.com/luyug/GradCache
 

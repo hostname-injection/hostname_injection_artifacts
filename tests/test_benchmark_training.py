@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -440,6 +441,51 @@ def test_binary_auxiliary_head_trains_on_both_views():
 
     assert summary["steps"] == 1
     assert trainer.recording_classifier.batch_sizes == [8]
+
+
+def test_benchmark_grad_cache_receives_supervised_orbit_labels(monkeypatch):
+    torch = pytest.importorskip("torch")
+    captured = {}
+
+    class FakeGradCache:
+        def __init__(self, **kwargs):
+            captured["loss_fn"] = kwargs["loss_fn"]
+
+        def __call__(self, *model_inputs, **loss_kwargs):
+            captured["model_inputs"] = model_inputs
+            captured["labels"] = loss_kwargs["labels"].detach().cpu().tolist()
+            return torch.tensor(0.0)
+
+    monkeypatch.setitem(sys.modules, "grad_cache", SimpleNamespace(GradCache=FakeGradCache))
+
+    trainer = BenchmarkContrastiveTrainer(
+        torch.nn.Linear(1, 1),
+        batch_size=4,
+        temperature=0.1,
+        lr=1e-2,
+        max_grad_norm=1.0,
+        scheduler="none",
+        min_lr=0.0,
+        weight_decay=0.02,
+        use_grad_cache=True,
+        grad_cache_chunk_size=2,
+        num_workers=0,
+        loss_mode="fixed",
+        loss_max_scale=100.0,
+        loss_min_scale=1.0,
+        optimize_loss=False,
+        log_every=0,
+    )
+
+    trainer.fit(_TinyViewDataset(), epochs=1)
+
+    assert captured["model_inputs"][0] == [
+        "safe.example.com",
+        "status.example.net",
+        "evil.$(id).example",
+        "probe'--.example",
+    ]
+    assert captured["labels"] == [0, 0, 1, 1]
 
 
 def test_binary_trainer_rejects_grad_cache_for_supervised_orbit_objective():

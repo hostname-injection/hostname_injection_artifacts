@@ -118,7 +118,7 @@ def main() -> int:
     parser.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
     parser.add_argument("--weight-decay", type=float, default=CAHO_DEFAULT_WEIGHT_DECAY)
     parser.add_argument("--temperature", type=float, default=0.07)
-    parser.add_argument("--loss", choices=["supcon", "contrastive"], default=CAHO_DEFAULT_LOSS)
+    parser.add_argument("--loss", choices=["contrastive"], default=CAHO_DEFAULT_LOSS)
     parser.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default=CAHO_DEFAULT_AUGMENTER)
     parser.add_argument("--weighted-num-augs", type=int, default=2)
     parser.add_argument("--weighted-max-attempts", type=int, default=3)

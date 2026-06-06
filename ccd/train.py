@@ -27,7 +27,6 @@ CAHO_TRAINING_SETTING_FIELDS = (
     "lr",
     "weight_decay",
     "temperature",
-    "loss",
     "augmenter",
     "weighted_num_augs",
     "weighted_max_attempts",
@@ -137,6 +136,26 @@ def resolve_caho_batch_size(batch_size: Optional[int], *, use_grad_cache: bool) 
     return value
 
 
+def orbit_labels_from_families(labels: Sequence[Optional[str]]) -> List[int]:
+    """Map CAHO row labels to supervised contrastive orbit ids.
+
+    Benign rows keep one unique orbit per batch item so benign naming diversity
+    is not collapsed. Positive rows with the same family share an orbit.
+    """
+    label_ids: List[int] = []
+    family_map: Dict[str, int] = {}
+    next_id = 0
+    for index, family in enumerate(labels):
+        if family is None:
+            label_ids.append(-(index + 1))
+            continue
+        if family not in family_map:
+            family_map[family] = next_id
+            next_id += 1
+        label_ids.append(family_map[family])
+    return label_ids
+
+
 def _require_finite_positive(value: float, name: str) -> float:
     value = float(value)
     if not np.isfinite(value) or value <= 0.0:
@@ -197,46 +216,6 @@ class CAHODataset:
             view2 = self.augmenter.augment(sample.hostname, is_malicious=sample.is_malicious, rng=rng)
         label = sample.family if sample.is_malicious else None
         return view1, view2, label
-
-
-# Training utilities for SupCon loss
-
-def supcon_loss(features: np.ndarray, labels: List[int], temperature: float = 0.07) -> float:
-    """Compute supervised contrastive loss (Khosla et al.).
-
-    Args:
-        features: Array of shape (batch, n_views, dim).
-        labels: Integer labels for each sample in the batch.
-        temperature: Contrastive temperature.
-    """
-    import torch
-    import torch.nn.functional as F
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    feats = torch.tensor(features, device=device, dtype=torch.float32)
-    batch, n_views, dim = feats.shape
-    feats = F.normalize(feats, dim=-1)
-    feats = feats.permute(1, 0, 2).reshape(batch * n_views, dim)
-
-    labels_t = torch.tensor(labels, device=device).view(-1)
-    labels_t = labels_t.repeat(n_views)
-    mask = labels_t.view(-1, 1).eq(labels_t.view(1, -1)).float()
-
-    logits = feats @ feats.T / temperature
-    logits_max, _ = torch.max(logits, dim=1, keepdim=True)
-    logits = logits - logits_max.detach()
-
-    logits_mask = torch.ones_like(mask)
-    logits_mask.fill_diagonal_(0)
-    mask = mask * logits_mask
-
-    exp_logits = torch.exp(logits) * logits_mask
-    log_prob = logits - torch.log(exp_logits.sum(dim=1, keepdim=True) + 1e-12)
-
-    mean_log_prob_pos = (mask * log_prob).sum(dim=1) / (mask.sum(dim=1) + 1e-12)
-    loss = -mean_log_prob_pos
-    loss = loss.view(n_views, batch).mean()
-    return float(loss.item())
 
 
 def pairwise_contrastive_loss(embeddings1, embeddings2, temperature: float = 0.1):
@@ -378,88 +357,8 @@ def torch_generator(seed: Optional[int]):
     return generator
 
 
-class CAHOTrainer:
-    """Trainer for CAHO using a SentenceTransformers model."""
-
-    def __init__(
-        self,
-        model,
-        batch_size: int = CAHO_94GB_ACTUAL_BATCH_SIZE,
-        temperature: float = 0.07,
-        lr: float = CAHO_DEFAULT_LR,
-        weight_decay: float = CAHO_DEFAULT_WEIGHT_DECAY,
-        seed: Optional[int] = None,
-    ) -> None:
-        """Initialize trainer.
-
-        Args:
-            model: sentence_transformers.SentenceTransformer
-            batch_size: Batch size per step.
-            temperature: SupCon temperature.
-            lr: AdamW learning rate.
-            weight_decay: AdamW weight decay.
-            seed: Optional deterministic seed for training order and augmentations.
-        """
-        self.model = model
-        self.batch_size = batch_size
-        self.temperature = temperature
-        self.lr = _require_finite_positive(lr, "lr")
-        self.weight_decay = _require_finite_nonnegative(weight_decay, "weight_decay")
-        self.seed = seed
-
-    def fit(self, dataset: CAHODataset, epochs: int = CAHO_DEFAULT_EPOCHS) -> None:
-        import torch
-        from torch.utils.data import DataLoader
-
-        seed_training(self.seed)
-        optim = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-        self.model.train()
-
-        def collate(batch):
-            v1 = [b[0] for b in batch]
-            v2 = [b[1] for b in batch]
-            labels = [b[2] for b in batch]
-            return v1, v2, labels
-
-        loader = DataLoader(
-            dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            collate_fn=collate,
-            generator=torch_generator(self.seed),
-        )
-        for _epoch in range(epochs):
-            if hasattr(dataset, "set_epoch"):
-                dataset.set_epoch(_epoch)
-            for v1, v2, labels in loader:
-                label_ids: List[int] = []
-                family_map: Dict[str, int] = {}
-                next_id = 0
-                for i, fam in enumerate(labels):
-                    if fam is None:
-                        label_ids.append(10_000_000 + i)
-                    else:
-                        if fam not in family_map:
-                            family_map[fam] = next_id
-                            next_id += 1
-                        label_ids.append(family_map[fam])
-
-                feats1 = self.model(self.model.tokenize(v1))["sentence_embedding"]
-                feats2 = self.model(self.model.tokenize(v2))["sentence_embedding"]
-                loss_t = supervised_orbit_contrastive_loss(
-                    feats1,
-                    feats2,
-                    label_ids,
-                    temperature=self.temperature,
-                )
-
-                optim.zero_grad()
-                loss_t.backward()
-                optim.step()
-
-
 class ContrastiveTrainer:
-    """Pairwise contrastive trainer matching the CAHO contrastive training script logic."""
+    """CAHO supervised orbit-contrastive trainer with GradCache replay support."""
 
     def __init__(
         self,
@@ -545,7 +444,8 @@ class ContrastiveTrainer:
         def collate(batch):
             v1 = [b[0] for b in batch]
             v2 = [b[1] for b in batch]
-            return v1, v2
+            labels = orbit_labels_from_families([b[2] for b in batch])
+            return v1, v2, labels
 
         loader = DataLoader(
             dataset,
@@ -576,7 +476,14 @@ class ContrastiveTrainer:
             if self._loss_module is not None:
                 loss_fn = self._loss_module
             else:
-                def loss_fn(e1, e2):
+                def loss_fn(e1, e2, labels=None):
+                    if labels is not None:
+                        return supervised_orbit_contrastive_loss(
+                            e1,
+                            e2,
+                            labels,
+                            temperature=self.temperature,
+                        )
                     return pairwise_contrastive_loss(e1, e2, temperature=self.temperature)
 
             gc_module = GradCache(
@@ -595,17 +502,22 @@ class ContrastiveTrainer:
                 dataset.set_epoch(_epoch)
             total_loss = 0.0
             steps = 0
-            for v1, v2 in loader:
+            for v1, v2, labels in loader:
                 optim.zero_grad()
                 if gc_module is not None:
-                    loss_t = gc_module(v1, v2)
+                    loss_t = gc_module(v1, v2, labels=labels)
                 else:
                     feats1 = self._embed_view(v1)
                     feats2 = self._embed_view(v2)
                     if self._loss_module is not None:
-                        loss_t = self._loss_module(feats1, feats2)
+                        loss_t = self._loss_module(feats1, feats2, labels)
                     else:
-                        loss_t = pairwise_contrastive_loss(feats1, feats2, temperature=self.temperature)
+                        loss_t = supervised_orbit_contrastive_loss(
+                            feats1,
+                            feats2,
+                            labels,
+                            temperature=self.temperature,
+                        )
 
                 if gc_module is None:
                     loss_t.backward()

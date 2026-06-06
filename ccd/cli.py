@@ -30,7 +30,6 @@ from .train import (
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     CAHO_DEFAULT_LOSS,
     CAHODataset,
-    CAHOTrainer,
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_WEIGHT_DECAY,
     CAHO_DEFAULT_USE_GRAD_CACHE,
@@ -128,44 +127,33 @@ def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_pat
     dataset = CAHODataset(
         samples,
         augmenter=augmenter,
-        include_original=args.loss == "contrastive",
+        include_original=True,
         seed=args.seed,
     )
     batch_size = resolve_caho_batch_size(args.batch_size, use_grad_cache=args.grad_cache)
 
-    if args.loss == "contrastive":
-        trainer = ContrastiveTrainer(
-            model,
-            batch_size=batch_size,
-            temperature=args.temperature,
-            lr=args.lr,
-            weight_decay=args.weight_decay,
-            max_grad_norm=args.max_grad_norm,
-            scheduler=args.scheduler,
-            min_lr=args.min_lr,
-            use_grad_cache=args.grad_cache,
-            grad_cache_chunk_size=args.grad_cache_chunk_size,
-            num_workers=args.num_workers,
-            empty_cache=args.empty_cache,
-            loss_mode=args.contrastive_loss,
-            loss_max_scale=args.contrastive_max_scale,
-            loss_min_scale=args.contrastive_min_scale,
-            optimize_loss=args.optimize_contrastive_scale,
-            save_best=args.save_best,
-            save_best_path=str(out_path) if args.save_best else None,
-            seed=args.seed,
-        )
-        trainer.fit(dataset, epochs=args.epochs)
-    else:
-        trainer = CAHOTrainer(
-            model,
-            batch_size=batch_size,
-            temperature=args.temperature,
-            lr=args.lr,
-            weight_decay=args.weight_decay,
-            seed=args.seed,
-        )
-        trainer.fit(dataset, epochs=args.epochs)
+    trainer = ContrastiveTrainer(
+        model,
+        batch_size=batch_size,
+        temperature=args.temperature,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        max_grad_norm=args.max_grad_norm,
+        scheduler=args.scheduler,
+        min_lr=args.min_lr,
+        use_grad_cache=args.grad_cache,
+        grad_cache_chunk_size=args.grad_cache_chunk_size,
+        num_workers=args.num_workers,
+        empty_cache=args.empty_cache,
+        loss_mode=args.contrastive_loss,
+        loss_max_scale=args.contrastive_max_scale,
+        loss_min_scale=args.contrastive_min_scale,
+        optimize_loss=args.optimize_contrastive_scale,
+        save_best=args.save_best,
+        save_best_path=str(out_path) if args.save_best else None,
+        seed=args.seed,
+    )
+    trainer.fit(dataset, epochs=args.epochs)
 
     if not args.no_save_final:
         model.save(str(out_path))
@@ -573,7 +561,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
     train_caho.add_argument("--weight-decay", type=float, default=CAHO_DEFAULT_WEIGHT_DECAY)
     train_caho.add_argument("--temperature", type=float, default=0.07)
-    train_caho.add_argument("--loss", choices=["supcon", "contrastive"], default=CAHO_DEFAULT_LOSS)
+    train_caho.add_argument("--loss", choices=["contrastive"], default=CAHO_DEFAULT_LOSS)
     train_caho.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default=CAHO_DEFAULT_AUGMENTER)
     train_caho.add_argument("--weighted-num-augs", type=int, default=2)
     train_caho.add_argument("--weighted-max-attempts", type=int, default=3)
@@ -629,7 +617,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
     train_caho_corpus.add_argument("--weight-decay", type=float, default=CAHO_DEFAULT_WEIGHT_DECAY)
     train_caho_corpus.add_argument("--temperature", type=float, default=0.07)
-    train_caho_corpus.add_argument("--loss", choices=["supcon", "contrastive"], default=CAHO_DEFAULT_LOSS)
+    train_caho_corpus.add_argument("--loss", choices=["contrastive"], default=CAHO_DEFAULT_LOSS)
     train_caho_corpus.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default=CAHO_DEFAULT_AUGMENTER)
     train_caho_corpus.add_argument("--weighted-num-augs", type=int, default=2)
     train_caho_corpus.add_argument("--weighted-max-attempts", type=int, default=3)

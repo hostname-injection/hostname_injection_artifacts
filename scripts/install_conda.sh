@@ -25,7 +25,7 @@ conda install -y -c conda-forge -c pytorch \
   pytest \
   sentencepiece
 
-# GradCache is required for replay-scale pairwise CAHO training.
+# GradCache is required for replay-scale CAHO training.
 python -m pip install "GradCache @ git+https://github.com/luyug/GradCache.git"
 
 # Install the local package (editable) for dev/test workflows.
