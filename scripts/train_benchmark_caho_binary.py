@@ -11,10 +11,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ccd.benchmark_training import (
-    CAHO_94GB_ACTUAL_BATCH_SIZE,
     CAHO_DEFAULT_EPOCHS,
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_WEIGHT_DECAY,
+    CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     BenchmarkBinaryContrastiveTrainer,
     BenchmarkCAHOViewDataset,
@@ -76,11 +76,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=CAHO_94GB_ACTUAL_BATCH_SIZE,
+        default=CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
         help=(
-            "Actual two-view CAHO batch size. Defaults to "
-            f"{CAHO_94GB_ACTUAL_BATCH_SIZE} for 94 GB VRAM; pass 256 for the "
-            "Appendix C paper recipe."
+            "Effective CAHO batch size. Defaults to "
+            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with required GradCache for 94 GB VRAM."
         ),
     )
     parser.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
@@ -90,7 +89,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     parser.add_argument("--min-lr", type=float, default=1e-5)
     parser.set_defaults(
-        grad_cache=False,
+        grad_cache=True,
         grad_cache_chunk_size=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     )
     parser.add_argument("--num-workers", type=int, default=0)

@@ -11,6 +11,9 @@ from ccd.benchmark_training import (
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_USE_GRAD_CACHE,
     CAHO_DEFAULT_WEIGHT_DECAY,
+    CAHO_DEFAULT_BINARY_HIDDEN_DIM,
+    CAHO_DEFAULT_BINARY_LOSS_WEIGHT,
+    CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     BenchmarkCAHOViewDataset,
@@ -47,6 +50,9 @@ BENCHMARK_CAHO_TRAINING_SETTING_FIELDS = (
     "contrastive_max_scale",
     "contrastive_min_scale",
     "optimize_contrastive_scale",
+    "binary_loss_weight",
+    "contrastive_loss_weight",
+    "binary_hidden_dim",
     "normalize_text",
     "resume",
     "log_every",
@@ -89,6 +95,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--contrastive-max-scale", type=float, default=100.0)
     parser.add_argument("--contrastive-min-scale", type=float, default=1.0)
     parser.add_argument("--optimize-contrastive-scale", action="store_true")
+    parser.add_argument("--binary-loss-weight", type=float, default=CAHO_DEFAULT_BINARY_LOSS_WEIGHT)
+    parser.add_argument("--contrastive-loss-weight", type=float, default=CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT)
+    parser.add_argument("--binary-hidden-dim", type=int, default=CAHO_DEFAULT_BINARY_HIDDEN_DIM)
     parser.add_argument("--normalize-text", action="store_true")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--log-every", type=int, default=100)
@@ -157,6 +166,9 @@ def main() -> None:
         contrastive_max_scale=args.contrastive_max_scale,
         contrastive_min_scale=args.contrastive_min_scale,
         optimize_contrastive_scale=args.optimize_contrastive_scale,
+        binary_loss_weight=args.binary_loss_weight,
+        contrastive_loss_weight=args.contrastive_loss_weight,
+        binary_hidden_dim=args.binary_hidden_dim,
         log_every=args.log_every,
         max_steps=args.max_steps,
         seed=args.seed,
@@ -177,6 +189,9 @@ def main() -> None:
         loss_max_scale=args.contrastive_max_scale,
         loss_min_scale=args.contrastive_min_scale,
         optimize_loss=args.optimize_contrastive_scale,
+        binary_loss_weight=args.binary_loss_weight,
+        contrastive_loss_weight=args.contrastive_loss_weight,
+        binary_hidden_dim=args.binary_hidden_dim,
         log_every=args.log_every,
         max_steps=args.max_steps,
         seed=args.seed,

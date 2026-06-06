@@ -14,6 +14,7 @@ from ccd.train import (
     CAHO_TRAINING_SETTING_FIELDS,
     ContrastiveTrainer,
     Sample,
+    binary_labels_from_families,
     caho_training_default_deviations,
     pairwise_contrastive_loss,
     orbit_labels_from_families,
@@ -91,6 +92,10 @@ def test_orbit_labels_keep_benign_unique_and_group_positive_families():
     assert labels[4] not in {labels[1], labels[3]}
 
 
+def test_binary_labels_map_family_presence_to_auxiliary_targets():
+    assert binary_labels_from_families([None, "cmd", "sql", None]) == [0, 1, 1, 0]
+
+
 def test_caho_trainers_default_to_paper_optimizer_recipe():
     contrastive_trainer = ContrastiveTrainer(object())
 
@@ -103,6 +108,12 @@ def test_caho_trainers_reject_invalid_optimizer_hyperparameters():
         ContrastiveTrainer(object(), lr=float("nan"))
     with pytest.raises(ValueError, match="weight_decay"):
         ContrastiveTrainer(object(), weight_decay=-0.01)
+    with pytest.raises(ValueError, match="binary_loss_weight"):
+        ContrastiveTrainer(object(), binary_loss_weight=0.0)
+    with pytest.raises(ValueError, match="contrastive_loss_weight"):
+        ContrastiveTrainer(object(), contrastive_loss_weight=0.0)
+    with pytest.raises(ValueError, match="binary_hidden_dim"):
+        ContrastiveTrainer(object(), binary_hidden_dim=0)
 
 
 def test_caho_training_default_deviation_warning(capsys):
@@ -123,7 +134,16 @@ def test_caho_training_default_deviation_warning(capsys):
 
 
 def test_caho_training_default_deviation_fields_cover_core_training_args():
-    assert {"epochs", "batch_size", "lr", "weight_decay", "seed"}.issubset(
+    assert {
+        "epochs",
+        "batch_size",
+        "lr",
+        "weight_decay",
+        "binary_loss_weight",
+        "contrastive_loss_weight",
+        "binary_hidden_dim",
+        "seed",
+    }.issubset(
         set(CAHO_TRAINING_SETTING_FIELDS)
     )
     assert caho_training_default_deviations(
@@ -167,6 +187,29 @@ def test_supervised_orbit_contrastive_loss_backpropagates():
     assert embeddings2.grad is not None
 
 
+def test_contrastive_trainer_training_loss_includes_binary_auxiliary_head():
+    torch = pytest.importorskip("torch")
+    model = torch.nn.Linear(2, 2)
+    trainer = ContrastiveTrainer(model, binary_hidden_dim=3)
+    trainer._binary_classifier = trainer._build_binary_classifier(2)
+
+    embeddings1 = torch.eye(2, requires_grad=True)
+    embeddings2 = torch.eye(2).detach().clone().requires_grad_(True)
+    loss = trainer._training_loss(
+        embeddings1,
+        embeddings2,
+        labels=[-1, 0],
+        binary_labels=[0, 1],
+    )
+    loss.backward()
+
+    head_grads = [param.grad for param in trainer._binary_classifier.parameters()]
+    assert loss.item() > 0.0
+    assert embeddings1.grad is not None
+    assert embeddings2.grad is not None
+    assert any(grad is not None for grad in head_grads)
+
+
 def test_contrastive_trainer_grad_cache_receives_orbit_labels(monkeypatch):
     torch = pytest.importorskip("torch")
     captured = {}
@@ -178,6 +221,7 @@ def test_contrastive_trainer_grad_cache_receives_orbit_labels(monkeypatch):
         def __call__(self, *model_inputs, **loss_kwargs):
             captured["model_inputs"] = model_inputs
             captured["labels"] = list(loss_kwargs["labels"])
+            captured["binary_labels"] = list(loss_kwargs["binary_labels"])
             return torch.tensor(0.0)
 
     monkeypatch.setitem(sys.modules, "grad_cache", SimpleNamespace(GradCache=FakeGradCache))
@@ -206,3 +250,4 @@ def test_contrastive_trainer_grad_cache_receives_orbit_labels(monkeypatch):
     assert captured["model_inputs"][0] == ["safe.example", "evil.example", "evil2.example"]
     assert captured["labels"][1] == captured["labels"][2]
     assert captured["labels"][0] != captured["labels"][1]
+    assert captured["binary_labels"] == [0, 1, 1]

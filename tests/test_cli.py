@@ -16,6 +16,9 @@ from ccd.train import (
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_USE_GRAD_CACHE,
     CAHO_DEFAULT_WEIGHT_DECAY,
+    CAHO_DEFAULT_BINARY_HIDDEN_DIM,
+    CAHO_DEFAULT_BINARY_LOSS_WEIGHT,
+    CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT,
     caho_training_default_deviations,
 )
 
@@ -44,6 +47,9 @@ def test_train_caho_parser_smoke():
     assert args.epochs == CAHO_DEFAULT_EPOCHS
     assert args.lr == CAHO_DEFAULT_LR
     assert args.weight_decay == CAHO_DEFAULT_WEIGHT_DECAY
+    assert args.binary_loss_weight == CAHO_DEFAULT_BINARY_LOSS_WEIGHT
+    assert args.contrastive_loss_weight == CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT
+    assert args.binary_hidden_dim == CAHO_DEFAULT_BINARY_HIDDEN_DIM
     assert args.seed == 13
 
 

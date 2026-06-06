@@ -20,6 +20,9 @@ CAHO_DEFAULT_WEIGHT_DECAY = 1e-2
 CAHO_DEFAULT_LOSS = "contrastive"
 CAHO_DEFAULT_AUGMENTER = "weighted"
 CAHO_DEFAULT_USE_GRAD_CACHE = True
+CAHO_DEFAULT_BINARY_LOSS_WEIGHT = 1.0
+CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT = 1.0
+CAHO_DEFAULT_BINARY_HIDDEN_DIM = 256
 CAHO_TRAINING_SETTING_FIELDS = (
     "model",
     "epochs",
@@ -40,6 +43,9 @@ CAHO_TRAINING_SETTING_FIELDS = (
     "contrastive_max_scale",
     "contrastive_min_scale",
     "optimize_contrastive_scale",
+    "binary_loss_weight",
+    "contrastive_loss_weight",
+    "binary_hidden_dim",
     "num_workers",
     "empty_cache",
     "device",
@@ -156,10 +162,44 @@ def orbit_labels_from_families(labels: Sequence[Optional[str]]) -> List[int]:
     return label_ids
 
 
+def binary_labels_from_families(labels: Sequence[Optional[str]]) -> List[int]:
+    """Map CAHO row labels to the binary auxiliary objective."""
+    return [0 if family is None else 1 for family in labels]
+
+
+def _model_embedding_dimension(model) -> int:
+    get_dim = getattr(model, "get_sentence_embedding_dimension", None)
+    if callable(get_dim):
+        value = int(get_dim())
+        if value > 0:
+            return value
+    out_features = getattr(model, "out_features", None)
+    if out_features is not None:
+        value = int(out_features)
+        if value > 0:
+            return value
+    modules = getattr(model, "modules", None)
+    if callable(modules):
+        for module in reversed(list(modules())):
+            out_features = getattr(module, "out_features", None)
+            if out_features is not None:
+                value = int(out_features)
+                if value > 0:
+                    return value
+    raise ValueError("CAHO model must expose a positive sentence embedding dimension")
+
+
 def _require_finite_positive(value: float, name: str) -> float:
     value = float(value)
     if not np.isfinite(value) or value <= 0.0:
         raise ValueError(f"{name} must be finite and positive")
+    return value
+
+
+def _require_positive_int(value: int, name: str) -> int:
+    value = int(value)
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
     return value
 
 
@@ -358,7 +398,7 @@ def torch_generator(seed: Optional[int]):
 
 
 class ContrastiveTrainer:
-    """CAHO supervised orbit-contrastive trainer with GradCache replay support."""
+    """CAHO supervised orbit-contrastive trainer with binary auxiliary loss."""
 
     def __init__(
         self,
@@ -378,6 +418,9 @@ class ContrastiveTrainer:
         loss_max_scale: float = 100.0,
         loss_min_scale: float = 1.0,
         optimize_loss: bool = False,
+        binary_loss_weight: float = CAHO_DEFAULT_BINARY_LOSS_WEIGHT,
+        contrastive_loss_weight: float = CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT,
+        binary_hidden_dim: int = CAHO_DEFAULT_BINARY_HIDDEN_DIM,
         save_best: bool = False,
         save_best_path: Optional[str] = None,
         seed: Optional[int] = None,
@@ -398,10 +441,26 @@ class ContrastiveTrainer:
         self.loss_max_scale = loss_max_scale
         self.loss_min_scale = loss_min_scale
         self.optimize_loss = optimize_loss
+        self.binary_loss_weight = _require_finite_positive(binary_loss_weight, "binary_loss_weight")
+        self.contrastive_loss_weight = _require_finite_positive(
+            contrastive_loss_weight,
+            "contrastive_loss_weight",
+        )
+        self.binary_hidden_dim = _require_positive_int(binary_hidden_dim, "binary_hidden_dim")
         self.save_best = save_best
         self.save_best_path = save_best_path
         self.seed = seed
         self._loss_module = None
+        self._binary_classifier = None
+
+    def _build_binary_classifier(self, embedding_dim: int):
+        import torch
+
+        return torch.nn.Sequential(
+            torch.nn.Linear(int(embedding_dim), self.binary_hidden_dim),
+            torch.nn.ReLU(),
+            torch.nn.Linear(self.binary_hidden_dim, 1),
+        )
 
     def _embed_view(self, view):
         import torch
@@ -418,12 +477,57 @@ class ContrastiveTrainer:
         model_output = self.model(tokenized)
         return model_output["sentence_embedding"]
 
+    def _contrastive_loss(self, embeddings1, embeddings2, labels=None):
+        if self._loss_module is not None:
+            loss_t = self._loss_module(embeddings1, embeddings2, labels)
+        elif labels is not None:
+            loss_t = supervised_orbit_contrastive_loss(
+                embeddings1,
+                embeddings2,
+                labels,
+                temperature=self.temperature,
+            )
+        else:
+            loss_t = pairwise_contrastive_loss(embeddings1, embeddings2, temperature=self.temperature)
+        return loss_t * self.contrastive_loss_weight
+
+    def _binary_auxiliary_loss(self, embeddings1, embeddings2, binary_labels):
+        if self._binary_classifier is None:
+            raise ValueError("binary auxiliary classifier is not initialized")
+
+        import torch
+        import torch.nn.functional as F
+
+        labels_t = torch.as_tensor(binary_labels, device=embeddings1.device, dtype=torch.float32).view(-1)
+        embeddings = torch.cat(
+            [F.normalize(embeddings1, dim=1), F.normalize(embeddings2, dim=1)],
+            dim=0,
+        )
+        logits = self._binary_classifier(embeddings).squeeze(-1)
+        return F.binary_cross_entropy_with_logits(logits, labels_t.repeat(2)) * self.binary_loss_weight
+
+    def _training_loss(self, embeddings1, embeddings2, labels=None, binary_labels=None):
+        loss_t = self._contrastive_loss(embeddings1, embeddings2, labels)
+        if binary_labels is not None:
+            loss_t = loss_t + self._binary_auxiliary_loss(embeddings1, embeddings2, binary_labels)
+        return loss_t
+
     def fit(self, dataset: CAHODataset, epochs: int = CAHO_DEFAULT_EPOCHS) -> None:
         import torch
         from torch.utils.data import DataLoader
         from torch.optim.lr_scheduler import CosineAnnealingLR
 
         seed_training(self.seed)
+        model_params = list(self.model.parameters())
+        if not model_params:
+            raise ValueError("CAHO model must expose trainable parameters")
+        device = model_params[0].device
+
+        self._binary_classifier = self._build_binary_classifier(
+            _model_embedding_dimension(self.model),
+        ).to(device)
+        binary_params = list(self._binary_classifier.parameters())
+
         loss_params = []
         if self.loss_mode == "learnable":
             self._loss_module = ContrastiveLoss(
@@ -431,21 +535,26 @@ class ContrastiveTrainer:
                 max_scale=self.loss_max_scale,
                 min_scale=self.loss_min_scale,
             )
+            self._loss_module.to(device)
             if self.optimize_loss:
                 loss_params = list(self._loss_module.parameters())
 
+        trainable_params = model_params + binary_params + loss_params
         optim = torch.optim.AdamW(
-            list(self.model.parameters()) + loss_params,
+            trainable_params,
             lr=self.lr,
             weight_decay=self.weight_decay,
         )
         self.model.train()
+        self._binary_classifier.train()
 
         def collate(batch):
             v1 = [b[0] for b in batch]
             v2 = [b[1] for b in batch]
-            labels = orbit_labels_from_families([b[2] for b in batch])
-            return v1, v2, labels
+            raw_labels = [b[2] for b in batch]
+            labels = orbit_labels_from_families(raw_labels)
+            binary_labels = binary_labels_from_families(raw_labels)
+            return v1, v2, labels, binary_labels
 
         loader = DataLoader(
             dataset,
@@ -473,28 +582,12 @@ class ContrastiveTrainer:
             def model_embedding(view):
                 return self._embed_view(view)
 
-            if self._loss_module is not None:
-                loss_fn = self._loss_module
-            else:
-                def loss_fn(e1, e2, labels=None):
-                    if labels is not None:
-                        return supervised_orbit_contrastive_loss(
-                            e1,
-                            e2,
-                            labels,
-                            temperature=self.temperature,
-                        )
-                    return pairwise_contrastive_loss(e1, e2, temperature=self.temperature)
-
             gc_module = GradCache(
                 models=[model_embedding, model_embedding],
                 chunk_sizes=self.grad_cache_chunk_size,
-                loss_fn=loss_fn,
+                loss_fn=self._training_loss,
                 split_input_fn=split_input_fn,
             )
-
-        if self._loss_module is not None:
-            self._loss_module.to(next(self.model.parameters()).device)
 
         best_loss = float("inf")
         for _epoch in range(epochs):
@@ -502,27 +595,19 @@ class ContrastiveTrainer:
                 dataset.set_epoch(_epoch)
             total_loss = 0.0
             steps = 0
-            for v1, v2, labels in loader:
+            for v1, v2, labels, binary_labels in loader:
                 optim.zero_grad()
                 if gc_module is not None:
-                    loss_t = gc_module(v1, v2, labels=labels)
+                    loss_t = gc_module(v1, v2, labels=labels, binary_labels=binary_labels)
                 else:
                     feats1 = self._embed_view(v1)
                     feats2 = self._embed_view(v2)
-                    if self._loss_module is not None:
-                        loss_t = self._loss_module(feats1, feats2, labels)
-                    else:
-                        loss_t = supervised_orbit_contrastive_loss(
-                            feats1,
-                            feats2,
-                            labels,
-                            temperature=self.temperature,
-                        )
+                    loss_t = self._training_loss(feats1, feats2, labels, binary_labels)
 
                 if gc_module is None:
                     loss_t.backward()
                 if self.max_grad_norm and self.max_grad_norm > 0:
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.max_grad_norm)
+                    torch.nn.utils.clip_grad_norm_(trainable_params, max_norm=self.max_grad_norm)
                 optim.step()
                 if lr_sched is not None:
                     lr_sched.step()

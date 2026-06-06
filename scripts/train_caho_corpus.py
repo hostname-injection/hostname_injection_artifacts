@@ -12,6 +12,9 @@ from ccd.train import (
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_USE_GRAD_CACHE,
     CAHO_DEFAULT_WEIGHT_DECAY,
+    CAHO_DEFAULT_BINARY_HIDDEN_DIM,
+    CAHO_DEFAULT_BINARY_LOSS_WEIGHT,
+    CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     CAHO_TRAINING_SETTING_FIELDS,
     training_default_values,
@@ -82,6 +85,12 @@ def _build_command(args) -> list[str]:
         cmd += ["--contrastive-min-scale", str(args.contrastive_min_scale)]
     if args.optimize_contrastive_scale:
         cmd += ["--optimize-contrastive-scale"]
+    if getattr(args, "binary_loss_weight", None) is not None:
+        cmd += ["--binary-loss-weight", str(args.binary_loss_weight)]
+    if getattr(args, "contrastive_loss_weight", None) is not None:
+        cmd += ["--contrastive-loss-weight", str(args.contrastive_loss_weight)]
+    if getattr(args, "binary_hidden_dim", None) is not None:
+        cmd += ["--binary-hidden-dim", str(args.binary_hidden_dim)]
     if args.num_workers is not None:
         cmd += ["--num-workers", str(args.num_workers)]
     if args.empty_cache:
@@ -132,6 +141,9 @@ def main() -> int:
     parser.add_argument("--contrastive-max-scale", type=float, default=100.0)
     parser.add_argument("--contrastive-min-scale", type=float, default=1.0)
     parser.add_argument("--optimize-contrastive-scale", action="store_true")
+    parser.add_argument("--binary-loss-weight", type=float, default=CAHO_DEFAULT_BINARY_LOSS_WEIGHT)
+    parser.add_argument("--contrastive-loss-weight", type=float, default=CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT)
+    parser.add_argument("--binary-hidden-dim", type=int, default=CAHO_DEFAULT_BINARY_HIDDEN_DIM)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--empty-cache", action="store_true")
     parser.add_argument("--device", default="auto")

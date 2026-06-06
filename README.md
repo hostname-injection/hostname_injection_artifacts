@@ -123,9 +123,10 @@ ad hoc threshold or calibration-file overrides.
 
 ## CAHO Training
 
-The reviewer-facing CAHO training pipeline uses GradCache and defaults to the
-shipped paper recipe: `--loss contrastive --augmenter weighted --epochs 20 --lr 1e-4
---weight-decay 1e-2 --seed 13`. The training scripts warn when
+The reviewer-facing CAHO training pipeline uses GradCache, supervised
+orbit-collapse contrastive loss, and the binary auxiliary training head. It
+defaults to the shipped paper recipe: `--loss contrastive --augmenter weighted --epochs 20
+--lr 1e-4 --weight-decay 1e-2 --seed 13`. The training scripts warn when
 result-affecting settings are changed; results should be expected to differ
 from the reported CAHO/CCD results when defaults are changed.
 

@@ -33,6 +33,9 @@ from .train import (
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_WEIGHT_DECAY,
     CAHO_DEFAULT_USE_GRAD_CACHE,
+    CAHO_DEFAULT_BINARY_HIDDEN_DIM,
+    CAHO_DEFAULT_BINARY_LOSS_WEIGHT,
+    CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT,
     CAHO_TRAINING_SETTING_FIELDS,
     ContrastiveTrainer,
     Sample,
@@ -149,6 +152,9 @@ def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_pat
         loss_max_scale=args.contrastive_max_scale,
         loss_min_scale=args.contrastive_min_scale,
         optimize_loss=args.optimize_contrastive_scale,
+        binary_loss_weight=args.binary_loss_weight,
+        contrastive_loss_weight=args.contrastive_loss_weight,
+        binary_hidden_dim=args.binary_hidden_dim,
         save_best=args.save_best,
         save_best_path=str(out_path) if args.save_best else None,
         seed=args.seed,
@@ -575,6 +581,9 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho.add_argument("--contrastive-max-scale", type=float, default=100.0)
     train_caho.add_argument("--contrastive-min-scale", type=float, default=1.0)
     train_caho.add_argument("--optimize-contrastive-scale", action="store_true")
+    train_caho.add_argument("--binary-loss-weight", type=float, default=CAHO_DEFAULT_BINARY_LOSS_WEIGHT)
+    train_caho.add_argument("--contrastive-loss-weight", type=float, default=CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT)
+    train_caho.add_argument("--binary-hidden-dim", type=int, default=CAHO_DEFAULT_BINARY_HIDDEN_DIM)
     train_caho.add_argument("--num-workers", type=int, default=0)
     train_caho.add_argument("--empty-cache", action="store_true")
     train_caho.add_argument("--device", default="auto", help="Training device: auto|cpu|cuda")
@@ -631,6 +640,9 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--contrastive-max-scale", type=float, default=100.0)
     train_caho_corpus.add_argument("--contrastive-min-scale", type=float, default=1.0)
     train_caho_corpus.add_argument("--optimize-contrastive-scale", action="store_true")
+    train_caho_corpus.add_argument("--binary-loss-weight", type=float, default=CAHO_DEFAULT_BINARY_LOSS_WEIGHT)
+    train_caho_corpus.add_argument("--contrastive-loss-weight", type=float, default=CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT)
+    train_caho_corpus.add_argument("--binary-hidden-dim", type=int, default=CAHO_DEFAULT_BINARY_HIDDEN_DIM)
     train_caho_corpus.add_argument("--num-workers", type=int, default=0)
     train_caho_corpus.add_argument("--empty-cache", action="store_true")
     train_caho_corpus.add_argument("--device", default="auto", help="Training device: auto|cpu|cuda")

@@ -450,10 +450,11 @@ def test_benchmark_grad_cache_receives_supervised_orbit_labels(monkeypatch):
     class FakeGradCache:
         def __init__(self, **kwargs):
             captured["loss_fn"] = kwargs["loss_fn"]
+            captured["labels"] = []
 
         def __call__(self, *model_inputs, **loss_kwargs):
             captured["model_inputs"] = model_inputs
-            captured["labels"] = loss_kwargs["labels"].detach().cpu().tolist()
+            captured["labels"].extend(loss_kwargs["labels"].detach().cpu().tolist())
             return torch.tensor(0.0)
 
     monkeypatch.setitem(sys.modules, "grad_cache", SimpleNamespace(GradCache=FakeGradCache))
@@ -488,8 +489,18 @@ def test_benchmark_grad_cache_receives_supervised_orbit_labels(monkeypatch):
     assert captured["labels"] == [0, 0, 1, 1]
 
 
-def test_binary_trainer_rejects_grad_cache_for_supervised_orbit_objective():
+def test_binary_trainer_grad_cache_uses_supported_caho_objective(monkeypatch):
     torch = pytest.importorskip("torch")
+    captured = {}
+
+    class FakeGradCache:
+        def __init__(self, **kwargs):
+            captured["loss_fn"] = kwargs["loss_fn"]
+
+        def __call__(self, *model_inputs, **loss_kwargs):
+            captured["model_inputs"] = model_inputs
+            captured["labels"] = loss_kwargs["labels"].detach().cpu().tolist()
+            return torch.tensor(0.0)
 
     class DummySentenceModel(torch.nn.Module):
         def __init__(self, dim=4):
@@ -531,8 +542,12 @@ def test_binary_trainer_rejects_grad_cache_for_supervised_orbit_objective():
         binary_hidden_dim=4,
     )
 
-    with pytest.raises(ValueError, match="GradCache is not supported"):
-        trainer.fit(_TinyViewDataset(), epochs=1)
+    monkeypatch.setitem(sys.modules, "grad_cache", SimpleNamespace(GradCache=FakeGradCache))
+
+    summary = trainer.fit(_TinyViewDataset(), epochs=1)
+
+    assert summary["steps"] == 2
+    assert sorted(captured["labels"]) == [0, 0, 1, 1]
 
 
 def test_benchmark_binary_script_does_not_expose_grad_cache_toggle():
@@ -543,9 +558,11 @@ def test_benchmark_binary_script_does_not_expose_grad_cache_toggle():
     spec.loader.exec_module(module)
     args = module.build_parser().parse_args(["--out", "unused-output"])
 
-    assert args.grad_cache is False
+    assert args.grad_cache is True
     with pytest.raises(SystemExit):
         module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
+    with pytest.raises(SystemExit):
+        module.build_parser().parse_args(["--out", "unused-output", "--no-grad-cache"])
 
 
 def test_benchmark_caho_94gb_batch_defaults():
@@ -560,7 +577,8 @@ def test_benchmark_caho_94gb_batch_defaults():
     binary_spec.loader.exec_module(binary_module)
     binary_args = binary_module.build_parser().parse_args(["--out", "unused-output"])
     assert binary_args.epochs == CAHO_DEFAULT_EPOCHS
-    assert binary_args.batch_size == CAHO_94GB_ACTUAL_BATCH_SIZE
+    assert binary_args.batch_size == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
+    assert binary_args.grad_cache is True
     assert binary_args.grad_cache_chunk_size == CAHO_94GB_GRAD_CACHE_CHUNK_SIZE
 
     regular_script = Path(__file__).resolve().parents[1] / "scripts" / "train_benchmark_caho.py"
