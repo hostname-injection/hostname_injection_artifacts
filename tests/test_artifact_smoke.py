@@ -155,7 +155,23 @@ def test_artifact_smoke_command_sequence_is_cli_parseable(monkeypatch):
                         {
                             "radius": 1,
                             "grouped_thresholds_used": True,
-                            "edit_manifest": {"edits": ["E5_case"]},
+                            "edit_manifest": {
+                                "edits": [
+                                    "E1_percent",
+                                    "E2_homoglyph",
+                                    "E3_delimiter",
+                                    "E4_label_split",
+                                    "E5_case",
+                                    "E5_zero_pad",
+                                    "E6_utf8_percent",
+                                    "E7_unicode_norm",
+                                    "E8_punycode",
+                                    "E9_label_transpose",
+                                    "E10_tld_swap",
+                                    "E11_quote_comment",
+                                    "E12_hex_base",
+                                ]
+                            },
                             "certificates": [{"calibration_group": "tenant-a", "checked": 2}],
                         }
                     ),

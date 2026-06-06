@@ -889,8 +889,6 @@ def test_certify_parser_smoke():
             "1",
             "--groups",
             "groups.txt",
-            "--edits",
-            "E3_delimiter,E5_case",
             "--cert-method",
             "combined",
             "--sketch-lipschitz",
@@ -902,7 +900,6 @@ def test_certify_parser_smoke():
     assert args.command == "certify"
     assert args.radius == 1
     assert str(args.groups) == "groups.txt"
-    assert args.edits == "E3_delimiter,E5_case"
     assert args.cert_method == "combined"
     assert args.sketch_lipschitz == 0.1
     assert args.embedding_rotation_bound == 0.2
@@ -935,6 +932,8 @@ def test_certify_parser_rejects_threshold_and_calibration_overrides():
         parser.parse_args([*base, "--threshold", "0.5"])
     with pytest.raises(SystemExit):
         parser.parse_args([*base, "--calibration", "calibration.json"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--" + "edits", "E5_case"])
 
 
 def test_certify_rejects_uncalibrated_model_bundle_before_certifying(tmp_path, monkeypatch):
@@ -1034,6 +1033,10 @@ def test_certify_writes_scope_and_combined_method_args(tmp_path, monkeypatch):
     assert seen["kwargs"]["method"] == "combined"
     assert seen["kwargs"]["sketch_lipschitz"] == 0.1
     assert seen["kwargs"]["embedding_rotation_bound"] == 0.2
+    edit_names = [op.name for op in seen["kwargs"]["edit_model"].edits]
+    assert len(edit_names) >= 12
+    assert "E1_percent" in edit_names
+    assert "E12_hex_base" in edit_names
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["cert_method"] == "combined"
     assert payload["grouped_thresholds_used"] is True

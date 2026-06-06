@@ -464,11 +464,7 @@ def cmd_certify(args: argparse.Namespace) -> None:
     grouped_thresholds_source = "model_bundle_grouped_thresholds" if grouped_thresholds else "none"
     groups = _read_parallel_lines(args.groups, len(hostnames), field_name="groups") if args.groups else None
 
-    edit_model = None
-    if args.edits:
-        edits = [name.strip() for name in args.edits.split(",") if name.strip()]
-        edit_model = EditModel(edits=edits)
-    edit_manifest = edit_model or EditModel()
+    edit_manifest = EditModel()
 
     certificates = []
     for index, hostname in enumerate(hostnames):
@@ -490,7 +486,7 @@ def cmd_certify(args: argparse.Namespace) -> None:
             hostname,
             radius=args.radius,
             threshold=row_threshold,
-            edit_model=edit_model,
+            edit_model=edit_manifest,
             normalize=not args.no_normalize,
             batch_size=args.batch_size,
             max_nodes=args.max_nodes,
@@ -806,7 +802,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail if --groups contains a group missing from grouped calibration output.",
     )
-    certify.add_argument("--edits", type=str, default=None, help="Comma-separated edit manifest subset, e.g. E3_delimiter,E5_case")
     certify.add_argument("--max-nodes", type=int, default=10000)
     certify.add_argument("--batch-size", type=int, default=64)
     certify.add_argument(

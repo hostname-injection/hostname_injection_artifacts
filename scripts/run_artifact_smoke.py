@@ -410,8 +410,6 @@ def main() -> int:
                 "--groups",
                 str(radius1_groups),
                 "--require-group-thresholds",
-                "--edits",
-                "E5_case",
                 "--max-nodes",
                 "512",
                 "--batch-size",
@@ -422,8 +420,13 @@ def main() -> int:
         radius1_rows = parsed_radius1.get("certificates", [])
         if parsed_radius1.get("radius") != 1 or len(radius1_rows) != 1:
             raise RuntimeError("expected one radius-1 certificate row")
-        if parsed_radius1.get("edit_manifest", {}).get("edits") != ["E5_case"]:
-            raise RuntimeError("expected radius-1 smoke certificate to use the E5_case edit manifest")
+        manifest_edits = parsed_radius1.get("edit_manifest", {}).get("edits", [])
+        if (
+            len(manifest_edits) < 12
+            or "E1_percent" not in manifest_edits
+            or "E12_hex_base" not in manifest_edits
+        ):
+            raise RuntimeError("expected radius-1 smoke certificate to use the full edit manifest")
         if radius1_rows[0].get("checked", 0) < 2:
             raise RuntimeError("expected radius-1 certificate to enumerate nontrivial edit neighbors")
 

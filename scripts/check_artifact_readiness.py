@@ -48,6 +48,7 @@ def review_term_fragments() -> tuple[str, ...]:
         "--no-" + "dedup",
         "--max-" + "rows",
         "--max-" + "steps",
+        "--" + "edits",
         "--skip-" + "encoder",
         "train-" + "user-" + "logins",
     )
