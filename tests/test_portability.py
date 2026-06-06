@@ -6,7 +6,9 @@ from types import SimpleNamespace
 import pytest
 
 import scripts.calibrate as calibrate_script
+import scripts.train_caho as train_caho_script
 import scripts.train_caho_corpus as train_caho_corpus
+import scripts.train_priors as train_priors_script
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,10 +72,8 @@ def test_train_caho_corpus_wrapper_uses_current_interpreter():
 
 
 def test_standalone_calibrate_script_requires_saved_model_bundle():
-    parser = calibrate_script.build_parser()
-
     with pytest.raises(SystemExit):
-        parser.parse_args(
+        calibrate_script.main(
             [
                 "--model",
                 "ccd_model.npz",
@@ -83,6 +83,14 @@ def test_standalone_calibrate_script_requires_saved_model_bundle():
                 "calibration.json",
             ]
         )
+
+
+def test_standalone_training_scripts_delegate_to_canonical_cli():
+    with pytest.raises(SystemExit):
+        train_caho_script.main(["--benign", "benign.txt", "--malicious", "malicious.csv"])
+
+    with pytest.raises(SystemExit):
+        train_priors_script.main(["--benign", "benign.txt", "--malicious", "malicious.csv"])
 
 
 def test_pyproject_exports_reviewer_console_scripts_and_packages():

@@ -1,83 +1,16 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
-import json
-from pathlib import Path
-
-from ccd.calibration import calibrate_thresholds_by_group, split_conformal_threshold_metadata
-from ccd.encoder import require_model_uses_trained_caho_checkpoint
-from ccd.io import ModelBundle, load_model, save_model
-from ccd.line_io import read_nonempty_lines, read_parallel_lines
-from ccd.preprocess import normalize_hostname
+import sys
+from typing import Sequence
 
 
-def read_lines(path: Path):
-    return read_nonempty_lines(path)
+def main(argv: Sequence[str] | None = None) -> None:
+    from ccd.cli import build_parser
 
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", required=True, type=Path)
-    parser.add_argument("--benign", required=True, type=Path)
-    parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--groups", type=Path, default=None, help="Optional one-calibration-group-per-benign-row file.")
-    parser.add_argument(
-        "--save-model",
-        type=Path,
-        required=True,
-        help="Path for the calibrated model bundle with the calibrated threshold embedded.",
-    )
-    parser.add_argument("--alpha", type=float, default=None)
-    parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--no-normalize", action="store_true", help="Skip hostname normalization")
-    return parser
-
-
-def main() -> None:
     parser = build_parser()
-    args = parser.parse_args()
-
-    model = load_model(args.model)
-    require_model_uses_trained_caho_checkpoint(model, purpose="scripts/calibrate.py")
-    hostnames = read_lines(args.benign)
-    if not args.no_normalize:
-        hostnames = [normalize_hostname(h) for h in hostnames]
-    groups = read_parallel_lines(args.groups, len(hostnames), field_name="groups") if args.groups else None
-
-    scores = model.score(hostnames, batch_size=args.batch_size, normalize=False)
-    alpha = args.alpha if args.alpha is not None else model.config.calibration.alpha
-    calibration_metadata = split_conformal_threshold_metadata(scores, alpha)
-    threshold = calibration_metadata["threshold"]
-    grouped_thresholds = calibrate_thresholds_by_group(scores, groups, alpha) if groups is not None else {}
-    model.threshold = threshold
-    if hasattr(model, "grouped_thresholds"):
-        model.grouped_thresholds = grouped_thresholds or None
-
-    output = {
-        **calibration_metadata,
-        "threshold_source": "grouped_benign_calibration_scores" if groups is not None else "benign_calibration_scores",
-        "grouped_thresholds": grouped_thresholds,
-        "n_calibration_groups": len(grouped_thresholds),
-        "score_path": {
-            "approximate": False,
-            "approximate_k": None,
-            "normalized_inputs": not args.no_normalize,
-        },
-    }
-    args.output.write_text(json.dumps(output, indent=2))
-    save_model(
-        args.save_model,
-        ModelBundle(
-            axes=model.cones.axes,
-            benign_prior=model.benign_prior,
-            malicious_priors=model.malicious_priors,
-            config=model.config,
-            threshold=threshold,
-            grouped_thresholds=grouped_thresholds or None,
-        ),
-    )
-    print(f"Wrote calibration to {args.output}")
+    args = parser.parse_args(["calibrate", *(sys.argv[1:] if argv is None else argv)])
+    args.func(args)
 
 
 if __name__ == "__main__":
