@@ -7,17 +7,17 @@ from types import SimpleNamespace
 import pytest
 
 from ccd.benchmark_training import (
-    CAHO_94GB_ACTUAL_BATCH_SIZE,
     CAHO_DEFAULT_EPOCHS,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
-    BenchmarkBinaryContrastiveTrainer,
     BenchmarkChunkShuffleSampler,
     BenchmarkContrastiveTrainer,
     BenchmarkTrainingConfig,
     _orbit_labels,
     resolve_caho_batch_size,
+    save_encoder_only,
 )
+from ccd.train import CAHO_94GB_ACTUAL_BATCH_SIZE
 
 
 class _TinyViewDataset:
@@ -73,83 +73,6 @@ def _training_config(out: Path) -> BenchmarkTrainingConfig:
     )
 
 
-def test_benchmark_binary_contrastive_trainer_fit_and_save(tmp_path):
-    torch = pytest.importorskip("torch")
-
-    class DummySentenceModel(torch.nn.Module):
-        def __init__(self, dim=4):
-            super().__init__()
-            self.dim = dim
-            self.embed = torch.nn.Embedding(256, dim)
-            self.proj = torch.nn.Linear(dim, dim)
-
-        def tokenize(self, texts):
-            ids = [sum(text.encode("utf-8")) % 256 for text in texts]
-            return {"input_ids": torch.tensor(ids, dtype=torch.long).unsqueeze(1)}
-
-        def forward(self, tokenized):
-            emb = self.embed(tokenized["input_ids"]).mean(dim=1)
-            return {"sentence_embedding": self.proj(emb)}
-
-        def get_sentence_embedding_dimension(self):
-            return self.dim
-
-        def save(self, out):
-            path = Path(out)
-            path.mkdir(parents=True, exist_ok=True)
-            (path / "dummy_model.txt").write_text("saved\n", encoding="utf-8")
-
-    model = DummySentenceModel()
-    before = [param.detach().clone() for param in model.parameters()]
-    trainer = BenchmarkBinaryContrastiveTrainer(
-        model,
-        batch_size=2,
-        temperature=0.1,
-        lr=1e-2,
-        max_grad_norm=1.0,
-        scheduler="none",
-        min_lr=0.0,
-        weight_decay=0.02,
-        use_grad_cache=False,
-        grad_cache_chunk_size=2,
-        num_workers=0,
-        loss_mode="fixed",
-        loss_max_scale=100.0,
-        loss_min_scale=1.0,
-        optimize_loss=False,
-        log_every=0,
-        binary_loss_weight=0.5,
-        contrastive_loss_weight=0.5,
-        binary_hidden_dim=4,
-        seed=17,
-    )
-
-    summary = trainer.fit(_TinyViewDataset(), epochs=1)
-
-    assert summary["steps"] == 2
-    assert summary["avg_contrastive_loss"] > 0.0
-    assert summary["avg_binary_loss"] > 0.0
-    assert trainer.classifier is not None
-    assert trainer.weight_decay == 0.02
-    after = list(model.parameters())
-    assert any(not torch.allclose(old, new) for old, new in zip(before, after))
-
-    out = tmp_path / "checkpoint"
-    config = _training_config(out)
-    trainer.save(out, config, summary)
-
-    assert (out / "dummy_model.txt").exists()
-    assert (out / "binary_classifier.pt").exists()
-    report = json.loads((out / "benchmark_training_report.json").read_text(encoding="utf-8"))
-    assert report["config"]["binary_loss_weight"] == 0.5
-    assert report["config"]["weight_decay"] == 0.02
-    assert report["config"]["seed"] == 17
-    assert report["contrastive_objective"]["name"] == "supervised_orbit_contrastive_loss"
-    assert report["contrastive_objective"]["binary_auxiliary_head_views"] == "both_l2_normalized_views"
-    assert report["contrastive_objective"]["deterministic_seed"] == 17
-    assert report["train_summary"]["steps"] == 2
-
-
 def _valid_benchmark_trainer_kwargs():
     return {
         "batch_size": 2,
@@ -171,8 +94,76 @@ def _valid_benchmark_trainer_kwargs():
     }
 
 
+def _dummy_sentence_model(dim=4):
+    torch = pytest.importorskip("torch")
+
+    class DummySentenceModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dim = dim
+            self.embed = torch.nn.Embedding(256, dim)
+            self.proj = torch.nn.Linear(dim, dim)
+
+        def tokenize(self, texts):
+            ids = [sum(text.encode("utf-8")) % 256 for text in texts]
+            return {"input_ids": torch.tensor(ids, dtype=torch.long).unsqueeze(1)}
+
+        def forward(self, tokenized):
+            emb = self.embed(tokenized["input_ids"]).mean(dim=1)
+            return {"sentence_embedding": self.proj(emb)}
+
+        def get_sentence_embedding_dimension(self):
+            return self.dim
+
+        def save(self, out):
+            path = Path(out)
+            path.mkdir(parents=True, exist_ok=True)
+            (path / "dummy_model.txt").write_text("saved\n", encoding="utf-8")
+
+    return DummySentenceModel()
+
+
+def test_benchmark_contrastive_trainer_fit_and_report(tmp_path):
+    torch = pytest.importorskip("torch")
+    model = _dummy_sentence_model()
+    before = [param.detach().clone() for param in model.parameters()]
+    trainer = BenchmarkContrastiveTrainer(
+        model,
+        **{
+            **_valid_benchmark_trainer_kwargs(),
+            "binary_loss_weight": 0.5,
+            "contrastive_loss_weight": 0.5,
+            "binary_hidden_dim": 4,
+            "seed": 17,
+        },
+    )
+
+    summary = trainer.fit(_TinyViewDataset(), epochs=1)
+
+    assert summary["steps"] == 2
+    assert summary["avg_loss"] > 0.0
+    assert trainer.classifier is not None
+    assert trainer.weight_decay == 0.02
+    after = list(model.parameters())
+    assert any(not torch.allclose(old, new) for old, new in zip(before, after))
+
+    out = tmp_path / "checkpoint"
+    config = _training_config(out)
+    save_encoder_only(model, out, config, summary)
+
+    assert (out / "dummy_model.txt").exists()
+    report = json.loads((out / "benchmark_training_report.json").read_text(encoding="utf-8"))
+    assert report["config"]["binary_loss_weight"] == 0.5
+    assert report["config"]["weight_decay"] == 0.02
+    assert report["config"]["seed"] == 17
+    assert report["contrastive_objective"]["name"] == "supervised_orbit_contrastive_loss"
+    assert report["contrastive_objective"]["binary_auxiliary_head_views"] == "both_l2_normalized_views"
+    assert report["contrastive_objective"]["deterministic_seed"] == 17
+    assert report["train_summary"]["steps"] == 2
+
+
 def test_benchmark_trainers_reject_invalid_hyperparameters():
-    invalid_contrastive_overrides = [
+    invalid_overrides = [
         {"batch_size": 0},
         {"temperature": 0.0},
         {"lr": float("nan")},
@@ -186,219 +177,22 @@ def test_benchmark_trainers_reject_invalid_hyperparameters():
         {"loss_max_scale": 0.0},
         {"loss_min_scale": float("inf")},
         {"loss_max_scale": 1.0, "loss_min_scale": 2.0},
+        {"binary_loss_weight": 0.0},
+        {"contrastive_loss_weight": float("nan")},
+        {"binary_hidden_dim": 0},
         {"log_every": -1},
         {"max_steps": 0},
     ]
 
-    for override in invalid_contrastive_overrides:
+    for override in invalid_overrides:
         kwargs = _valid_benchmark_trainer_kwargs()
         kwargs.update(override)
         with pytest.raises(ValueError):
             BenchmarkContrastiveTrainer(object(), **kwargs)
 
-    invalid_binary_overrides = [
-        {"binary_loss_weight": 0.0},
-        {"contrastive_loss_weight": float("nan")},
-        {"binary_hidden_dim": 0},
-        {"checkpoint_every_steps": -1},
-    ]
-    for override in invalid_binary_overrides:
-        kwargs = _valid_benchmark_trainer_kwargs()
-        kwargs.update(override)
-        with pytest.raises(ValueError):
-            BenchmarkBinaryContrastiveTrainer(object(), **kwargs)
-
-
-def test_binary_trainer_records_validation_fixed_fpr_selection():
-    torch = pytest.importorskip("torch")
-
-    class DummySentenceModel(torch.nn.Module):
-        def __init__(self, dim=4):
-            super().__init__()
-            self.dim = dim
-            self.embed = torch.nn.Embedding(256, dim)
-            self.proj = torch.nn.Linear(dim, dim)
-
-        def tokenize(self, texts):
-            ids = [sum(text.encode("utf-8")) % 256 for text in texts]
-            return {"input_ids": torch.tensor(ids, dtype=torch.long).unsqueeze(1)}
-
-        def forward(self, tokenized):
-            emb = self.embed(tokenized["input_ids"]).mean(dim=1)
-            return {"sentence_embedding": self.proj(emb)}
-
-        def get_sentence_embedding_dimension(self):
-            return self.dim
-
-    trainer = BenchmarkBinaryContrastiveTrainer(
-        DummySentenceModel(),
-        batch_size=2,
-        temperature=0.1,
-        lr=1e-2,
-        max_grad_norm=1.0,
-        scheduler="none",
-        min_lr=0.0,
-        weight_decay=0.02,
-        use_grad_cache=False,
-        grad_cache_chunk_size=2,
-        num_workers=0,
-        loss_mode="fixed",
-        loss_max_scale=100.0,
-        loss_min_scale=1.0,
-        optimize_loss=False,
-        log_every=0,
-        binary_loss_weight=0.5,
-        contrastive_loss_weight=0.5,
-        binary_hidden_dim=4,
-        seed=17,
-    )
-
-    summary = trainer.fit(
-        _TinyViewDataset(),
-        epochs=1,
-        validation_dataset=_TinyViewDataset(),
-        validation_target_fpr=0.5,
-        restore_best_validation=True,
-    )
-
-    selection = summary["validation_model_selection"]
-    assert selection["metric"] == "tpr_at_target_fpr"
-    assert selection["target_fpr"] == 0.5
-    assert selection["selection_rule"] == "maximize_tpr_at_target_fpr;ties_keep_earliest"
-    assert selection["score_source"] == "binary_auxiliary_head_sigmoid"
-    assert selection["score_view"] == "canonical_view1_only"
-    assert selection["best_epoch"] == 1
-    assert selection["restored_best_validation_checkpoint"] is True
-    assert selection["history"][0]["status"] == "pass"
-    assert selection["history"][0]["threshold_source"] == "validation_benign_scores"
-    assert selection["history"][0]["score_source"] == "binary_auxiliary_head_sigmoid"
-    assert selection["history"][0]["score_view"] == "canonical_view1_only"
-    assert selection["history"][0]["embedding_normalization"] == "l2"
-    assert selection["history"][0]["alpha"] == 0.5
-    assert selection["history"][0]["num_samples"] == 2
-    assert selection["history"][0]["order_statistic_rank"] == 2
-    assert selection["history"][0]["decision_rule"] == "score > threshold"
-    assert selection["history"][0]["calibration_scores"] == "benign_only"
-    assert selection["history"][0]["n_validation_benign"] == 2
-    assert selection["history"][0]["n_validation_positive"] == 2
-
-
-def test_binary_trainer_restores_best_validation_state():
-    torch = pytest.importorskip("torch")
-
-    class DummySentenceModel(torch.nn.Module):
-        def __init__(self, dim=4):
-            super().__init__()
-            self.dim = dim
-            self.embed = torch.nn.Embedding(256, dim)
-            self.proj = torch.nn.Linear(dim, dim)
-
-        def tokenize(self, texts):
-            ids = [sum(text.encode("utf-8")) % 256 for text in texts]
-            return {"input_ids": torch.tensor(ids, dtype=torch.long).unsqueeze(1)}
-
-        def forward(self, tokenized):
-            emb = self.embed(tokenized["input_ids"]).mean(dim=1)
-            return {"sentence_embedding": self.proj(emb)}
-
-        def get_sentence_embedding_dimension(self):
-            return self.dim
-
-    class RecordingTrainer(BenchmarkBinaryContrastiveTrainer):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.validation_states = []
-
-        def evaluate_fixed_fpr(self, dataset, *, target_fpr=1e-4):
-            del dataset
-            self.validation_states.append(
-                {key: value.detach().cpu().clone() for key, value in self.model.state_dict().items()}
-            )
-            call_index = len(self.validation_states)
-            return {
-                "status": "pass",
-                "target_fpr": float(target_fpr),
-                "threshold": 0.5,
-                "alpha": float(target_fpr),
-                "num_samples": 2,
-                "order_statistic_rank": 2,
-                "decision_rule": "score > threshold",
-                "calibration_scores": "benign_only",
-                "threshold_source": "validation_benign_scores",
-                "score_source": "binary_auxiliary_head_sigmoid",
-                "score_view": "canonical_view1_only",
-                "embedding_normalization": "l2",
-                "n_validation_rows": 4,
-                "n_validation_benign": 2,
-                "n_validation_positive": 2,
-                "false_positives": 0,
-                "true_positives": 2 if call_index == 1 else 0,
-                "observed_fpr": 0.0,
-                "tpr_at_target_fpr": 1.0 if call_index == 1 else 0.0,
-            }
-
-    trainer = RecordingTrainer(
-        DummySentenceModel(),
-        batch_size=2,
-        temperature=0.1,
-        lr=1e-2,
-        max_grad_norm=1.0,
-        scheduler="none",
-        min_lr=0.0,
-        weight_decay=0.02,
-        use_grad_cache=False,
-        grad_cache_chunk_size=2,
-        num_workers=0,
-        loss_mode="fixed",
-        loss_max_scale=100.0,
-        loss_min_scale=1.0,
-        optimize_loss=False,
-        log_every=0,
-        binary_loss_weight=0.5,
-        contrastive_loss_weight=0.5,
-        binary_hidden_dim=4,
-        seed=17,
-    )
-
-    summary = trainer.fit(
-        _TinyViewDataset(),
-        epochs=2,
-        validation_dataset=_TinyViewDataset(),
-        validation_target_fpr=0.5,
-        restore_best_validation=True,
-    )
-
-    assert summary["validation_model_selection"]["best_epoch"] == 1
-    assert summary["validation_model_selection"]["restored_best_validation_checkpoint"] is True
-    assert len(trainer.validation_states) == 2
-    assert any(
-        not torch.allclose(trainer.validation_states[0][key], trainer.validation_states[1][key])
-        for key in trainer.validation_states[0]
-    )
-    restored = trainer.model.state_dict()
-    assert all(torch.allclose(restored[key].cpu(), trainer.validation_states[0][key]) for key in restored)
-
 
 def test_binary_auxiliary_head_trains_on_both_views():
     torch = pytest.importorskip("torch")
-
-    class DummySentenceModel(torch.nn.Module):
-        def __init__(self, dim=4):
-            super().__init__()
-            self.dim = dim
-            self.embed = torch.nn.Embedding(256, dim)
-            self.proj = torch.nn.Linear(dim, dim)
-
-        def tokenize(self, texts):
-            ids = [sum(text.encode("utf-8")) % 256 for text in texts]
-            return {"input_ids": torch.tensor(ids, dtype=torch.long).unsqueeze(1)}
-
-        def forward(self, tokenized):
-            emb = self.embed(tokenized["input_ids"]).mean(dim=1)
-            return {"sentence_embedding": self.proj(emb)}
-
-        def get_sentence_embedding_dimension(self):
-            return self.dim
 
     class RecordingClassifier(torch.nn.Module):
         def __init__(self, dim):
@@ -410,31 +204,20 @@ def test_binary_auxiliary_head_trains_on_both_views():
             self.batch_sizes.append(int(embeddings.shape[0]))
             return self.linear(embeddings)
 
-    class RecordingTrainer(BenchmarkBinaryContrastiveTrainer):
+    class RecordingTrainer(BenchmarkContrastiveTrainer):
         def _build_classifier(self, embedding_dim: int):
             self.recording_classifier = RecordingClassifier(embedding_dim)
             return self.recording_classifier
 
     trainer = RecordingTrainer(
-        DummySentenceModel(),
-        batch_size=4,
-        temperature=0.1,
-        lr=1e-2,
-        max_grad_norm=1.0,
-        scheduler="none",
-        min_lr=0.0,
-        weight_decay=0.02,
-        use_grad_cache=False,
-        grad_cache_chunk_size=2,
-        num_workers=0,
-        loss_mode="fixed",
-        loss_max_scale=100.0,
-        loss_min_scale=1.0,
-        optimize_loss=False,
-        log_every=0,
-        binary_loss_weight=0.5,
-        contrastive_loss_weight=0.5,
-        binary_hidden_dim=4,
+        _dummy_sentence_model(),
+        **{
+            **_valid_benchmark_trainer_kwargs(),
+            "batch_size": 4,
+            "binary_loss_weight": 0.5,
+            "contrastive_loss_weight": 0.5,
+            "binary_hidden_dim": 4,
+        },
     )
 
     summary = trainer.fit(_TinyViewDataset(), epochs=1)
@@ -443,7 +226,7 @@ def test_binary_auxiliary_head_trains_on_both_views():
     assert trainer.recording_classifier.batch_sizes == [8]
 
 
-def test_benchmark_grad_cache_receives_supervised_orbit_labels(monkeypatch):
+def test_benchmark_grad_cache_uses_single_caho_training_loss(monkeypatch):
     torch = pytest.importorskip("torch")
     captured = {}
 
@@ -461,25 +244,16 @@ def test_benchmark_grad_cache_receives_supervised_orbit_labels(monkeypatch):
 
     trainer = BenchmarkContrastiveTrainer(
         torch.nn.Linear(1, 1),
-        batch_size=4,
-        temperature=0.1,
-        lr=1e-2,
-        max_grad_norm=1.0,
-        scheduler="none",
-        min_lr=0.0,
-        weight_decay=0.02,
-        use_grad_cache=True,
-        grad_cache_chunk_size=2,
-        num_workers=0,
-        loss_mode="fixed",
-        loss_max_scale=100.0,
-        loss_min_scale=1.0,
-        optimize_loss=False,
-        log_every=0,
+        **{
+            **_valid_benchmark_trainer_kwargs(),
+            "batch_size": 4,
+            "use_grad_cache": True,
+        },
     )
 
     trainer.fit(_TinyViewDataset(), epochs=1)
 
+    assert captured["loss_fn"].__name__ == "_training_loss"
     assert captured["model_inputs"][0] == [
         "safe.example.com",
         "status.example.net",
@@ -489,137 +263,25 @@ def test_benchmark_grad_cache_receives_supervised_orbit_labels(monkeypatch):
     assert captured["labels"] == [0, 0, 1, 1]
 
 
-def test_binary_trainer_grad_cache_uses_supported_caho_objective(monkeypatch):
-    torch = pytest.importorskip("torch")
-    captured = {}
-
-    class FakeGradCache:
-        def __init__(self, **kwargs):
-            captured["loss_fn"] = kwargs["loss_fn"]
-
-        def __call__(self, *model_inputs, **loss_kwargs):
-            captured["model_inputs"] = model_inputs
-            captured["labels"] = loss_kwargs["labels"].detach().cpu().tolist()
-            return torch.tensor(0.0)
-
-    class DummySentenceModel(torch.nn.Module):
-        def __init__(self, dim=4):
-            super().__init__()
-            self.dim = dim
-            self.embed = torch.nn.Embedding(256, dim)
-            self.proj = torch.nn.Linear(dim, dim)
-
-        def tokenize(self, texts):
-            ids = [sum(text.encode("utf-8")) % 256 for text in texts]
-            return {"input_ids": torch.tensor(ids, dtype=torch.long).unsqueeze(1)}
-
-        def forward(self, tokenized):
-            emb = self.embed(tokenized["input_ids"]).mean(dim=1)
-            return {"sentence_embedding": self.proj(emb)}
-
-        def get_sentence_embedding_dimension(self):
-            return self.dim
-
-    trainer = BenchmarkBinaryContrastiveTrainer(
-        DummySentenceModel(),
-        batch_size=2,
-        temperature=0.1,
-        lr=1e-2,
-        max_grad_norm=1.0,
-        scheduler="none",
-        min_lr=0.0,
-        weight_decay=0.02,
-        use_grad_cache=True,
-        grad_cache_chunk_size=2,
-        num_workers=0,
-        loss_mode="fixed",
-        loss_max_scale=100.0,
-        loss_min_scale=1.0,
-        optimize_loss=False,
-        log_every=0,
-        binary_loss_weight=0.5,
-        contrastive_loss_weight=0.5,
-        binary_hidden_dim=4,
-    )
-
-    monkeypatch.setitem(sys.modules, "grad_cache", SimpleNamespace(GradCache=FakeGradCache))
-
-    summary = trainer.fit(_TinyViewDataset(), epochs=1)
-
-    assert summary["steps"] == 2
-    assert sorted(captured["labels"]) == [0, 0, 1, 1]
-
-
-def test_benchmark_binary_script_does_not_expose_grad_cache_toggle():
-    script = Path(__file__).resolve().parents[1] / "scripts" / "train_benchmark_caho_binary.py"
-    spec = importlib.util.spec_from_file_location("_test_train_benchmark_caho_binary", script)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    args = module.build_parser().parse_args(["--out", "unused-output"])
-
-    assert args.grad_cache is True
-    with pytest.raises(SystemExit):
-        module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
-    with pytest.raises(SystemExit):
-        module.build_parser().parse_args(["--out", "unused-output", "--no-grad-cache"])
-
-
 def test_benchmark_caho_94gb_batch_defaults():
     assert resolve_caho_batch_size(None, use_grad_cache=False) == CAHO_94GB_ACTUAL_BATCH_SIZE
     assert resolve_caho_batch_size(None, use_grad_cache=True) == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
     assert CAHO_94GB_GRAD_CACHE_CHUNK_SIZE == 8192
 
-    binary_script = Path(__file__).resolve().parents[1] / "scripts" / "train_benchmark_caho_binary.py"
-    binary_spec = importlib.util.spec_from_file_location("_test_train_benchmark_caho_binary_defaults", binary_script)
-    assert binary_spec is not None and binary_spec.loader is not None
-    binary_module = importlib.util.module_from_spec(binary_spec)
-    binary_spec.loader.exec_module(binary_module)
-    binary_args = binary_module.build_parser().parse_args(["--out", "unused-output"])
-    assert binary_args.epochs == CAHO_DEFAULT_EPOCHS
-    assert binary_args.batch_size == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
-    assert binary_args.grad_cache is True
-    assert binary_args.grad_cache_chunk_size == CAHO_94GB_GRAD_CACHE_CHUNK_SIZE
-
-    regular_script = Path(__file__).resolve().parents[1] / "scripts" / "train_benchmark_caho.py"
-    regular_spec = importlib.util.spec_from_file_location("_test_train_benchmark_caho_defaults", regular_script)
-    assert regular_spec is not None and regular_spec.loader is not None
-    regular_module = importlib.util.module_from_spec(regular_spec)
-    regular_spec.loader.exec_module(regular_module)
-    regular_args = regular_module.build_parser().parse_args(["--out", "unused-output"])
-    assert regular_args.epochs == CAHO_DEFAULT_EPOCHS
-    assert regular_args.grad_cache is True
-    assert resolve_caho_batch_size(regular_args.batch_size, use_grad_cache=True) == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
-    assert regular_args.grad_cache_chunk_size == CAHO_94GB_GRAD_CACHE_CHUNK_SIZE
-    with pytest.raises(SystemExit):
-        regular_module.build_parser().parse_args(["--out", "unused-output", "--no-grad-cache"])
-    with pytest.raises(SystemExit):
-        regular_module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
-
-
-def test_benchmark_binary_script_validation_selection_args():
-    script = Path(__file__).resolve().parents[1] / "scripts" / "train_benchmark_caho_binary.py"
-    spec = importlib.util.spec_from_file_location("_test_train_benchmark_caho_binary_args", script)
+    script = Path(__file__).resolve().parents[1] / "scripts" / "train_benchmark_caho.py"
+    spec = importlib.util.spec_from_file_location("_test_train_benchmark_caho_defaults", script)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-
-    args = module.build_parser().parse_args(
-        [
-            "--out",
-            "unused-output",
-            "--validation-root",
-            "validation-only",
-            "--validation-target-fpr",
-            "0.001",
-            "--restore-best-validation",
-        ]
-    )
-
-    assert module.validate_args(args) is args
-    assert str(args.validation_root) == "validation-only"
-    assert args.validation_target_fpr == 0.001
-    assert args.restore_best_validation is True
+    args = module.build_parser().parse_args(["--out", "unused-output"])
+    assert args.epochs == CAHO_DEFAULT_EPOCHS
+    assert args.grad_cache is True
+    assert resolve_caho_batch_size(args.batch_size, use_grad_cache=True) == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
+    assert args.grad_cache_chunk_size == CAHO_94GB_GRAD_CACHE_CHUNK_SIZE
+    with pytest.raises(SystemExit):
+        module.build_parser().parse_args(["--out", "unused-output", "--no-grad-cache"])
+    with pytest.raises(SystemExit):
+        module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
 
 
 def test_chunk_shuffle_sampler_preserves_all_indices_and_chunk_locality():
