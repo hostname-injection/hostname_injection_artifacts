@@ -23,6 +23,7 @@ def _simple_model():
         cones=cones,
         benign_prior=benign_prior,
         malicious_priors=malicious_priors,
+        threshold=0.0,
     )
 
 
@@ -42,6 +43,7 @@ def _multi_family_model():
         cones=cones,
         benign_prior=benign_prior,
         malicious_priors=malicious_priors,
+        threshold=0.0,
     )
 
 

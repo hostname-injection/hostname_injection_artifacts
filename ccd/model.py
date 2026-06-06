@@ -12,6 +12,7 @@ from .calibration import (
     calibrate_thresholds_by_group,
     coerce_finite_threshold,
     conformal_p_value,
+    require_calibrated_threshold,
     split_conformal_threshold_metadata,
     threshold_for_group,
 )
@@ -136,9 +137,9 @@ class CCDModel:
         )
         log_benign, log_malicious = self._get_log_priors()
         families = list(log_malicious.keys())
+        calibrated_threshold = self._require_calibrated_threshold("CCDModel.explain_embeddings")
         if thresholds is None:
-            default_threshold = 0.0 if self.threshold is None else self.threshold
-            thresholds = [default_threshold] * len(embeddings)
+            thresholds = [calibrated_threshold] * len(embeddings)
 
         explanations: List[Dict[str, Any]] = []
         for i, u in enumerate(embeddings):
@@ -200,6 +201,7 @@ class CCDModel:
     ) -> List[Dict[str, Any]]:
         if not hostnames:
             return []
+        self._require_calibrated_threshold("CCDModel.explain")
         if normalize:
             hostnames = [normalize_hostname(h) for h in hostnames]
         thresholds = None
@@ -365,6 +367,7 @@ class CCDModel:
     ) -> np.ndarray:
         if calibration_groups is not None and len(calibration_groups) != len(hostnames):
             raise ValueError("calibration_groups must have one value per hostname")
+        calibrated_threshold = self._require_calibrated_threshold("CCDModel.predict")
         scores = self.score(
             hostnames,
             batch_size=batch_size,
@@ -373,8 +376,7 @@ class CCDModel:
             approximate_k=approximate_k,
         )
         if calibration_groups is None:
-            threshold = 0.0 if self.threshold is None else self.threshold
-            return scores > threshold
+            return scores > calibrated_threshold
         thresholds = np.asarray(
             [
                 self.threshold_for_group(group, missing=missing_group_threshold)
@@ -386,6 +388,9 @@ class CCDModel:
 
     def threshold_for_group(self, group: str, *, missing: str = "default") -> float:
         return threshold_for_group(group, self.threshold, self.grouped_thresholds, missing=missing)
+
+    def _require_calibrated_threshold(self, purpose: str) -> float:
+        return require_calibrated_threshold(self, purpose=purpose)
 
     def certify(
         self,
@@ -419,9 +424,8 @@ class CCDModel:
         ):
             raise ValueError("max_nodes must be a positive integer")
 
-        threshold = float(threshold if threshold is not None else (self.threshold or 0.0))
-        if not math.isfinite(threshold):
-            raise ValueError("threshold must be finite")
+        calibrated_threshold = self._require_calibrated_threshold("CCDModel.certify")
+        threshold = calibrated_threshold if threshold is None else coerce_finite_threshold(threshold)
         if method in {"calibrated-margin", "combined"}:
             if sketch_lipschitz is None or embedding_rotation_bound is None:
                 raise ValueError(

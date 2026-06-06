@@ -783,6 +783,75 @@ def test_score_empty_inputs():
     assert scores.size == 0
 
 
+def test_predict_requires_calibrated_threshold_before_scoring():
+    class FailingEncoder:
+        def encode(self, texts, batch_size=32, normalize=True):
+            raise AssertionError("predict should not encode before calibration")
+
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=FailingEncoder(),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+    )
+
+    try:
+        model.predict(["same.example"])
+    except ValueError as exc:
+        assert "requires a calibrated model bundle" in str(exc)
+        return
+
+    assert False, "Expected thresholded prediction to require calibration"
+
+
+def test_explain_requires_calibrated_threshold_before_encoding():
+    class FailingEncoder:
+        def encode(self, texts, batch_size=32, normalize=True):
+            raise AssertionError("explain should not encode before calibration")
+
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=FailingEncoder(),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+    )
+
+    try:
+        model.explain(["same.example"])
+    except ValueError as exc:
+        assert "requires a calibrated model bundle" in str(exc)
+        return
+
+    assert False, "Expected thresholded explanation to require calibration"
+
+
+def test_certify_requires_calibrated_threshold_even_with_explicit_threshold():
+    class FailingEncoder:
+        def encode(self, texts, batch_size=32, normalize=True):
+            raise AssertionError("certify should not encode before calibration")
+
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=FailingEncoder(),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+    )
+
+    try:
+        model.certify("same.example", radius=1, threshold=0.0)
+    except ValueError as exc:
+        assert "requires a calibrated model bundle" in str(exc)
+        return
+
+    assert False, "Expected certification to require model calibration"
+
+
 def test_predict_applies_grouped_thresholds():
     class FixedEncoder:
         def encode(self, texts, batch_size=32, normalize=True):
