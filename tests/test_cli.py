@@ -574,7 +574,29 @@ def test_calibrate_can_embed_threshold_in_model_bundle(tmp_path, monkeypatch):
     assert "tenant-a" in payload["grouped_thresholds"]
     assert payload["grouped_thresholds"]["tenant-b"]["decision_rule"] == "score > threshold"
     assert payload["n_calibration_groups"] == 2
+    assert payload["score_path"]["exact_all_cones"] is True
+    assert payload["score_path"]["score_statistic"] == "deployed_top_r_cone_sketch"
     assert payload["score_path"]["normalized_inputs"] is False
+
+
+def test_calibrate_parser_rejects_alternate_score_path_flags():
+    parser = build_parser()
+    base = [
+        "calibrate",
+        "--model",
+        "model.npz",
+        "--benign",
+        "benign.txt",
+        "--output",
+        "calibration.json",
+        "--save-model",
+        "calibrated.npz",
+    ]
+
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--" + "approximate"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--" + "approximate" + "-k", "2"])
 
 
 def test_score_parser_rejects_threshold_and_calibration_overrides():
@@ -585,6 +607,10 @@ def test_score_parser_rejects_threshold_and_calibration_overrides():
         parser.parse_args([*base, "--threshold", "0.5"])
     with pytest.raises(SystemExit):
         parser.parse_args([*base, "--calibration", "calibration.json"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--" + "approximate"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--" + "approximate" + "-k", "2"])
 
 
 def test_explain_parser_rejects_threshold_and_calibration_overrides():
@@ -595,6 +621,10 @@ def test_explain_parser_rejects_threshold_and_calibration_overrides():
         parser.parse_args([*base, "--threshold", "0.5"])
     with pytest.raises(SystemExit):
         parser.parse_args([*base, "--calibration", "calibration.json"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--" + "approximate"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--" + "approximate" + "-k", "2"])
 
 
 def test_score_csv_preserves_raw_artifact_commas(tmp_path, monkeypatch):
@@ -762,6 +792,24 @@ def test_refresh_benign_parser_smoke():
     assert args.drop_grouped_thresholds is True
 
 
+def test_refresh_benign_parser_rejects_alternate_score_path_flags():
+    parser = build_parser()
+    base = [
+        "refresh-benign",
+        "--model",
+        "model.npz",
+        "--benign",
+        "benign_window.txt",
+        "--output",
+        "refreshed.npz",
+    ]
+
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--" + "approximate"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--" + "approximate" + "-k", "2"])
+
+
 def test_refresh_benign_saves_updated_model_bundle(tmp_path, monkeypatch):
     benign = tmp_path / "benign_window.txt"
     benign.write_text("alpha.example\nbeta.example\nbeta2.example\n", encoding="utf-8")
@@ -837,6 +885,8 @@ def test_refresh_benign_saves_updated_model_bundle(tmp_path, monkeypatch):
     assert report["calibration_scores"] == "benign_only"
     assert report["n_calibration_groups"] == 2
     assert report["refresh_scope"]["encoder_config_fixed"] is True
+    assert report["score_path"]["exact_all_cones"] is True
+    assert report["score_path"]["score_statistic"] == "deployed_top_r_cone_sketch"
     assert report["score_path"]["normalized_inputs"] is False
     assert report["input"]["num_hostnames"] == 3
 

@@ -331,8 +331,6 @@ def cmd_score(args: argparse.Namespace) -> None:
         hostnames,
         batch_size=args.batch_size,
         normalize=False,
-        approximate=args.approximate,
-        approximate_k=args.approximate_k,
     )
     if groups is not None:
         row_thresholds = np.array(
@@ -374,8 +372,6 @@ def cmd_calibrate(args: argparse.Namespace) -> None:
         hostnames,
         batch_size=args.batch_size,
         normalize=False,
-        approximate=args.approximate,
-        approximate_k=args.approximate_k,
     )
     alpha = args.alpha if args.alpha is not None else model.config.calibration.alpha
     calibration_metadata = split_conformal_threshold_metadata(scores, alpha)
@@ -391,8 +387,8 @@ def cmd_calibrate(args: argparse.Namespace) -> None:
         "grouped_thresholds": grouped_thresholds,
         "n_calibration_groups": len(grouped_thresholds),
         "score_path": {
-            "approximate": bool(args.approximate),
-            "approximate_k": args.approximate_k,
+            "exact_all_cones": True,
+            "score_statistic": "deployed_top_r_cone_sketch",
             "normalized_inputs": not args.no_normalize,
         },
     }
@@ -429,10 +425,12 @@ def cmd_refresh_benign(args: argparse.Namespace) -> None:
         alpha=alpha,
         calibration_groups=groups,
         drop_grouped_thresholds=args.drop_grouped_thresholds,
-        approximate=args.approximate,
-        approximate_k=args.approximate_k,
     )
-    report["score_path"]["normalized_inputs"] = not args.no_normalize
+    report["score_path"] = {
+        "exact_all_cones": True,
+        "score_statistic": "deployed_top_r_cone_sketch",
+        "normalized_inputs": not args.no_normalize,
+    }
     report["input"] = {
         "benign_path": str(args.benign),
         "num_hostnames": len(hostnames),
@@ -712,17 +710,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail if --groups contains a group missing from grouped calibration output.",
     )
     score.add_argument("--batch-size", type=int, default=64)
-    score.add_argument(
-        "--approximate",
-        action="store_true",
-        help="Use fast approximate scoring (hard-cone).",
-    )
-    score.add_argument(
-        "--approximate-k",
-        type=int,
-        default=None,
-        help="Top-k cones to use for approximate scoring (implies --approximate).",
-    )
     score.add_argument("--no-normalize", action="store_true")
     score.set_defaults(func=cmd_score)
 
@@ -743,17 +730,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     calibrate.add_argument("--alpha", type=float, default=None)
     calibrate.add_argument("--batch-size", type=int, default=64)
-    calibrate.add_argument(
-        "--approximate",
-        action="store_true",
-        help="Use fast approximate scoring (hard-cone) for calibration.",
-    )
-    calibrate.add_argument(
-        "--approximate-k",
-        type=int,
-        default=None,
-        help="Top-k cones to use for approximate scoring (implies --approximate).",
-    )
     calibrate.add_argument("--no-normalize", action="store_true")
     calibrate.set_defaults(func=cmd_calibrate)
 
@@ -777,17 +753,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     refresh_benign.add_argument("--alpha", type=float, default=None)
     refresh_benign.add_argument("--batch-size", type=int, default=64)
-    refresh_benign.add_argument(
-        "--approximate",
-        action="store_true",
-        help="Use fast approximate scoring when recalibrating the refreshed threshold.",
-    )
-    refresh_benign.add_argument(
-        "--approximate-k",
-        type=int,
-        default=None,
-        help="Top-k cones to use for approximate refreshed-threshold scoring.",
-    )
     refresh_benign.add_argument("--no-normalize", action="store_true")
     refresh_benign.set_defaults(func=cmd_refresh_benign)
 

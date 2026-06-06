@@ -15,14 +15,12 @@ def test_score_cli_writes_output(tmp_path, monkeypatch):
     output_path = tmp_path / "out.csv"
     input_path.write_text("alpha.example\nbeta.example\n")
 
-    seen = {}
-
     class DummyModel:
         threshold = 0.5
 
         def score(self, hostnames, batch_size=32, normalize=True, approximate=False, approximate_k=None):
-            seen["approximate"] = approximate
-            seen["approximate_k"] = approximate_k
+            assert approximate is False
+            assert approximate_k is None
             return np.array([0.1, 0.9], dtype=np.float32)
 
     monkeypatch.setattr(score_cli, "load_model", lambda _: DummyModel())
@@ -37,9 +35,6 @@ def test_score_cli_writes_output(tmp_path, monkeypatch):
             str(input_path),
             "--output",
             str(output_path),
-            "--approximate",
-            "--approximate-k",
-            "2",
         ],
     )
 
@@ -47,8 +42,29 @@ def test_score_cli_writes_output(tmp_path, monkeypatch):
     assert output_path.exists()
     lines = output_path.read_text().strip().splitlines()
     assert len(lines) == 3
-    assert seen["approximate"] is True
-    assert seen["approximate_k"] == 2
+
+
+def test_score_cli_rejects_approximate_score_path_flags(tmp_path, monkeypatch):
+    input_path = tmp_path / "input.txt"
+    output_path = tmp_path / "out.csv"
+    input_path.write_text("alpha.example\n", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ccd-score",
+            "--model",
+            "model.npz",
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--" + "approximate",
+        ],
+    )
+
+    with pytest.raises(SystemExit):
+        score_cli.main()
 
 
 def test_score_cli_applies_grouped_thresholds(tmp_path, monkeypatch):
@@ -291,8 +307,8 @@ def test_explain_cli_outputs_json(tmp_path, monkeypatch):
     assert data["grouped_thresholds_used"] is True
     assert data["decision_rule"] == "score > threshold"
     assert data["score_path"] == {
-        "approximate": False,
-        "approximate_k": None,
+        "exact_all_cones": True,
+        "score_statistic": "deployed_top_r_cone_sketch",
         "normalized_inputs": True,
     }
     assert data["normalizer"]["function"] == "ccd.preprocess.normalize_hostname"

@@ -31,8 +31,6 @@ def add_explain_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     parser.add_argument("--top-k", type=int, default=3, help="Number of top cones to show")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--no-normalize", action="store_true", help="Skip hostname normalization")
-    parser.add_argument("--approximate", action="store_true", help="Use fast approximate scoring")
-    parser.add_argument("--approximate-k", type=int, default=None, help="Top-k cones for approximate scoring")
     return parser
 
 
@@ -60,8 +58,6 @@ def run(args: argparse.Namespace) -> int:
         top_k=args.top_k,
         calibration_groups=groups,
         missing_group_threshold="error" if args.require_group_thresholds else "default",
-        approximate=args.approximate,
-        approximate_k=args.approximate_k,
     )
     for index, row in enumerate(explanations):
         row["decision_rule"] = SPLIT_CONFORMAL_DECISION_RULE
@@ -84,8 +80,8 @@ def run(args: argparse.Namespace) -> int:
         "grouped_thresholds_used": groups is not None,
         "decision_rule": SPLIT_CONFORMAL_DECISION_RULE,
         "score_path": {
-            "approximate": bool(args.approximate or args.approximate_k is not None),
-            "approximate_k": args.approximate_k if args.approximate_k is not None else (1 if args.approximate else None),
+            "exact_all_cones": True,
+            "score_statistic": "deployed_top_r_cone_sketch",
             "normalized_inputs": not args.no_normalize,
         },
         "normalizer": {

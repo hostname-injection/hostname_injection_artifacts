@@ -32,8 +32,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--no-normalize", action="store_true", help="Skip hostname normalization")
-    parser.add_argument("--approximate", action="store_true", help="Use fast approximate scoring")
-    parser.add_argument("--approximate-k", type=int, default=None, help="Top-k cones for approximate scoring")
     return parser
 
 
@@ -55,8 +53,6 @@ def main() -> int:
         hostnames,
         batch_size=args.batch_size,
         normalize=False,
-        approximate=args.approximate,
-        approximate_k=args.approximate_k,
     )
     if groups is not None:
         row_thresholds = np.array(
