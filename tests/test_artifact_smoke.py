@@ -82,6 +82,22 @@ def test_artifact_smoke_command_sequence_is_cli_parseable(monkeypatch):
                 ),
                 encoding="utf-8",
             )
+        elif any(str(part).endswith("export_hib_release_pipeline_inputs.py") for part in cmd) and "--output-dir" in cmd:
+            out_dir = Path(cmd[cmd.index("--output-dir") + 1])
+            out_dir.mkdir(parents=True, exist_ok=True)
+            files = {
+                "benign.txt": 1,
+                "malicious.csv": 1,
+                "benign_calibration.txt": 1,
+                "queries.txt": 1,
+                "query_labels.csv": 1,
+            }
+            for filename in files:
+                (out_dir / filename).write_text("placeholder\n", encoding="utf-8")
+            (out_dir / "pipeline_inputs_manifest.json").write_text(
+                json.dumps({"files": files, "policy": {"row_multiplicity_preserved": True}}),
+                encoding="utf-8",
+            )
         elif "refresh-benign" in cmd:
             report = Path(cmd[cmd.index("--report") + 1])
             report.write_text(

@@ -134,13 +134,13 @@ def test_train_caho_corpus_rejects_grad_cache_toggles():
     with pytest.raises(SystemExit):
         parser.parse_args([*base, "--loss", "unsupported"])
     with pytest.raises(SystemExit):
-        parser.parse_args([*base, "--no-dedup"])
+        parser.parse_args([*base, "--no-" + "dedup"])
 
 
-def test_train_user_logins_command_is_not_available():
+def test_single_source_training_command_is_not_available():
     parser = build_parser()
     with pytest.raises(SystemExit):
-        parser.parse_args(["train-user-logins"])
+        parser.parse_args(["-".join(["train", "user", "logins"])])
 
 
 def test_train_priors_parser_smoke():

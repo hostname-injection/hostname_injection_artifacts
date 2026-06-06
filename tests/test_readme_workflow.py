@@ -60,3 +60,21 @@ def test_root_readme_requires_embedded_calibrated_threshold_for_downstream_comma
     assert "`--save-model` is required" in normalized
     assert "The input model must already contain an embedded calibrated threshold" in normalized
     assert "do not accept ad hoc threshold or calibration-file overrides" in normalized
+
+
+def test_root_readme_shows_public_release_pipeline_export():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    normalized = " ".join(readme.split())
+
+    assert "scripts/export_hib_release_pipeline_inputs.py" in readme
+    assert "--public-release deidentification_release/data/release/hib_release.jsonl" in readme
+    assert "preserves released row multiplicity" in normalized
+
+
+def test_root_readme_links_reviewer_slice():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert (
+        "https://drive.google.com/drive/folders/1KeKZyIXIqZvEJ4tZAWxE9h4gPoinZCWt?usp=drive_link"
+        in readme
+    )

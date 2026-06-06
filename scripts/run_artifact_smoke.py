@@ -163,6 +163,31 @@ def main() -> int:
         if any(fixed_fpr.get(key, 0) < 1 for key in ("tp", "fp", "tn", "fn")):
             raise RuntimeError("expected public fixed-FPR sample to exercise TP/FP/TN/FN accounting")
 
+        pipeline_dir = Path(tmp) / "pipeline_inputs"
+        run(
+            [
+                sys.executable,
+                "scripts/export_hib_release_pipeline_inputs.py",
+                "--public-release",
+                "deidentification_release/data/release/hib_release.jsonl",
+                "--output-dir",
+                str(pipeline_dir),
+            ]
+        )
+        manifest = json.loads((pipeline_dir / "pipeline_inputs_manifest.json").read_text(encoding="utf-8"))
+        exported = manifest.get("files", {})
+        for filename in (
+            "benign.txt",
+            "malicious.csv",
+            "benign_calibration.txt",
+            "queries.txt",
+            "query_labels.csv",
+        ):
+            if exported.get(filename, 0) < 1 or not (pipeline_dir / filename).exists():
+                raise RuntimeError(f"expected exported public-release pipeline input {filename}")
+        if manifest.get("policy", {}).get("row_multiplicity_preserved") is not True:
+            raise RuntimeError("expected public-release pipeline export to preserve row multiplicity")
+
     with tempfile.TemporaryDirectory(prefix="ccd-artifact-smoke-") as tmp:
         tmp_path = Path(tmp)
         caho_encoder = tmp_path / "caho_encoder"

@@ -291,6 +291,20 @@ python deidentification_release/scripts/recompute_metrics.py \
 Public reports intentionally do not disclose whether duplicate raw hostnames
 or raw-hostname grouping conditions existed in the private input.
 
+To materialize CAHO/CCD pipeline inputs from a de-identified public release
+JSONL, export the split-preserving files first:
+
+```bash
+python scripts/export_hib_release_pipeline_inputs.py \
+  --public-release deidentification_release/data/release/hib_release.jsonl \
+  --output-dir data
+```
+
+The exporter writes `benign.txt`, `malicious.csv`,
+`benign_calibration.txt`, `queries.txt`, `query_labels.csv`, and public group
+files when release-safe calibration groups are present. It preserves released
+row multiplicity and does not report private raw-hostname duplicate facts.
+
 ## Useful Commands
 
 ```bash
