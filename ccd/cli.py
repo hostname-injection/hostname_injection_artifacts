@@ -87,7 +87,18 @@ def _require_model_bundle_caho_checkpoint(model, *, purpose: str) -> None:
     require_model_uses_trained_caho_checkpoint(model, purpose=purpose)
 
 
+def _require_caho_training_samples(samples: List[Sample], *, source: str) -> None:
+    benign_count = sum(1 for sample in samples if not sample.is_malicious)
+    malicious_count = sum(1 for sample in samples if sample.is_malicious)
+    if benign_count == 0:
+        raise ValueError(f"{source} requires at least one benign hostname")
+    if malicious_count == 0:
+        raise ValueError(f"{source} requires at least one malicious hostname")
+
+
 def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_path: Path) -> None:
+    _require_caho_training_samples(samples, source="CAHO training")
+
     from sentence_transformers import SentenceTransformer
 
     defaults = getattr(args, "_caho_training_defaults", None)
@@ -173,6 +184,7 @@ def cmd_train_caho(args: argparse.Namespace) -> None:
     ]
 
     samples = benign_samples + malicious_samples
+    _require_caho_training_samples(samples, source="ccd train-caho")
     if not args.no_normalize:
         samples = [Sample(normalize_hostname(s.hostname), s.is_malicious, s.family) for s in samples]
 
@@ -217,6 +229,7 @@ def cmd_train_caho_corpus(args: argparse.Namespace) -> None:
         Sample(h, is_malicious=True, family=args.malicious_family) for h in malicious_hosts
     ]
     samples = benign_samples + malicious_samples
+    _require_caho_training_samples(samples, source="ccd train-caho-corpus")
     if not args.no_normalize:
         samples = [Sample(normalize_hostname(s.hostname), s.is_malicious, s.family) for s in samples]
 

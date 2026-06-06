@@ -199,9 +199,12 @@ def main() -> int:
         scores = tmp_path / "scores.csv"
         explanations = tmp_path / "explanations.json"
         certificates = tmp_path / "certificates.json"
+        radius1_certificates = tmp_path / "certificates_radius1.json"
         embeddings = tmp_path / "embeddings.npz"
         calibration_groups = tmp_path / "benign_calibration_groups.txt"
         query_groups = tmp_path / "query_groups.txt"
+        radius1_queries = tmp_path / "radius1_queries.txt"
+        radius1_groups = tmp_path / "radius1_groups.txt"
         calibration_groups.write_text(
             "\n".join(["tenant-a", "tenant-a", "tenant-b", "tenant-b", "tenant-a", "tenant-b", "tenant-a", "tenant-b"]) + "\n",
             encoding="utf-8",
@@ -210,6 +213,8 @@ def main() -> int:
             "\n".join(["tenant-a", "tenant-b", "tenant-a", "tenant-b", "tenant-a"]) + "\n",
             encoding="utf-8",
         )
+        radius1_queries.write_text("Alpha.example\n", encoding="utf-8")
+        radius1_groups.write_text("tenant-a\n", encoding="utf-8")
 
         run(
             [
@@ -381,6 +386,40 @@ def main() -> int:
             raise RuntimeError("expected grouped thresholds in certificate smoke output")
         if any("calibration_group" not in row for row in parsed_certificates.get("certificates", [])):
             raise RuntimeError("expected calibration_group on each certificate row")
+
+        run(
+            [
+                sys.executable,
+                "-m",
+                "ccd.cli",
+                "certify",
+                "--model",
+                str(refreshed_model),
+                "--input",
+                str(radius1_queries),
+                "--output",
+                str(radius1_certificates),
+                "--radius",
+                "1",
+                "--groups",
+                str(radius1_groups),
+                "--require-group-thresholds",
+                "--edits",
+                "E5_case",
+                "--max-nodes",
+                "512",
+                "--batch-size",
+                "8",
+            ]
+        )
+        parsed_radius1 = json.loads(radius1_certificates.read_text(encoding="utf-8"))
+        radius1_rows = parsed_radius1.get("certificates", [])
+        if parsed_radius1.get("radius") != 1 or len(radius1_rows) != 1:
+            raise RuntimeError("expected one radius-1 certificate row")
+        if parsed_radius1.get("edit_manifest", {}).get("edits") != ["E5_case"]:
+            raise RuntimeError("expected radius-1 smoke certificate to use the E5_case edit manifest")
+        if radius1_rows[0].get("checked", 0) < 2:
+            raise RuntimeError("expected radius-1 certificate to enumerate nontrivial edit neighbors")
 
         run(
             [

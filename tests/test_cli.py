@@ -114,6 +114,44 @@ def test_train_caho_defaults_match_paper_recipe():
         )
 
 
+def test_train_caho_rejects_missing_training_side(tmp_path):
+    parser = build_parser()
+    benign = tmp_path / "benign.txt"
+    malicious = tmp_path / "malicious.csv"
+
+    benign.write_text("", encoding="utf-8")
+    malicious.write_text("hostname,family\nevil.example,cmd\n", encoding="utf-8")
+    args = parser.parse_args(
+        [
+            "train-caho",
+            "--benign",
+            str(benign),
+            "--malicious",
+            str(malicious),
+            "--out",
+            str(tmp_path / "caho_encoder"),
+        ]
+    )
+    with pytest.raises(ValueError, match="requires at least one benign hostname"):
+        args.func(args)
+
+    benign.write_text("safe.example\n", encoding="utf-8")
+    malicious.write_text("hostname,family\n", encoding="utf-8")
+    args = parser.parse_args(
+        [
+            "train-caho",
+            "--benign",
+            str(benign),
+            "--malicious",
+            str(malicious),
+            "--out",
+            str(tmp_path / "caho_encoder"),
+        ]
+    )
+    with pytest.raises(ValueError, match="requires at least one malicious hostname"):
+        args.func(args)
+
+
 def test_train_caho_corpus_rejects_grad_cache_toggles():
     parser = build_parser()
     base = [

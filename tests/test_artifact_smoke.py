@@ -137,10 +137,25 @@ def test_artifact_smoke_command_sequence_is_cli_parseable(monkeypatch):
             )
         elif "certify" in cmd:
             output = Path(cmd[cmd.index("--output") + 1])
+            radius = int(cmd[cmd.index("--radius") + 1])
+            if radius == 1:
+                output.write_text(
+                    json.dumps(
+                        {
+                            "radius": 1,
+                            "grouped_thresholds_used": True,
+                            "edit_manifest": {"edits": ["E5_case"]},
+                            "certificates": [{"calibration_group": "tenant-a", "checked": 2}],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                return
             output.write_text(
                 json.dumps(
                     {
                         "count": 5,
+                        "radius": radius,
                         "grouped_thresholds_used": True,
                         "certificates": [{"calibration_group": "tenant-a"} for _ in range(5)],
                     }
