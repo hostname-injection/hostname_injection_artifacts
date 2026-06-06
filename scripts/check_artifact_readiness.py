@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 
@@ -27,6 +28,23 @@ MODEL_ARTIFACT_SUFFIXES = {
     ".pt",
     ".pth",
     ".safetensors",
+}
+EXPECTED_SCRIPT_FILES = {
+    "scripts/benchmark_artifact_latency.py",
+    "scripts/check_artifact_readiness.py",
+    "scripts/export_hib_release_pipeline_inputs.py",
+    "scripts/run_artifact_smoke.py",
+    "scripts/train_benchmark_caho.py",
+}
+EXPECTED_MARKDOWN_FILES = {
+    "README.md",
+    "deidentification_release/data/audits/release_data_card.md",
+}
+EXPECTED_CONSOLE_SCRIPTS = {
+    "ccd",
+    "ccd-diagnose",
+    "ccd-explain",
+    "ccd-score",
 }
 
 
@@ -85,6 +103,23 @@ def fail(message: str, failures: list[str]) -> None:
 
 
 def check_repo_shape(files: list[Path], failures: list[str]) -> None:
+    rel_files = {path.relative_to(ROOT).as_posix() for path in files}
+    script_files = {rel for rel in rel_files if rel.startswith("scripts/") and rel.endswith(".py")}
+    markdown_files = {rel for rel in rel_files if rel.endswith(".md")}
+
+    if script_files != EXPECTED_SCRIPT_FILES:
+        fail(
+            "reviewer artifact script surface changed: "
+            f"expected={sorted(EXPECTED_SCRIPT_FILES)}, observed={sorted(script_files)}",
+            failures,
+        )
+    if markdown_files != EXPECTED_MARKDOWN_FILES:
+        fail(
+            "reviewer artifact markdown surface changed: "
+            f"expected={sorted(EXPECTED_MARKDOWN_FILES)}, observed={sorted(markdown_files)}",
+            failures,
+        )
+
     for path in files:
         rel = path.relative_to(ROOT).as_posix()
         lower_name = path.name.lower()
@@ -94,6 +129,34 @@ def check_repo_shape(files: list[Path], failures: list[str]) -> None:
             fail(f"compiled Python artifact is checked in: {rel}", failures)
         if path.suffix.lower() in MODEL_ARTIFACT_SUFFIXES:
             fail(f"pretrained/model artifact is checked in: {rel}", failures)
+
+
+def check_packaging(failures: list[str]) -> None:
+    pyproject = ROOT / "pyproject.toml"
+    if not pyproject.exists():
+        fail("pyproject.toml is missing", failures)
+        return
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    project = data.get("project", {})
+    tool = data.get("tool", {})
+    setuptools = tool.get("setuptools", {}) if isinstance(tool, dict) else {}
+    scripts = set(project.get("scripts", {}))
+    packages = set(setuptools.get("packages", []))
+
+    if project.get("requires-python") != ">=3.11":
+        fail("pyproject.toml must require Python >=3.11", failures)
+    if "license" in project:
+        fail("pyproject.toml must not include license metadata for the reviewer artifact", failures)
+    if "optional-dependencies" in project:
+        fail("pyproject.toml must not define optional dependency extras", failures)
+    if scripts != EXPECTED_CONSOLE_SCRIPTS:
+        fail(
+            "reviewer artifact console scripts changed: "
+            f"expected={sorted(EXPECTED_CONSOLE_SCRIPTS)}, observed={sorted(scripts)}",
+            failures,
+        )
+    if packages != {"ccd"}:
+        fail(f"pyproject.toml must package only ccd; observed packages={sorted(packages)}", failures)
 
 
 def check_readme(failures: list[str]) -> None:
@@ -170,6 +233,7 @@ def main() -> int:
     failures: list[str] = []
     files = iter_repo_files()
     check_repo_shape(files, failures)
+    check_packaging(failures)
     check_readme(failures)
     check_review_terms(text_files(files), failures)
     run_release_validators(failures)

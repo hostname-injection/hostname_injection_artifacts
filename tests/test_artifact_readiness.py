@@ -25,6 +25,37 @@ def test_readiness_gate_scans_constructed_removed_terms(tmp_path: Path) -> None:
     assert failures
 
 
+def test_readiness_gate_enforces_reviewer_shape() -> None:
+    module = _load_module()
+    files = [
+        module.ROOT / "README.md",
+        module.ROOT / "deidentification_release/data/audits/release_data_card.md",
+        module.ROOT / "scripts/benchmark_artifact_latency.py",
+        module.ROOT / "scripts/check_artifact_readiness.py",
+        module.ROOT / "scripts/export_hib_release_pipeline_inputs.py",
+        module.ROOT / "scripts/run_artifact_smoke.py",
+        module.ROOT / "scripts/train_benchmark_caho.py",
+    ]
+    failures: list[str] = []
+
+    module.check_repo_shape(files, failures)
+
+    assert failures == []
+
+    module.check_repo_shape([*files, module.ROOT / "scripts/extra.py"], failures)
+
+    assert any("script surface" in item for item in failures)
+
+
+def test_readiness_gate_validates_packaging_metadata() -> None:
+    module = _load_module()
+    failures: list[str] = []
+
+    module.check_packaging(failures)
+
+    assert failures == []
+
+
 def test_readiness_gate_accepts_current_reviewer_artifact() -> None:
     module = _load_module()
 
