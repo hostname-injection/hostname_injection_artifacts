@@ -83,7 +83,7 @@ def compute_metrics(
         n_rows += 1
         split = row.get("split")
         label = str(row.get("label"))
-        outputs = detector_outputs(row)
+        outputs = ccd_outputs(row)
         calibration_group = extract_calibration_group(row, outputs, group_key_list)
 
         by_split[split] += 1
@@ -238,7 +238,7 @@ def collect_calibration_scores(
     for row in iter_jsonl(path):
         if row.get("split") != "calibration" or row.get("label") != NEGATIVE_LABEL:
             continue
-        outputs = detector_outputs(row)
+        outputs = ccd_outputs(row)
         score, key = extract_score(row, outputs, score_key_list)
         if score is not None:
             scores.append(score)
@@ -249,8 +249,8 @@ def collect_calibration_scores(
     return scores, hits, grouped_scores
 
 
-def detector_outputs(row: Mapping[str, Any]) -> Mapping[str, Any]:
-    outputs = row.get("detector_outputs", {})
+def ccd_outputs(row: Mapping[str, Any]) -> Mapping[str, Any]:
+    outputs = row.get("ccd_outputs", {})
     return outputs if isinstance(outputs, Mapping) else {}
 
 
@@ -259,7 +259,7 @@ def extract_score(row: Mapping[str, Any], outputs: Mapping[str, Any], score_keys
         if key in outputs:
             score = as_float(outputs.get(key))
             if score is not None:
-                return score, f"detector_outputs.{key}"
+                return score, f"ccd_outputs.{key}"
         if key in row:
             score = as_float(row.get(key))
             if score is not None:
@@ -387,13 +387,13 @@ def main() -> None:
         "--score-key",
         action="append",
         default=None,
-        help="Candidate public CCD score key to read from detector_outputs or the row. May be repeated.",
+        help="Candidate public CCD score key to read from ccd_outputs or the row. May be repeated.",
     )
     parser.add_argument(
         "--calibration-group-key",
         action="append",
         default=None,
-        help="Candidate public calibration group key to read from detector_outputs or the row. May be repeated.",
+        help="Candidate public calibration group key to read from ccd_outputs or the row. May be repeated.",
     )
     args = parser.parse_args()
 

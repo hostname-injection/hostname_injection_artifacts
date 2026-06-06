@@ -10,6 +10,6 @@
     "public_calibration_group"
   ],
   "release_version": "hib-v1.0",
-  "stage": "detector_output_publication",
+  "stage": "ccd_output_publication",
   "status": "complete"
 }

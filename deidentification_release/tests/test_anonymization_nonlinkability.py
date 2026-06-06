@@ -212,7 +212,7 @@ def test_streaming_chunk_directory_mode_shuffles_and_preserves_schema(tmp_path: 
         "obfuscation_family",
         "released_length_bucket",
         "character_class_mask",
-        "detector_outputs",
+        "ccd_outputs",
         "row_integrity_hash",
     }
 

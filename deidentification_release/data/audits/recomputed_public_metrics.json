@@ -48,7 +48,7 @@
     "order_statistic_rank": 9,
     "order_statistic_sample_count": 9,
     "score_field_hits_on_calibration_rows": {
-      "detector_outputs.ccd_score_public": 9
+      "ccd_outputs.ccd_score_public": 9
     },
     "score_fields_considered": [
       "ccd_score",

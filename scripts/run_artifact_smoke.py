@@ -95,7 +95,7 @@ def main() -> int:
     parser.add_argument(
         "--skip-tests",
         action="store_true",
-        help="Skip pytest. The detector and release-gate smoke checks still run.",
+        help="Skip pytest. The CCD and release-gate smoke checks still run.",
     )
     args = parser.parse_args()
 

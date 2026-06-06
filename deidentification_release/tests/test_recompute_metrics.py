@@ -44,7 +44,7 @@ def _row(
         "obfuscation_family": "none",
         "released_length_bucket": "withheld",
         "character_class_mask": "withheld",
-        "detector_outputs": outputs,
+        "ccd_outputs": outputs,
         "row_integrity_hash": row_id,
     }
 

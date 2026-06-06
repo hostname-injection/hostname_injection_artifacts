@@ -23,7 +23,7 @@ PUBLIC_SCHEMA_FIELDS = [
     "obfuscation_family",
     "released_length_bucket",
     "character_class_mask",
-    "detector_outputs",
+    "ccd_outputs",
     "row_integrity_hash",
 ]
 

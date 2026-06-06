@@ -66,7 +66,7 @@ def test_label_preservation_and_public_schema(tmp_path: Path) -> None:
         "obfuscation_family",
         "released_length_bucket",
         "character_class_mask",
-        "detector_outputs",
+        "ccd_outputs",
         "row_integrity_hash",
     }
 
@@ -86,7 +86,7 @@ def test_payload_markers_delimiters_and_encoding_preserved(tmp_path: Path) -> No
     assert all(row["sink_family"] == "query" for row in malicious)
 
 
-def test_optional_public_detector_scores_are_replayable(tmp_path: Path) -> None:
+def test_optional_public_ccd_scores_are_replayable(tmp_path: Path) -> None:
     private_csv = tmp_path / "private.csv"
     public_jsonl = tmp_path / "release.jsonl"
     audit_dir = tmp_path / "audits"
@@ -115,11 +115,11 @@ def test_optional_public_detector_scores_are_replayable(tmp_path: Path) -> None:
     anonymize_csv(private_csv, public_jsonl, audit_dir, _config())
     public_rows = read_jsonl(public_jsonl)
 
-    assert all(row["detector_outputs"]["ccd_score_bin"] == "public_score" for row in public_rows)
-    assert all("ccd_score_public" in row["detector_outputs"] for row in public_rows)
-    assert all(row["detector_outputs"].get("public_calibration_group") in {"public_group_a", "public_group_b"} for row in public_rows)
-    assert any(row["detector_outputs"]["ccd_flag"] is True for row in public_rows)
-    assert all(set(row["detector_outputs"]) <= {"ccd_score_bin", "ccd_flag", "ccd_score_public", "public_calibration_group"} for row in public_rows)
+    assert all(row["ccd_outputs"]["ccd_score_bin"] == "public_score" for row in public_rows)
+    assert all("ccd_score_public" in row["ccd_outputs"] for row in public_rows)
+    assert all(row["ccd_outputs"].get("public_calibration_group") in {"public_group_a", "public_group_b"} for row in public_rows)
+    assert any(row["ccd_outputs"]["ccd_flag"] is True for row in public_rows)
+    assert all(set(row["ccd_outputs"]) <= {"ccd_score_bin", "ccd_flag", "ccd_score_public", "public_calibration_group"} for row in public_rows)
 
 
 def test_public_calibration_group_rejects_tenant_identifying_terms(tmp_path: Path) -> None:
@@ -250,7 +250,7 @@ def test_repair_row_preserves_label_and_recomputes_public_fields() -> None:
         "obfuscation_family": "none",
         "released_length_bucket": "16-31",
         "character_class_mask": "aaaa",
-        "detector_outputs": {"ccd_score_bin": "not_recomputed", "ccd_flag": None},
+        "ccd_outputs": {"ccd_score_bin": "not_recomputed", "ccd_flag": None},
         "row_integrity_hash": "old",
     }
 
@@ -282,7 +282,7 @@ def test_repair_writes_schema_and_sha256_sidecar(tmp_path: Path) -> None:
         "obfuscation_family": "none",
         "released_length_bucket": "16-31",
         "character_class_mask": "aaaa",
-        "detector_outputs": {"ccd_score_bin": "not_recomputed", "ccd_flag": None},
+        "ccd_outputs": {"ccd_score_bin": "not_recomputed", "ccd_flag": None},
         "row_integrity_hash": "old",
     }
     input_jsonl.write_text(json.dumps(row) + "\n", encoding="utf-8")

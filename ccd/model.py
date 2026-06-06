@@ -272,7 +272,7 @@ class CCDModel:
         return self.score_embeddings(embeddings, approximate=approximate, approximate_k=approximate_k)
 
     def _validate_model_state(self) -> None:
-        """Reject malformed in-memory detector state before it can score."""
+        """Reject malformed in-memory model state before it can score."""
         if self.config.cone.to_dict() != self.cones.config.to_dict():
             raise ValueError("model config cone must match cone partition config")
 

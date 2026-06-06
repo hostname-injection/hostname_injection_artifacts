@@ -25,15 +25,15 @@ def repair_row(row: dict) -> dict:
     label = str(row.get("label", ""))
     sink, evidence = public_sink_and_evidence(label, str(row.get("sink_family", "")), str(row.get("evidence_tier", "")))
     row = dict(row)
-    outputs = row.get("detector_outputs", {})
+    outputs = row.get("ccd_outputs", {})
     if isinstance(outputs, dict):
-        row["detector_outputs"] = {
+        row["ccd_outputs"] = {
             key: outputs[key]
             for key in ("ccd_score_bin", "ccd_flag", "ccd_score_public", "public_calibration_group")
             if key in outputs
         }
     else:
-        row["detector_outputs"] = {}
+        row["ccd_outputs"] = {}
     row["released_artifact"] = released
     row["released_canonical_artifact"] = canonicalize_artifact(released)
     row["time_bucket"] = "withheld"
