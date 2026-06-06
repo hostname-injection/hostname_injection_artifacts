@@ -72,10 +72,6 @@ def _build_command(args) -> list[str]:
         cmd += ["--scheduler", args.scheduler]
     if args.min_lr is not None:
         cmd += ["--min-lr", str(args.min_lr)]
-    if args.grad_cache:
-        cmd += ["--grad-cache"]
-    else:
-        cmd += ["--no-grad-cache"]
     if args.grad_cache_chunk_size is not None:
         cmd += ["--grad-cache-chunk-size", str(args.grad_cache_chunk_size)]
     if args.contrastive_loss:
@@ -130,8 +126,7 @@ def main() -> int:
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
     parser.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     parser.add_argument("--min-lr", type=float, default=1e-5)
-    parser.add_argument("--grad-cache", dest="grad_cache", action="store_true", default=CAHO_DEFAULT_USE_GRAD_CACHE)
-    parser.add_argument("--no-grad-cache", dest="grad_cache", action="store_false")
+    parser.set_defaults(grad_cache=CAHO_DEFAULT_USE_GRAD_CACHE)
     parser.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     parser.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     parser.add_argument("--contrastive-max-scale", type=float, default=100.0)

@@ -489,16 +489,17 @@ def test_binary_trainer_rejects_grad_cache_for_supervised_orbit_objective():
         trainer.fit(_TinyViewDataset(), epochs=1)
 
 
-def test_benchmark_binary_script_rejects_grad_cache():
+def test_benchmark_binary_script_does_not_expose_grad_cache_toggle():
     script = Path(__file__).resolve().parents[1] / "scripts" / "train_benchmark_caho_binary.py"
     spec = importlib.util.spec_from_file_location("_test_train_benchmark_caho_binary", script)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    args = module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
+    args = module.build_parser().parse_args(["--out", "unused-output"])
 
-    with pytest.raises(RuntimeError, match="supervised orbit labels"):
-        module.validate_args(args)
+    assert args.grad_cache is False
+    with pytest.raises(SystemExit):
+        module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
 
 
 def test_benchmark_caho_94gb_batch_defaults():
@@ -522,13 +523,14 @@ def test_benchmark_caho_94gb_batch_defaults():
     regular_module = importlib.util.module_from_spec(regular_spec)
     regular_spec.loader.exec_module(regular_module)
     regular_args = regular_module.build_parser().parse_args(["--out", "unused-output"])
-    no_gradcache_args = regular_module.build_parser().parse_args(["--out", "unused-output", "--no-grad-cache"])
     assert regular_args.epochs == CAHO_DEFAULT_EPOCHS
     assert regular_args.grad_cache is True
-    assert no_gradcache_args.grad_cache is False
     assert resolve_caho_batch_size(regular_args.batch_size, use_grad_cache=True) == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
-    assert resolve_caho_batch_size(no_gradcache_args.batch_size, use_grad_cache=False) == CAHO_94GB_ACTUAL_BATCH_SIZE
     assert regular_args.grad_cache_chunk_size == CAHO_94GB_GRAD_CACHE_CHUNK_SIZE
+    with pytest.raises(SystemExit):
+        regular_module.build_parser().parse_args(["--out", "unused-output", "--no-grad-cache"])
+    with pytest.raises(SystemExit):
+        regular_module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
 
 
 def test_benchmark_binary_script_validation_selection_args():

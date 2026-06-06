@@ -123,12 +123,11 @@ ad hoc threshold or calibration-file overrides.
 
 ## CAHO Training
 
-All CAHO training entry points default to the shipped paper recipe:
-`--loss contrastive --augmenter weighted --grad-cache --epochs 20 --lr 1e-4
+All CAHO training entry points use GradCache and default to the shipped paper
+recipe: `--loss contrastive --augmenter weighted --epochs 20 --lr 1e-4
 --weight-decay 1e-2 --seed 13`. The training scripts warn when
 result-affecting settings are changed; results should be expected to differ
-from the reported CAHO/CCD results when defaults are changed. `--no-grad-cache`
-is intended only for lower-scale debugging.
+from the reported CAHO/CCD results when defaults are changed.
 
 Small file-based training:
 
@@ -152,26 +151,13 @@ ccd train-caho-corpus \
   --out caho_encoder \
   --loss contrastive \
   --augmenter weighted \
-  --grad-cache \
   --batch-size 49152 \
   --grad-cache-chunk-size 8192 \
   --epochs 20
 ```
 
-For the benchmark trainer with the supervised binary auxiliary head:
-
-```bash
-python scripts/train_benchmark_caho_binary.py \
-  --root HostnameCommandInjectionBenchmark/train \
-  --validation-root HostnameCommandInjectionBenchmark/validation \
-  --validation-target-fpr 1e-4 \
-  --restore-best-validation \
-  --out caho_encoder
-```
-
-The 94 GB CUDA defaults are `batch_size=16384` for the actual non-GradCache
-objective and `batch_size=49152` with `grad_cache_chunk_size=8192` for the
-GradCache path.
+The 94 GB CUDA default is `batch_size=49152` with
+`grad_cache_chunk_size=8192` on the required GradCache path.
 
 ## CCD Training
 

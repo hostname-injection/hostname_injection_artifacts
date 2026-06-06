@@ -35,7 +35,6 @@ def test_train_caho_parser_smoke():
             "contrastive",
             "--augmenter",
             "weighted",
-            "--grad-cache",
         ]
     )
     assert args.command == "train-caho"
@@ -66,19 +65,52 @@ def test_train_caho_defaults_match_paper_recipe():
     assert args.augmenter == CAHO_DEFAULT_AUGMENTER == "weighted"
     assert args.grad_cache is CAHO_DEFAULT_USE_GRAD_CACHE is True
 
-    disabled = parser.parse_args(
-        [
-            "train-caho",
-            "--benign",
-            "benign.txt",
-            "--malicious",
-            "malicious.csv",
-            "--out",
-            "caho_encoder",
-            "--no-grad-cache",
-        ]
-    )
-    assert disabled.grad_cache is False
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "train-caho",
+                "--benign",
+                "benign.txt",
+                "--malicious",
+                "malicious.csv",
+                "--out",
+                "caho_encoder",
+                "--no-grad-cache",
+            ]
+        )
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "train-caho",
+                "--benign",
+                "benign.txt",
+                "--malicious",
+                "malicious.csv",
+                "--out",
+                "caho_encoder",
+                "--grad-cache",
+            ]
+        )
+
+
+def test_train_caho_corpus_rejects_grad_cache_toggles():
+    parser = build_parser()
+    base = [
+        "train-caho-corpus",
+        "--benign-dir",
+        "benign_dir",
+        "--malicious-jsonl-dir",
+        "jsonl_dir",
+        "--malicious-txt-dir",
+        "txt_dir",
+        "--out",
+        "caho_encoder",
+    ]
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--no-grad-cache"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--grad-cache"])
 
 
 def test_train_user_logins_command_is_not_available():
@@ -138,7 +170,6 @@ def test_train_caho_corpus_parser_smoke():
             "contrastive",
             "--augmenter",
             "weighted",
-            "--grad-cache",
             "--contrastive-loss",
             "learnable",
             "--save-best",
@@ -191,7 +222,6 @@ def test_train_caho_corpus_readme_recipe_does_not_trigger_default_warning():
             "contrastive",
             "--augmenter",
             "weighted",
-            "--grad-cache",
             "--batch-size",
             "49152",
             "--grad-cache-chunk-size",

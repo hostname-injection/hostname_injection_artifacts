@@ -29,7 +29,8 @@ def test_root_readme_states_runtime_requirements_and_scaled_smoke_scope():
     assert "94 GB of VRAM" in readme
     assert "small `examples/` smoke path" in readme
     assert "different results" in readme
-    assert "--loss contrastive --augmenter weighted --grad-cache --epochs 20" in readme
+    assert "All CAHO training entry points use GradCache" in readme
+    assert "--loss contrastive --augmenter weighted --epochs 20" in readme
 
 
 def test_root_readme_maps_reviewer_evidence_to_method_surfaces():

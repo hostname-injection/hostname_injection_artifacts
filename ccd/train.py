@@ -124,9 +124,9 @@ def warn_if_caho_training_defaults_changed(
 def resolve_caho_batch_size(batch_size: Optional[int], *, use_grad_cache: bool) -> int:
     """Resolve CAHO training batch defaults for a 94 GB CUDA card.
 
-    The non-GradCache default keeps the full two-view contrastive graph resident
-    while leaving headroom for optimizer state. GradCache can use a larger
-    effective batch because encoder activations are replayed in chunks.
+    Public CAHO training uses the larger GradCache effective batch because
+    encoder activations are replayed in chunks. The smaller internal fallback
+    remains available for tests that construct trainers directly.
     """
     if batch_size is None:
         value = CAHO_94GB_GRAD_CACHE_BATCH_SIZE if use_grad_cache else CAHO_94GB_ACTUAL_BATCH_SIZE
@@ -566,8 +566,8 @@ class ContrastiveTrainer:
                 from grad_cache import GradCache
             except Exception as exc:
                 raise ImportError(
-                    "grad-cache is required for --grad-cache training. "
-                    "Install with `pip install 'GradCache @ git+https://github.com/luyug/GradCache.git'`."
+                    "GradCache is required for CAHO training. Install GradCache from "
+                    "https://github.com/luyug/GradCache before running this mode."
                 ) from exc
 
             def model_embedding(view):

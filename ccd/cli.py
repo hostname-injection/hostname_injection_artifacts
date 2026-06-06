@@ -24,7 +24,6 @@ from .explain import add_explain_arguments, run as run_explain
 from .preprocess import normalize_hostname, normalization_trace
 from .priors import build_benign_prior, build_malicious_priors
 from .train import (
-    CAHO_94GB_ACTUAL_BATCH_SIZE,
     CAHO_DEFAULT_EPOCHS,
     CAHO_DEFAULT_AUGMENTER,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
@@ -568,8 +567,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Effective CAHO batch size. Defaults to "
-            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with --grad-cache and "
-            f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
+            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with required GradCache for 94 GB VRAM."
         ),
     )
     train_caho.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
@@ -583,14 +581,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho.add_argument("--max-grad-norm", type=float, default=1.0)
     train_caho.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     train_caho.add_argument("--min-lr", type=float, default=1e-5)
-    train_caho.add_argument(
-        "--grad-cache",
-        dest="grad_cache",
-        action="store_true",
-        default=CAHO_DEFAULT_USE_GRAD_CACHE,
-        help="Use GradCache for replay-scale pairwise CAHO batches",
-    )
-    train_caho.add_argument("--no-grad-cache", dest="grad_cache", action="store_false", help="Disable GradCache for debugging only")
+    train_caho.set_defaults(grad_cache=CAHO_DEFAULT_USE_GRAD_CACHE)
     train_caho.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     train_caho.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     train_caho.add_argument("--contrastive-max-scale", type=float, default=100.0)
@@ -632,8 +623,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Effective CAHO batch size. Defaults to "
-            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with --grad-cache and "
-            f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
+            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with required GradCache for 94 GB VRAM."
         ),
     )
     train_caho_corpus.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
@@ -647,14 +637,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--max-grad-norm", type=float, default=1.0)
     train_caho_corpus.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     train_caho_corpus.add_argument("--min-lr", type=float, default=1e-5)
-    train_caho_corpus.add_argument(
-        "--grad-cache",
-        dest="grad_cache",
-        action="store_true",
-        default=CAHO_DEFAULT_USE_GRAD_CACHE,
-        help="Use GradCache for replay-scale pairwise CAHO batches",
-    )
-    train_caho_corpus.add_argument("--no-grad-cache", dest="grad_cache", action="store_false", help="Disable GradCache for debugging only")
+    train_caho_corpus.set_defaults(grad_cache=CAHO_DEFAULT_USE_GRAD_CACHE)
     train_caho_corpus.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     train_caho_corpus.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     train_caho_corpus.add_argument("--contrastive-max-scale", type=float, default=100.0)

@@ -66,7 +66,7 @@ def test_train_caho_corpus_wrapper_uses_current_interpreter():
 
     assert cmd[:3] == [sys.executable, "-m", "ccd.cli"]
     assert "train-caho-corpus" in cmd
-    assert "--grad-cache" in cmd
+    assert "--grad-cache" not in cmd
     assert "--no-grad-cache" not in cmd
 
 

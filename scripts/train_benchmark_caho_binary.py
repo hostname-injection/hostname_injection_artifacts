@@ -89,8 +89,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
     parser.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     parser.add_argument("--min-lr", type=float, default=1e-5)
-    parser.add_argument("--grad-cache", action="store_true")
-    parser.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
+    parser.set_defaults(
+        grad_cache=False,
+        grad_cache_chunk_size=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+    )
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", default="auto")
     parser.add_argument(
@@ -111,12 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--binary-hidden-dim", type=int, default=256)
     parser.add_argument("--normalize-text", action="store_true")
     parser.add_argument("--resume", action="store_true")
-    parser.add_argument(
-        "--binary-classifier",
-        type=Path,
-        default=None,
-        help="Optional binary_classifier.pt checkpoint to load before training.",
-    )
+    parser.set_defaults(binary_classifier=None)
     parser.add_argument("--log-every", type=int, default=100)
     parser.add_argument("--seed", type=int, default=13, help="Deterministic seed for augmentation and training order.")
     parser.add_argument("--checkpoint-every-steps", type=int, default=5000)
@@ -145,12 +142,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def validate_args(args: argparse.Namespace) -> argparse.Namespace:
-    if args.grad_cache:
-        raise RuntimeError(
-            "--grad-cache is not supported by train_benchmark_caho_binary.py because "
-            "the Appendix C binary trainer requires supervised orbit labels in the "
-            "contrastive loss. Omit --grad-cache for paper-aligned binary training."
-        )
     if not 0.0 < float(args.validation_target_fpr) < 1.0:
         raise RuntimeError("--validation-target-fpr must be in (0, 1).")
     if args.restore_best_validation and args.validation_root is None:

@@ -407,7 +407,7 @@ class BenchmarkContrastiveTrainer:
             from grad_cache import GradCache
         except Exception as exc:
             raise ImportError(
-                "grad-cache is required for --grad-cache training. Install GradCache from "
+                "GradCache is required for CAHO training. Install GradCache from "
                 "https://github.com/luyug/GradCache before running this mode."
             ) from exc
 
@@ -480,8 +480,8 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
             raise ValueError(
                 "GradCache is not supported for BenchmarkBinaryContrastiveTrainer because "
                 "the deployed Appendix C objective requires supervised orbit labels in the "
-                "contrastive loss. Run the binary trainer without --grad-cache, or use the "
-                "regular pairwise CAHO trainer for GradCache experiments."
+                "contrastive loss. Use BenchmarkContrastiveTrainer for replay-scale "
+                "GradCache CAHO training."
             )
 
         emb_dim = int(self.model.get_sentence_embedding_dimension())
