@@ -19,6 +19,7 @@ def test_makefile_uses_configurable_python_interpreter():
 
     assert "PYTHON ?= python3" in makefile
     assert "$(PYTHON) -m pytest" in makefile
+    assert "$(PYTHON) scripts/check_artifact_readiness.py" in makefile
     assert "\n\tpython " not in makefile
     assert "\n\tpytest" not in makefile
 

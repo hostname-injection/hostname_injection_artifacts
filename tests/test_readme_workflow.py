@@ -39,6 +39,7 @@ def test_root_readme_maps_reviewer_evidence_to_method_surfaces():
 
     assert "## Reviewer Evidence" in readme
     assert "make test" in readme
+    assert "make artifact-readiness" in readme
     assert "python scripts/run_artifact_smoke.py --skip-tests" in readme
     for phrase in [
         "CAHO augmentation",

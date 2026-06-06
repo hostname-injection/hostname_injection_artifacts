@@ -7,7 +7,7 @@ OUTPUT ?= out/scores.csv
 CHECKPOINT ?= caho_encoder
 BATCH ?= 128
 
-.PHONY: help diagnose explain score test artifact-smoke artifact-latency train-caho-corpus
+.PHONY: help diagnose explain score test artifact-readiness artifact-smoke artifact-latency train-caho-corpus
 
 help:
 	@echo "Targets:"
@@ -15,6 +15,7 @@ help:
 	@echo "  explain           Explain CCD predictions for INPUT"
 	@echo "  score             Score INPUT with MODEL"
 	@echo "  test              Run pytest"
+	@echo "  artifact-readiness Run fast reviewer artifact readiness checks"
 	@echo "  artifact-smoke    Run evaluator smoke test"
 	@echo "  artifact-latency  Run local hardware-dependent latency smoke benchmark"
 	@echo "  train-caho-corpus Train CAHO encoder from corpus"
@@ -32,6 +33,9 @@ score:
 
 test:
 	$(PYTHON) -m pytest
+
+artifact-readiness:
+	$(PYTHON) scripts/check_artifact_readiness.py
 
 artifact-smoke:
 	$(PYTHON) scripts/run_artifact_smoke.py

@@ -90,6 +90,7 @@ the main method claims:
 
 ```bash
 make test
+make artifact-readiness
 python scripts/run_artifact_smoke.py --skip-tests
 ```
 
