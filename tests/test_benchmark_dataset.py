@@ -5,6 +5,7 @@ from ccd.benchmark_dataset import (
     BenchmarkFamily,
     BenchmarkLabelMethod,
     HostnameCommandInjectionBenchmarkDataset,
+    benchmark_row_split,
     resolve_benchmark_label,
 )
 from ccd.benchmark_training import BenchmarkCAHOViewDataset
@@ -32,6 +33,7 @@ FIELDNAMES = [
     "CLAUDE_OPUS_4_8_DNS_CMD_INJECTION_REASON",
     "RESOLVED_LABEL_BOTH_M",
     "SINK_FAMILY",
+    "split",
     "LABEL_AGREEMENT",
     "DATASET_FAMILY",
     "CONTENT_TYPE",
@@ -52,7 +54,7 @@ def _write_chunk(path, rows):
         writer.writerows(rows)
 
 
-def _row(row_id, family, text, gpt_5_5, opus, *, hostname=None, username=None, sink_family=""):
+def _row(row_id, family, text, gpt_5_5, opus, *, hostname=None, username=None, sink_family="", split="train"):
     hostname = text if hostname is None and family == "dns_hostnames" else hostname or "10.0.0.1"
     username = text if username is None and family == "user_logins" else username or ""
     content_type = "HOSTNAME" if family == "dns_hostnames" else "USERNAME"
@@ -78,6 +80,7 @@ def _row(row_id, family, text, gpt_5_5, opus, *, hostname=None, username=None, s
         "CLAUDE_OPUS_4_8_DNS_CMD_INJECTION_REASON": f"opus {text}",
         "RESOLVED_LABEL_BOTH_M": "",
         "SINK_FAMILY": sink_family,
+        "split": split,
         "LABEL_AGREEMENT": "conflict" if gpt_5_5 != opus else "agree",
         "DATASET_FAMILY": family,
         "CONTENT_TYPE": content_type,
@@ -100,6 +103,15 @@ def _write_benchmark(root):
         _row("dns_hostnames-000000000001", "dns_hostnames", "safe.example.com", "B", "B"),
         _row("dns_hostnames-000000000002", "dns_hostnames", "evil.$(id).example", "B", "M", sink_family="query"),
         _row("dns_hostnames-000000000003", "dns_hostnames", "maybe.example", "U", "B"),
+        _row(
+            "dns_hostnames-000000000004",
+            "dns_hostnames",
+            "heldout.$(id).example",
+            "M",
+            "M",
+            sink_family="command",
+            split="validation",
+        ),
     ]
     user_path = root / "data/user_logins/chunks/user_logins_00000.csv"
     dns_path = root / "data/dns_hostnames/chunks/dns_hostnames_00000.csv"
@@ -162,7 +174,7 @@ def test_benchmark_dataset_loads_selected_families_and_preserves_metadata(tmp_pa
         include_explanations=True,
         include_metadata=True,
     )
-    assert len(ds) == 3
+    assert len(ds) == 4
     item = ds[1]
     assert item["text"] == "evil.$(id).example"
     assert item["label"] == 1
@@ -171,8 +183,8 @@ def test_benchmark_dataset_loads_selected_families_and_preserves_metadata(tmp_pa
     assert item["opus_reason"] == "opus evil.$(id).example"
     assert item["row"]["HOSTNAME"] == "evil.$(id).example"
     assert item["row"]["CONTENT"] == "evil.$(id).example"
-    assert ds.stats.total_rows == 3
-    assert ds.stats.selected_rows == 3
+    assert ds.stats.total_rows == 4
+    assert ds.stats.selected_rows == 4
 
 
 def test_benchmark_dataset_drop_unknown_and_tuple_output(tmp_path):
@@ -184,9 +196,10 @@ def test_benchmark_dataset_drop_unknown_and_tuple_output(tmp_path):
         drop_unknown=True,
         return_dict=False,
     )
-    assert len(ds) == 2
+    assert len(ds) == 3
     assert ds[0] == ("good-user", 0)
     assert ds[1] == ("safe.example.com", 0)
+    assert ds[2] == ("heldout.$(id).example", 1)
 
 
 def test_benchmark_dataset_auto_text_uses_username_for_user_logins(tmp_path):
@@ -212,8 +225,24 @@ def test_benchmark_dataset_any_malicious_else_benign_has_no_unknowns(tmp_path):
         label_method=BenchmarkLabelMethod.ANY_MALICIOUS_ELSE_BENIGN,
         drop_unknown=False,
     )
-    assert [ds[i]["label_text"] for i in range(len(ds))] == ["B", "M", "B", "B", "M", "B"]
-    assert [ds[i]["label"] for i in range(len(ds))] == [0, 1, 0, 0, 1, 0]
+    assert [ds[i]["label_text"] for i in range(len(ds))] == ["B", "M", "B", "B", "M", "B", "M"]
+    assert [ds[i]["label"] for i in range(len(ds))] == [0, 1, 0, 0, 1, 0, 1]
+
+
+def test_benchmark_dataset_can_filter_declared_splits(tmp_path):
+    _write_benchmark(tmp_path)
+    ds = HostnameCommandInjectionBenchmarkDataset(
+        tmp_path,
+        family=BenchmarkFamily.BOTH,
+        label_method=BenchmarkLabelMethod.BOTH_DISAGREE_MALICIOUS,
+        drop_unknown=True,
+        splits="validation",
+    )
+
+    assert len(ds) == 1
+    assert ds[0]["text"] == "heldout.$(id).example"
+    assert ds[0]["split"] == "validation"
+    assert benchmark_row_split(ds.row_at(0)) == "validation"
 
 
 def test_benchmark_caho_training_view_excludes_unresolved_rows_by_default(tmp_path):
@@ -224,6 +253,7 @@ def test_benchmark_caho_training_view_excludes_unresolved_rows_by_default(tmp_pa
 
     assert ds.base.label_method == BenchmarkLabelMethod.RESOLVED_OR_DISAGREE_MALICIOUS
     assert ds.base.drop_unknown is True
+    assert ds.base.splits == {"train"}
     assert ds.base.stats.selected_rows == 4
     assert [row[0] for row in rows] == [
         "good-user",

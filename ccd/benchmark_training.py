@@ -6,7 +6,7 @@ import random
 from dataclasses import asdict, dataclass
 from numbers import Integral
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
 from .augment import AugmentConfig, CAHOAugmenter, WeightedAugmentConfig
 from .benchmark_dataset import (
@@ -39,6 +39,8 @@ from .train import (
     training_default_values,
     warn_if_caho_training_defaults_changed,
 )
+
+BENCHMARK_CAHO_TRAINING_SPLITS = ("train",)
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,7 @@ class BenchmarkTrainingConfig:
     validation_root: Optional[str] = None
     validation_target_fpr: float = 1e-4
     restore_best_validation: bool = False
+    training_splits: Tuple[str, ...] = BENCHMARK_CAHO_TRAINING_SPLITS
 
 
 class BenchmarkCAHOViewDataset:
@@ -95,6 +98,7 @@ class BenchmarkCAHOViewDataset:
         normalize_text: bool = False,
         augmenter: Optional[CAHOAugmenter] = None,
         include_original: bool = True,
+        splits: Optional[Union[str, Sequence[str]]] = BENCHMARK_CAHO_TRAINING_SPLITS,
         max_rows: Optional[int] = None,
         seed: Optional[int] = None,
     ) -> None:
@@ -108,6 +112,7 @@ class BenchmarkCAHOViewDataset:
             return_dict=True,
             text_field=BenchmarkTextField.AUTO,
             normalize_text=normalize_text,
+            splits=splits,
             max_rows=max_rows,
             cache_chunks=1,
         )

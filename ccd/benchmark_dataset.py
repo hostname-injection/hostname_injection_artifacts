@@ -70,6 +70,14 @@ POSITIVE_FAMILY_COLUMNS = (
     "sink_harness_class",
     "SINK_HARNESS_CLASS",
 )
+SPLIT_COLUMNS = (
+    "split",
+    "SPLIT",
+    "partition",
+    "PARTITION",
+    "DATA_SPLIT",
+    "DATA_PARTITION",
+)
 
 
 @dataclass(frozen=True)
@@ -142,6 +150,24 @@ def benchmark_positive_family(row: Mapping[str, str], *, default: str = "positiv
     return default
 
 
+def benchmark_row_split(row: Mapping[str, str]) -> str:
+    for column in SPLIT_COLUMNS:
+        raw = str(row.get(column, "")).strip().lower()
+        if raw:
+            return raw
+    return ""
+
+
+def _normalize_splits(splits: Optional[Union[str, Sequence[str]]]) -> Optional[set[str]]:
+    if splits is None:
+        return None
+    values = [splits] if isinstance(splits, str) else list(splits)
+    normalized = {str(value).strip().lower() for value in values if str(value).strip()}
+    if not normalized:
+        raise ValueError("splits must contain at least one non-empty split")
+    return normalized
+
+
 def _as_families(family: Union[BenchmarkFamily, str, Sequence[Union[BenchmarkFamily, str]]]) -> List[str]:
     if isinstance(family, (str, BenchmarkFamily)):
         value = BenchmarkFamily(family)
@@ -163,8 +189,8 @@ class HostnameCommandInjectionBenchmarkDataset(Dataset):
     """Map-style PyTorch dataset for HostnameCommandInjectionBenchmark chunks.
 
     The dataset indexes chunk files from `manifest.json` and loads at most a
-    small LRU cache of CSV chunks into memory. It does not create train/test
-    splits; callers should use samplers or downstream split logic.
+    small LRU cache of CSV chunks into memory. When `splits` is supplied, rows
+    are selected only from those benchmark partitions.
     """
 
     def __init__(
@@ -180,6 +206,7 @@ class HostnameCommandInjectionBenchmarkDataset(Dataset):
         text_field: Union[BenchmarkTextField, str] = BenchmarkTextField.AUTO,
         normalize_text: bool = False,
         unknown_label: int = -1,
+        splits: Optional[Union[str, Sequence[str]]] = None,
         max_rows: Optional[int] = None,
         cache_chunks: int = 1,
         transform: Optional[Callable[[str], Any]] = None,
@@ -197,6 +224,7 @@ class HostnameCommandInjectionBenchmarkDataset(Dataset):
         self.text_field = BenchmarkTextField(text_field)
         self.normalize_text = normalize_text
         self.unknown_label = unknown_label
+        self.splits = _normalize_splits(splits)
         self.cache_chunks = max(int(cache_chunks), 0)
         self.transform = transform
         self.target_transform = target_transform
@@ -210,10 +238,12 @@ class HostnameCommandInjectionBenchmarkDataset(Dataset):
                 self._chunks.append((fam, self.root / chunk["path"], int(chunk["rows"])))
 
         self._selected: Optional[List[Tuple[int, int]]] = None
-        if self.drop_unknown or max_rows is not None:
+        if self.drop_unknown or self.splits is not None or max_rows is not None:
             self._selected = []
             for chunk_index, (_, path, _) in enumerate(self._chunks):
                 for row_index, row in enumerate(_read_chunk_rows(path)):
+                    if self.splits is not None and benchmark_row_split(row) not in self.splits:
+                        continue
                     label = resolve_benchmark_label(row, self.label_method)
                     if self.drop_unknown and label == "U":
                         continue
@@ -308,6 +338,7 @@ class HostnameCommandInjectionBenchmarkDataset(Dataset):
             "label_text": label_text,
             "row_id": row.get("ROW_ID", ""),
             "family": row.get("DATASET_FAMILY", ""),
+            "split": benchmark_row_split(row),
         }
         if self.include_explanations:
             item["gpt_5_5_reason"] = row.get(GPT_5_5_REASON, "")

@@ -160,10 +160,11 @@ ccd train-caho-corpus \
 
 The 94 GB CUDA default is `batch_size=49152` with
 `grad_cache_chunk_size=8192` on the required GradCache path.
-Benchmark-backed CAHO training uses both HIB source families, prefers resolved
-labels when present, excludes unresolved rows rather than treating them as
-benign, and uses released sink/payload family metadata for positive CAHO
-orbits when that metadata is available.
+Benchmark-backed CAHO training uses both HIB source families, trains only on
+the benchmark `train` split, prefers resolved labels when present, excludes
+unresolved rows rather than treating them as benign, and uses released
+sink/payload family metadata for positive CAHO orbits when that metadata is
+available.
 
 ## CCD Training
 

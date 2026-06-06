@@ -19,6 +19,7 @@ from ccd.benchmark_training import (
     BenchmarkCAHOViewDataset,
     BenchmarkContrastiveTrainer,
     BenchmarkTrainingConfig,
+    BENCHMARK_CAHO_TRAINING_SPLITS,
     build_augmenter,
     resolve_caho_batch_size,
     resolve_device,
@@ -166,6 +167,7 @@ def main() -> None:
         binary_hidden_dim=args.binary_hidden_dim,
         log_every=args.log_every,
         seed=args.seed,
+        training_splits=BENCHMARK_CAHO_TRAINING_SPLITS,
     )
     trainer = BenchmarkContrastiveTrainer(
         model,
