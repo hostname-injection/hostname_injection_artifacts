@@ -157,9 +157,7 @@ def benchmark_scoring_kernel(args: argparse.Namespace) -> dict[str, Any]:
     return metrics
 
 
-def benchmark_encoder(args: argparse.Namespace, hostnames: list[str]) -> dict[str, Any] | None:
-    if args.skip_encoder:
-        return None
+def benchmark_encoder(args: argparse.Namespace, hostnames: list[str]) -> dict[str, Any]:
     config = CCDConfig()
     config.encoder.model_name = str(require_trained_caho_checkpoint(args.checkpoint, purpose="benchmark_artifact_latency.py"))
     config.encoder.device = args.device
@@ -215,14 +213,13 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a local CCD latency smoke benchmark.")
-    parser.add_argument("--checkpoint", default=None, help="Trained CAHO checkpoint directory")
+    parser.add_argument("--checkpoint", required=True, help="Trained CAHO checkpoint directory")
     parser.add_argument("--input", default="examples/queries.txt")
     parser.add_argument("--num-samples", type=int, default=128)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--warmup", type=int, default=1)
     parser.add_argument("--device", default="auto")
-    parser.add_argument("--skip-encoder", action="store_true", help="Only benchmark the deterministic scoring kernel.")
     parser.add_argument("--dim", type=int, default=384)
     parser.add_argument("--num-cones", type=int, default=256)
     parser.add_argument("--active-cones", type=int, default=8)
@@ -230,8 +227,6 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=13)
     parser.add_argument("--out", default=None)
     args = parser.parse_args()
-    if not args.skip_encoder and not args.checkpoint:
-        raise ValueError("--checkpoint is required unless --skip-encoder is set")
 
     report = build_report(args)
     text = json.dumps(report, indent=2, sort_keys=True)
