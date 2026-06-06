@@ -14,6 +14,7 @@ from .benchmark_dataset import (
     BenchmarkLabelMethod,
     BenchmarkTextField,
     HostnameCommandInjectionBenchmarkDataset,
+    benchmark_positive_family,
 )
 from .preprocess import normalize_hostname
 from .train import (
@@ -90,7 +91,7 @@ class BenchmarkCAHOViewDataset:
         self,
         root: str | Path,
         *,
-        label_method: BenchmarkLabelMethod | str = BenchmarkLabelMethod.BOTH_DISAGREE_MALICIOUS,
+        label_method: BenchmarkLabelMethod | str = BenchmarkLabelMethod.RESOLVED_OR_DISAGREE_MALICIOUS,
         normalize_text: bool = False,
         augmenter: Optional[CAHOAugmenter] = None,
         include_original: bool = True,
@@ -131,11 +132,12 @@ class BenchmarkCAHOViewDataset:
         epoch_stride = max(1, len(self))
         return random.Random(int(self.seed) + self.epoch * epoch_stride + int(idx))
 
-    def __getitem__(self, idx: int) -> Tuple[str, str, int]:
+    def __getitem__(self, idx: int) -> Tuple[str, str, int, str]:
         item = self.base[idx]
         text = str(item["text"])
         label = int(item["label"])
         is_malicious = label == 1
+        orbit_family = benchmark_positive_family(self.base.row_at(idx)) if is_malicious else ""
         rng = self._rng_for_index(idx)
         if self.include_original:
             view1 = text
@@ -143,7 +145,7 @@ class BenchmarkCAHOViewDataset:
         else:
             view1 = self.augmenter.augment(text, is_malicious=is_malicious, rng=rng)
             view2 = self.augmenter.augment(text, is_malicious=is_malicious, rng=rng)
-        return view1, view2, label
+        return view1, view2, label, orbit_family
 
 
 class BenchmarkChunkShuffleSampler:
@@ -390,14 +392,14 @@ class BenchmarkContrastiveTrainer:
         for _epoch in range(epochs):
             if hasattr(dataset, "set_epoch"):
                 dataset.set_epoch(_epoch)
-            for v1, v2, labels in loader:
+            for v1, v2, labels, orbit_labels in loader:
                 optim.zero_grad()
                 if gc_module is not None:
-                    loss_t = gc_module(v1, v2, labels=labels)
+                    loss_t = gc_module(v1, v2, labels=labels, orbit_labels=orbit_labels)
                 else:
                     e1 = self._embed_view(v1)
                     e2 = self._embed_view(v2)
-                    loss_t = self._training_loss(e1, e2, labels)
+                    loss_t = self._training_loss(e1, e2, labels, orbit_labels)
                     loss_t.backward()
                 if self.max_grad_norm and self.max_grad_norm > 0:
                     torch.nn.utils.clip_grad_norm_(trainable_params, max_norm=self.max_grad_norm)
@@ -443,13 +445,14 @@ class BenchmarkContrastiveTrainer:
         import torch
         import torch.nn.functional as F
 
-        labels_t = torch.as_tensor(labels, device=e1.device, dtype=torch.float32).view(-1)
+        labels_t = (torch.as_tensor(labels, device=e1.device, dtype=torch.long).view(-1) > 0).float()
         binary_embeddings = torch.cat([F.normalize(e1, dim=1), F.normalize(e2, dim=1)], dim=0)
         logits = self.classifier(binary_embeddings).squeeze(-1)
         return F.binary_cross_entropy_with_logits(logits, labels_t.repeat(2)) * self.binary_loss_weight
 
-    def _training_loss(self, e1, e2, labels=None):
-        loss_t = self._contrastive_loss(e1, e2, labels)
+    def _training_loss(self, e1, e2, labels=None, orbit_labels=None):
+        contrastive_labels = orbit_labels if orbit_labels is not None else labels
+        loss_t = self._contrastive_loss(e1, e2, contrastive_labels)
         if labels is not None:
             loss_t = loss_t + self._binary_auxiliary_loss(e1, e2, labels)
         return loss_t
@@ -479,8 +482,27 @@ def _collate_views(batch):
 
     v1 = [b[0] for b in batch]
     v2 = [b[1] for b in batch]
-    labels = torch.tensor([int(b[2]) for b in batch], dtype=torch.long)
-    return v1, v2, labels
+    labels_list = [int(b[2]) for b in batch]
+    labels = torch.tensor(labels_list, dtype=torch.long)
+    orbit_values = [b[3] if len(b) > 3 else b[2] for b in batch]
+    orbit_labels = torch.tensor(_batch_orbit_values(labels_list, orbit_values), dtype=torch.long)
+    return v1, v2, labels, orbit_labels
+
+
+def _batch_orbit_values(binary_labels: Iterable[int], orbit_values: Iterable[Any]) -> List[int]:
+    positive_family_ids: Dict[str, int] = {}
+    out: List[int] = []
+    next_family_id = 1
+    for binary_label, orbit_value in zip(binary_labels, orbit_values):
+        if int(binary_label) != 1:
+            out.append(0)
+            continue
+        key = str(orbit_value).strip() or "positive"
+        if key not in positive_family_ids:
+            positive_family_ids[key] = next_family_id
+            next_family_id += 1
+        out.append(positive_family_ids[key])
+    return out
 
 
 def _orbit_labels(labels, *, device=None):
@@ -488,7 +510,7 @@ def _orbit_labels(labels, *, device=None):
 
     labels = torch.as_tensor(labels, dtype=torch.long, device=device)
     orbit = labels.clone()
-    benign = labels != 1
+    benign = labels <= 0
     if torch.any(benign):
         unique_benign = -torch.arange(1, int(benign.sum().item()) + 1, device=labels.device, dtype=torch.long)
         orbit[benign] = unique_benign
@@ -499,16 +521,17 @@ def _write_report(out: Path, config: BenchmarkTrainingConfig, train_summary: Map
     report = {
         "config": asdict(config),
         "label_policy": {
-            "method": BenchmarkLabelMethod.BOTH_DISAGREE_MALICIOUS.value,
+            "method": BenchmarkLabelMethod.RESOLVED_OR_DISAGREE_MALICIOUS.value,
             "meaning": (
-                "resolved malicious rows train as positive, resolved benign rows train as benign, "
-                "and unresolved rows are excluded rather than treated as benign"
+                "resolved labels are used when present; resolved malicious rows train as positive, "
+                "resolved benign rows train as benign, and unresolved rows are excluded rather than "
+                "treated as benign"
             ),
         },
         "contrastive_objective": {
             "name": "supervised_orbit_contrastive_loss",
             "benign_orbits": "unique_per_batch_item",
-            "positive_orbits": "shared_positive_label_when_family_labels_are_unavailable",
+            "positive_orbits": "sink_or_payload_family_when_available_else_shared_positive_fallback",
             "binary_auxiliary_head_views": "both_l2_normalized_views",
             "grad_cache_boundary": "GradCache carries supervised orbit labels and binary labels through the training loss.",
             "deterministic_seed": config.seed,

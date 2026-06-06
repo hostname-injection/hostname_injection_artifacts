@@ -31,6 +31,7 @@ FIELDNAMES = [
     "CLAUDE_OPUS_4_8_DNS_CMD_INJECTION_CONFIDENCE",
     "CLAUDE_OPUS_4_8_DNS_CMD_INJECTION_REASON",
     "RESOLVED_LABEL_BOTH_M",
+    "SINK_FAMILY",
     "LABEL_AGREEMENT",
     "DATASET_FAMILY",
     "CONTENT_TYPE",
@@ -51,7 +52,7 @@ def _write_chunk(path, rows):
         writer.writerows(rows)
 
 
-def _row(row_id, family, text, gpt_5_5, opus, *, hostname=None, username=None):
+def _row(row_id, family, text, gpt_5_5, opus, *, hostname=None, username=None, sink_family=""):
     hostname = text if hostname is None and family == "dns_hostnames" else hostname or "10.0.0.1"
     username = text if username is None and family == "user_logins" else username or ""
     content_type = "HOSTNAME" if family == "dns_hostnames" else "USERNAME"
@@ -76,6 +77,7 @@ def _row(row_id, family, text, gpt_5_5, opus, *, hostname=None, username=None):
         "CLAUDE_OPUS_4_8_DNS_CMD_INJECTION_CONFIDENCE": "0.8",
         "CLAUDE_OPUS_4_8_DNS_CMD_INJECTION_REASON": f"opus {text}",
         "RESOLVED_LABEL_BOTH_M": "",
+        "SINK_FAMILY": sink_family,
         "LABEL_AGREEMENT": "conflict" if gpt_5_5 != opus else "agree",
         "DATASET_FAMILY": family,
         "CONTENT_TYPE": content_type,
@@ -91,12 +93,12 @@ def _row(row_id, family, text, gpt_5_5, opus, *, hostname=None, username=None):
 def _write_benchmark(root):
     user_rows = [
         _row("user_logins-000000000001", "user_logins", "good-user", "B", "B", hostname="10.0.0.10"),
-        _row("user_logins-000000000002", "user_logins", "bad-user", "M", "B", hostname="10.0.0.11"),
+        _row("user_logins-000000000002", "user_logins", "bad-user", "M", "B", hostname="10.0.0.11", sink_family="command"),
         _row("user_logins-000000000003", "user_logins", "unknown-user", "U", "U", hostname="10.0.0.12"),
     ]
     dns_rows = [
         _row("dns_hostnames-000000000001", "dns_hostnames", "safe.example.com", "B", "B"),
-        _row("dns_hostnames-000000000002", "dns_hostnames", "evil.$(id).example", "B", "M"),
+        _row("dns_hostnames-000000000002", "dns_hostnames", "evil.$(id).example", "B", "M", sink_family="query"),
         _row("dns_hostnames-000000000003", "dns_hostnames", "maybe.example", "U", "B"),
     ]
     user_path = root / "data/user_logins/chunks/user_logins_00000.csv"
@@ -134,6 +136,14 @@ def test_resolve_benchmark_label_policies():
     assert resolve_benchmark_label(row, BenchmarkLabelMethod.BOTH_DISAGREE_BENIGN) == "B"
     assert resolve_benchmark_label(row, BenchmarkLabelMethod.BOTH_DISAGREE_UNKNOWN) == "U"
     assert resolve_benchmark_label(row, BenchmarkLabelMethod.ANY_MALICIOUS_ELSE_BENIGN) == "M"
+    assert resolve_benchmark_label(
+        {**row, "RESOLVED_LABEL_BOTH_M": "B"},
+        BenchmarkLabelMethod.RESOLVED_OR_DISAGREE_MALICIOUS,
+    ) == "B"
+    assert resolve_benchmark_label(
+        {**row, "RESOLVED_LABEL_BOTH_M": "U"},
+        BenchmarkLabelMethod.RESOLVED_OR_DISAGREE_MALICIOUS,
+    ) == "U"
 
     unknown_row = {
         "GPT_5_5_IS_DNS_CMD_INJECTION": "U",
@@ -212,7 +222,7 @@ def test_benchmark_caho_training_view_excludes_unresolved_rows_by_default(tmp_pa
 
     rows = [ds[i] for i in range(len(ds))]
 
-    assert ds.base.label_method == BenchmarkLabelMethod.BOTH_DISAGREE_MALICIOUS
+    assert ds.base.label_method == BenchmarkLabelMethod.RESOLVED_OR_DISAGREE_MALICIOUS
     assert ds.base.drop_unknown is True
     assert ds.base.stats.selected_rows == 4
     assert [row[0] for row in rows] == [
@@ -222,3 +232,4 @@ def test_benchmark_caho_training_view_excludes_unresolved_rows_by_default(tmp_pa
         "evil.$(id).example",
     ]
     assert [row[2] for row in rows] == [0, 1, 0, 1]
+    assert [row[3] for row in rows] == ["", "command", "", "query"]

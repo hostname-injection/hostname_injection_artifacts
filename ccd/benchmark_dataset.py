@@ -3,6 +3,7 @@ from __future__ import annotations
 import bisect
 import csv
 import json
+import re
 from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
@@ -24,6 +25,7 @@ GPT_5_5_REASON = "GPT_5_5_DNS_CMD_INJECTION_REASON"
 OPUS_LABEL = "CLAUDE_OPUS_4_8_IS_DNS_CMD_INJECTION"
 OPUS_CONF = "CLAUDE_OPUS_4_8_DNS_CMD_INJECTION_CONFIDENCE"
 OPUS_REASON = "CLAUDE_OPUS_4_8_DNS_CMD_INJECTION_REASON"
+RESOLVED_LABEL = "RESOLVED_LABEL_BOTH_M"
 
 # Backward-compatible Python names for older training code. The CSV schema uses
 # GPT_5_5_* columns; these aliases do not imply Sonnet labeled the data.
@@ -39,6 +41,8 @@ class BenchmarkFamily(str, Enum):
 
 
 class BenchmarkLabelMethod(str, Enum):
+    RESOLVED = "resolved"
+    RESOLVED_OR_DISAGREE_MALICIOUS = "resolved-or-disagree-malicious"
     GPT_5_5_ONLY = "gpt-5.5-only"
     OPUS_4_8_ONLY = "opus-4.8-only"
     SONNET_ONLY = "sonnet-only"
@@ -54,6 +58,18 @@ class BenchmarkTextField(str, Enum):
     HOSTNAME = "HOSTNAME"
     USERNAME = "USERNAME"
     AUTO = "auto"
+
+
+POSITIVE_FAMILY_COLUMNS = (
+    "sink_family",
+    "SINK_FAMILY",
+    "payload_family",
+    "PAYLOAD_FAMILY",
+    "payload_class",
+    "PAYLOAD_CLASS",
+    "sink_harness_class",
+    "SINK_HARNESS_CLASS",
+)
 
 
 @dataclass(frozen=True)
@@ -86,8 +102,19 @@ def resolve_benchmark_label(
     method: Union[BenchmarkLabelMethod, str],
 ) -> str:
     method = BenchmarkLabelMethod(method)
+    resolved_raw = row.get(RESOLVED_LABEL)
+    resolved_present = resolved_raw is not None and str(resolved_raw).strip() != ""
+    resolved = normalize_benchmark_label(resolved_raw)
+    if method == BenchmarkLabelMethod.RESOLVED:
+        return resolved
+
     gpt_5_5 = normalize_benchmark_label(row.get(GPT_5_5_LABEL))
     opus = normalize_benchmark_label(row.get(OPUS_LABEL))
+
+    if method == BenchmarkLabelMethod.RESOLVED_OR_DISAGREE_MALICIOUS and resolved_present:
+        return resolved
+    if method == BenchmarkLabelMethod.RESOLVED_OR_DISAGREE_MALICIOUS:
+        method = BenchmarkLabelMethod.BOTH_DISAGREE_MALICIOUS
 
     if method in {BenchmarkLabelMethod.GPT_5_5_ONLY, BenchmarkLabelMethod.SONNET_ONLY}:
         return gpt_5_5
@@ -102,6 +129,17 @@ def resolve_benchmark_label(
     if "B" in {gpt_5_5, opus} and method == BenchmarkLabelMethod.BOTH_DISAGREE_BENIGN:
         return "B"
     return "U"
+
+
+def benchmark_positive_family(row: Mapping[str, str], *, default: str = "positive") -> str:
+    for column in POSITIVE_FAMILY_COLUMNS:
+        raw = str(row.get(column, "")).strip().lower()
+        if not raw or raw in {"none", "unknown", "unresolved", "withheld", "present"}:
+            continue
+        family = re.sub(r"[^a-z0-9_.:-]+", "_", raw).strip("_.:-")
+        if family:
+            return family
+    return default
 
 
 def _as_families(family: Union[BenchmarkFamily, str, Sequence[Union[BenchmarkFamily, str]]]) -> List[str]:

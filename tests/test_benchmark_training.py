@@ -13,6 +13,7 @@ from ccd.benchmark_training import (
     BenchmarkChunkShuffleSampler,
     BenchmarkContrastiveTrainer,
     BenchmarkTrainingConfig,
+    _batch_orbit_values,
     _orbit_labels,
     resolve_caho_batch_size,
     save_encoder_only,
@@ -156,9 +157,12 @@ def test_benchmark_contrastive_trainer_fit_and_report(tmp_path):
     assert report["config"]["binary_loss_weight"] == 0.5
     assert report["config"]["weight_decay"] == 0.02
     assert report["config"]["seed"] == 17
-    assert report["label_policy"]["method"] == "both-disagree-malicious"
+    assert report["label_policy"]["method"] == "resolved-or-disagree-malicious"
     assert "unresolved rows are excluded" in report["label_policy"]["meaning"]
     assert report["contrastive_objective"]["name"] == "supervised_orbit_contrastive_loss"
+    assert report["contrastive_objective"]["positive_orbits"] == (
+        "sink_or_payload_family_when_available_else_shared_positive_fallback"
+    )
     assert report["contrastive_objective"]["binary_auxiliary_head_views"] == "both_l2_normalized_views"
     assert report["contrastive_objective"]["deterministic_seed"] == 17
     assert report["train_summary"]["steps"] == 2
@@ -236,10 +240,12 @@ def test_benchmark_grad_cache_uses_single_caho_training_loss(monkeypatch):
         def __init__(self, **kwargs):
             captured["loss_fn"] = kwargs["loss_fn"]
             captured["labels"] = []
+            captured["orbit_labels"] = []
 
         def __call__(self, *model_inputs, **loss_kwargs):
             captured["model_inputs"] = model_inputs
             captured["labels"].extend(loss_kwargs["labels"].detach().cpu().tolist())
+            captured["orbit_labels"].extend(loss_kwargs["orbit_labels"].detach().cpu().tolist())
             return torch.tensor(0.0)
 
     monkeypatch.setitem(sys.modules, "grad_cache", SimpleNamespace(GradCache=FakeGradCache))
@@ -263,6 +269,7 @@ def test_benchmark_grad_cache_uses_single_caho_training_loss(monkeypatch):
         "probe'--.example",
     ]
     assert captured["labels"] == [0, 0, 1, 1]
+    assert captured["orbit_labels"] == [0, 0, 1, 1]
 
 
 def test_benchmark_caho_94gb_batch_defaults():
@@ -318,8 +325,17 @@ def test_chunk_shuffle_sampler_preserves_all_indices_and_chunk_locality():
 
 def test_orbit_labels_share_positive_and_keep_benign_unique():
     torch = pytest.importorskip("torch")
-    labels = torch.tensor([0, 1, 0, 1, -1], dtype=torch.long)
+    labels = torch.tensor([0, 1, 0, 2, 1, -1], dtype=torch.long)
 
     orbit = _orbit_labels(labels)
 
-    assert orbit.tolist() == [-1, 1, -2, 1, -3]
+    assert orbit.tolist() == [-1, 1, -2, 2, 1, -3]
+
+
+def test_batch_orbit_values_use_positive_family_keys():
+    orbit = _batch_orbit_values(
+        [0, 1, 1, 1, 0],
+        ["", "query", "command", "query", ""],
+    )
+
+    assert orbit == [0, 1, 2, 1, 0]
