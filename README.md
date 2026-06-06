@@ -272,6 +272,9 @@ ccd certify \
 Certificates are scoped to the frozen normalizer, cone sketch, score path,
 threshold, and edit manifest. Inputs fail closed on invalid thresholds, invalid
 edit-ball limits, non-finite bounds, or missing required group thresholds.
+The default certificate method is the combined paper path: calibrated-margin
+certification when validation-derived bounds are supplied, followed by
+deterministic edit-ball enumeration.
 
 ## De-Identification Release Checks
 

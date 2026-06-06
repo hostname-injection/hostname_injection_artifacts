@@ -854,6 +854,25 @@ def test_certify_parser_smoke():
     assert args.embedding_rotation_bound == 0.2
 
 
+def test_certify_parser_defaults_to_combined_method():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "certify",
+            "--model",
+            "ccd_model.npz",
+            "--input",
+            "queries.txt",
+            "--output",
+            "certificates.json",
+            "--radius",
+            "1",
+        ]
+    )
+
+    assert args.cert_method == "combined"
+
+
 def test_certify_parser_rejects_threshold_and_calibration_overrides():
     parser = build_parser()
 

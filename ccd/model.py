@@ -402,7 +402,7 @@ class CCDModel:
         normalize: bool = True,
         batch_size: int = 32,
         max_nodes: int = 10000,
-        method: str = "enumeration",
+        method: str = "combined",
         sketch_lipschitz: Optional[float] = None,
         embedding_rotation_bound: Optional[float] = None,
         eps: float = 1e-12,
@@ -426,7 +426,9 @@ class CCDModel:
 
         calibrated_threshold = self._require_calibrated_threshold("CCDModel.certify")
         threshold = calibrated_threshold if threshold is None else coerce_finite_threshold(threshold)
-        if method in {"calibrated-margin", "combined"}:
+        has_margin_bounds = sketch_lipschitz is not None or embedding_rotation_bound is not None
+        should_try_margin = method == "calibrated-margin" or (method == "combined" and has_margin_bounds)
+        if should_try_margin:
             if sketch_lipschitz is None or embedding_rotation_bound is None:
                 raise ValueError(
                     "sketch_lipschitz and embedding_rotation_bound are required "
@@ -452,7 +454,7 @@ class CCDModel:
             )
             return float(scores[0])
 
-        if method in {"calibrated-margin", "combined"}:
+        if should_try_margin:
             margin_cert = certify_by_calibrated_margin(
                 score_one(normalizer(hostname)),
                 threshold,

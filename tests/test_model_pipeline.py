@@ -983,11 +983,28 @@ def test_model_certify_supports_calibrated_margin_and_combined_fallback():
         sketch_lipschitz=10.0,
         embedding_rotation_bound=10.0,
     )
+    no_bounds_fallback = model.certify(
+        "Example.com",
+        radius=1,
+        method="combined",
+        edit_model=EditModel(edits=["E5_case"]),
+    )
+    enumeration_with_unused_bound = model.certify(
+        "Example.com",
+        radius=1,
+        method="enumeration",
+        edit_model=EditModel(edits=["E5_case"]),
+        sketch_lipschitz=0.1,
+    )
 
     assert cmc.certified is True
     assert cmc.method == "calibrated_margin"
     assert fallback.certified is True
     assert fallback.method == "enumeration"
+    assert no_bounds_fallback.certified is True
+    assert no_bounds_fallback.method == "enumeration"
+    assert enumeration_with_unused_bound.certified is True
+    assert enumeration_with_unused_bound.method == "enumeration"
 
 
 def test_model_certify_requires_bounds_for_calibrated_margin():

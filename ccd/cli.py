@@ -798,8 +798,11 @@ def build_parser() -> argparse.ArgumentParser:
     certify.add_argument(
         "--cert-method",
         choices=["enumeration", "calibrated-margin", "combined"],
-        default="enumeration",
-        help="Certificate method. combined tries calibrated-margin first, then deterministic enumeration.",
+        default="combined",
+        help=(
+            "Certificate method. combined tries calibrated-margin when bounds are supplied, "
+            "then deterministic enumeration."
+        ),
     )
     certify.add_argument("--sketch-lipschitz", type=float, default=None)
     certify.add_argument("--embedding-rotation-bound", type=float, default=None)
