@@ -96,6 +96,19 @@ def _require_caho_training_samples(samples: List[Sample], *, source: str) -> Non
         raise ValueError(f"{source} requires at least one malicious hostname")
 
 
+def _require_prior_training_inputs(benign: List[str], malicious: Dict[str, List[str]]) -> None:
+    if not benign:
+        raise ValueError("ccd train-priors requires at least one benign hostname")
+    if not malicious:
+        raise ValueError("ccd train-priors requires at least one malicious hostname")
+    empty_families = sorted(family for family, hosts in malicious.items() if not hosts)
+    if empty_families:
+        raise ValueError(
+            "ccd train-priors requires non-empty malicious families; "
+            f"empty families: {', '.join(empty_families)}"
+        )
+
+
 def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_path: Path) -> None:
     _require_caho_training_samples(samples, source="CAHO training")
 
@@ -281,6 +294,7 @@ def cmd_train_priors(args: argparse.Namespace) -> None:
     encoder = CahoEncoder(config.encoder)
     benign = _read_lines(args.benign)
     malicious = _read_malicious_csv(args.malicious)
+    _require_prior_training_inputs(benign, malicious)
 
     if not args.no_normalize:
         benign = _apply_normalization(benign)

@@ -215,6 +215,60 @@ def test_train_priors_parser_requires_caho_checkpoint_arg():
         )
 
 
+def test_train_priors_rejects_missing_training_side_before_encoding(tmp_path, monkeypatch):
+    checkpoint = tmp_path / "caho_encoder"
+    checkpoint.mkdir()
+    (checkpoint / "modules.json").write_text("[]", encoding="utf-8")
+    benign = tmp_path / "benign.txt"
+    malicious = tmp_path / "malicious.csv"
+    output = tmp_path / "model.npz"
+
+    class FailIfEncoded:
+        def __init__(self, _config):
+            pass
+
+        def encode(self, *_args, **_kwargs):
+            raise AssertionError("train-priors should validate input rows before encoding")
+
+    monkeypatch.setattr(cli_module, "CahoEncoder", FailIfEncoded)
+
+    benign.write_text("", encoding="utf-8")
+    malicious.write_text("hostname,family\nevil.example,cmd\n", encoding="utf-8")
+    args = build_parser().parse_args(
+        [
+            "train-priors",
+            "--benign",
+            str(benign),
+            "--malicious",
+            str(malicious),
+            "--encoder",
+            str(checkpoint),
+            "--output",
+            str(output),
+        ]
+    )
+    with pytest.raises(ValueError, match="requires at least one benign hostname"):
+        args.func(args)
+
+    benign.write_text("safe.example\n", encoding="utf-8")
+    malicious.write_text("hostname,family\n", encoding="utf-8")
+    args = build_parser().parse_args(
+        [
+            "train-priors",
+            "--benign",
+            str(benign),
+            "--malicious",
+            str(malicious),
+            "--encoder",
+            str(checkpoint),
+            "--output",
+            str(output),
+        ]
+    )
+    with pytest.raises(ValueError, match="requires at least one malicious hostname"):
+        args.func(args)
+
+
 def test_train_caho_corpus_parser_smoke():
     parser = build_parser()
     args = parser.parse_args(

@@ -314,7 +314,9 @@ python scripts/export_hib_release_pipeline_inputs.py \
 The exporter writes `benign.txt`, `malicious.csv`,
 `benign_calibration.txt`, `queries.txt`, `query_labels.csv`, and public group
 files when release-safe calibration groups are present. It preserves released
-row multiplicity and does not report private raw-hostname duplicate facts.
+row multiplicity, fails if the labeled query slice does not contain both
+resolved benign and verified malicious rows, and does not report private
+raw-hostname duplicate facts.
 
 ## Useful Commands
 

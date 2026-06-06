@@ -95,7 +95,18 @@ def test_artifact_smoke_command_sequence_is_cli_parseable(monkeypatch):
             for filename in files:
                 (out_dir / filename).write_text("placeholder\n", encoding="utf-8")
             (out_dir / "pipeline_inputs_manifest.json").write_text(
-                json.dumps({"files": files, "policy": {"row_multiplicity_preserved": True}}),
+                json.dumps(
+                    {
+                        "files": files,
+                        "counts": {
+                            "query_labels_by_label": {
+                                "resolved_benign": 1,
+                                "verified_executable_semantics": 1,
+                            }
+                        },
+                        "policy": {"row_multiplicity_preserved": True},
+                    }
+                ),
                 encoding="utf-8",
             )
         elif "refresh-benign" in cmd:

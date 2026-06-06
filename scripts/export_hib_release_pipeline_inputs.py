@@ -103,6 +103,7 @@ def export_pipeline_inputs(public_release: Path, output_dir: Path) -> dict[str, 
 
     by_split: Counter[str] = Counter()
     by_label: Counter[str] = Counter()
+    query_labels_by_label: Counter[str] = Counter()
     row_count = 0
     files: dict[str, int] = {}
 
@@ -145,6 +146,7 @@ def export_pipeline_inputs(public_release: Path, output_dir: Path) -> dict[str, 
             if split in {"test", "validation"} and label != UNRESOLVED_LABEL:
                 queries.write(released_artifact(row))
                 query_groups.write_for_row(row)
+                query_labels_by_label[label] += 1
                 query_labels.write(
                     [
                         row.get("public_row_id", ""),
@@ -186,6 +188,20 @@ def export_pipeline_inputs(public_release: Path, output_dir: Path) -> dict[str, 
     if empty:
         raise ValueError(f"public release is missing required rows for: {', '.join(empty)}")
 
+    missing_query_labels = [
+        name
+        for name, label in (
+            ("query_benign", NEGATIVE_LABEL),
+            ("query_malicious", POSITIVE_LABEL),
+        )
+        if query_labels_by_label[label] == 0
+    ]
+    if missing_query_labels:
+        raise ValueError(
+            "public release is missing required labeled query rows for: "
+            f"{', '.join(missing_query_labels)}"
+        )
+
     for filename in ("benign_calibration_groups.txt", "query_groups.txt", "recent_benign_window_groups.txt"):
         if files.get(filename, 0) == 0:
             path = output_dir / filename
@@ -204,6 +220,7 @@ def export_pipeline_inputs(public_release: Path, output_dir: Path) -> dict[str, 
             "rows": row_count,
             "by_split": dict(by_split),
             "by_label": dict(by_label),
+            "query_labels_by_label": dict(query_labels_by_label),
         },
         "files": files,
         "policy": {

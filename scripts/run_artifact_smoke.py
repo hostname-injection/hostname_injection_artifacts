@@ -187,6 +187,12 @@ def main() -> int:
                 raise RuntimeError(f"expected exported public-release pipeline input {filename}")
         if manifest.get("policy", {}).get("row_multiplicity_preserved") is not True:
             raise RuntimeError("expected public-release pipeline export to preserve row multiplicity")
+        query_label_counts = manifest.get("counts", {}).get("query_labels_by_label", {})
+        if (
+            query_label_counts.get("resolved_benign", 0) < 1
+            or query_label_counts.get("verified_executable_semantics", 0) < 1
+        ):
+            raise RuntimeError("expected exported query labels to include resolved benign and verified positive rows")
 
     with tempfile.TemporaryDirectory(prefix="ccd-artifact-smoke-") as tmp:
         tmp_path = Path(tmp)

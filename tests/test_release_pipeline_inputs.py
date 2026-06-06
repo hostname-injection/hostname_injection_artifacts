@@ -3,6 +3,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 def _load_export_module():
     script = Path(__file__).resolve().parents[1] / "scripts" / "export_hib_release_pipeline_inputs.py"
@@ -114,4 +116,39 @@ def test_export_public_release_pipeline_inputs_preserves_rows_and_groups(tmp_pat
     assert summary["files"]["benign.txt"] == 2
     assert summary["policy"]["row_multiplicity_preserved"] is True
     manifest = json.loads((out / "pipeline_inputs_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["counts"]["query_labels_by_label"] == {
+        "resolved_benign": 1,
+        "verified_executable_semantics": 1,
+    }
     assert manifest["policy"]["unresolved_rows_excluded_from_training_and_queries"] is True
+
+
+def test_export_requires_benign_and_malicious_query_labels(tmp_path: Path) -> None:
+    module = _load_export_module()
+    release = tmp_path / "hib_release.jsonl"
+    _write_release(release)
+    rows = [json.loads(line) for line in release.read_text(encoding="utf-8").splitlines()]
+
+    no_benign_query = tmp_path / "no_benign_query.jsonl"
+    no_benign_query.write_text(
+        "".join(
+            json.dumps(row, sort_keys=True) + "\n"
+            for row in rows
+            if row["public_row_id"] != "validation-benign"
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="query_benign"):
+        module.export_pipeline_inputs(no_benign_query, tmp_path / "no_benign_out")
+
+    no_malicious_query = tmp_path / "no_malicious_query.jsonl"
+    no_malicious_query.write_text(
+        "".join(
+            json.dumps(row, sort_keys=True) + "\n"
+            for row in rows
+            if row["public_row_id"] != "test-positive"
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="query_malicious"):
+        module.export_pipeline_inputs(no_malicious_query, tmp_path / "no_malicious_out")
