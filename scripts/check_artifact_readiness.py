@@ -42,9 +42,6 @@ EXPECTED_MARKDOWN_FILES = {
 }
 EXPECTED_CONSOLE_SCRIPTS = {
     "ccd",
-    "ccd-diagnose",
-    "ccd-explain",
-    "ccd-score",
 }
 
 

@@ -59,7 +59,7 @@ def main() -> int:
         raise ValueError("--num-samples must be positive")
 
     config = CCDConfig()
-    config.encoder.model_name = str(require_trained_caho_checkpoint(args.checkpoint, purpose="ccd-diagnose"))
+    config.encoder.model_name = str(require_trained_caho_checkpoint(args.checkpoint, purpose="ccd diagnostics"))
     config.encoder.device = args.device
 
     encoder = CahoEncoder(config.encoder)

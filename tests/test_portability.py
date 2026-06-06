@@ -25,7 +25,7 @@ def test_pyproject_exports_reviewer_console_scripts_and_packages():
     assert "license" not in pyproject["project"]
     assert all("License ::" not in classifier for classifier in pyproject["project"]["classifiers"])
     assert "optional-dependencies" not in pyproject["project"]
-    assert {"ccd", "ccd-diagnose", "ccd-explain", "ccd-score"}.issubset(scripts)
+    assert set(scripts) == {"ccd"}
     assert packages == {"ccd"}
 
 

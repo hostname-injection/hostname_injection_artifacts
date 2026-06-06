@@ -27,9 +27,6 @@ dependencies = [
 
 [project.scripts]
 ccd = "ccd.cli:main"
-ccd-diagnose = "ccd.entrypoints:diagnose_main"
-ccd-explain = "ccd.entrypoints:explain_main"
-ccd-score = "ccd.entrypoints:score_main"
 
 [tool.setuptools]
 packages = ["ccd"]

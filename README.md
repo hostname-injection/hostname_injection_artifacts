@@ -329,14 +329,6 @@ make score MODEL=ccd_model.refreshed.npz INPUT=data/queries.txt OUTPUT=out/score
 make artifact-latency CHECKPOINT=caho_encoder
 ```
 
-Installed console entry points:
-
-```bash
-ccd-diagnose --checkpoint caho_encoder --batch-size 256
-ccd-score --model ccd_model.refreshed.npz --input data/queries.txt --output out/scores.csv
-ccd-explain --model ccd_model.refreshed.npz --input data/queries.txt --output out/explanations.json
-```
-
 ## Data Formats
 
 - `benign.txt`: one benign hostname per line.

@@ -26,10 +26,10 @@ diagnose:
 	$(PYTHON) -m ccd.diagnostics --checkpoint $(CHECKPOINT) --batch-size $(BATCH)
 
 explain:
-	$(PYTHON) -m ccd.explain --model $(MODEL) --input $(INPUT)
+	$(PYTHON) -m ccd.cli explain --model $(MODEL) --input $(INPUT)
 
 score:
-	$(PYTHON) -m ccd.score_cli --model $(MODEL) --input $(INPUT) --output $(OUTPUT) --batch-size $(BATCH)
+	$(PYTHON) -m ccd.cli score --model $(MODEL) --input $(INPUT) --output $(OUTPUT) --batch-size $(BATCH)
 
 test:
 	$(PYTHON) -m pytest

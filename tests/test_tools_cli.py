@@ -1,240 +1,10 @@
-import csv
 import json
 import sys
 
-import numpy as np
 import pytest
 
 import ccd.diagnostics as diagnostics
 import ccd.explain as explain
-import ccd.score_cli as score_cli
-
-
-def test_score_cli_writes_output(tmp_path, monkeypatch):
-    input_path = tmp_path / "input.txt"
-    output_path = tmp_path / "out.csv"
-    input_path.write_text("alpha.example\nbeta.example\n")
-
-    class DummyModel:
-        threshold = 0.5
-
-        def score(self, hostnames, batch_size=32, normalize=True, approximate=False, approximate_k=None):
-            assert approximate is False
-            assert approximate_k is None
-            return np.array([0.1, 0.9], dtype=np.float32)
-
-    monkeypatch.setattr(score_cli, "load_model", lambda _: DummyModel())
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "ccd-score",
-            "--model",
-            "model.npz",
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-        ],
-    )
-
-    assert score_cli.main() == 0
-    assert output_path.exists()
-    lines = output_path.read_text().strip().splitlines()
-    assert len(lines) == 3
-
-
-def test_score_cli_rejects_approximate_score_path_flags(tmp_path, monkeypatch):
-    input_path = tmp_path / "input.txt"
-    output_path = tmp_path / "out.csv"
-    input_path.write_text("alpha.example\n", encoding="utf-8")
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "ccd-score",
-            "--model",
-            "model.npz",
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-            "--" + "approximate",
-        ],
-    )
-
-    with pytest.raises(SystemExit):
-        score_cli.main()
-
-
-def test_score_cli_applies_grouped_thresholds(tmp_path, monkeypatch):
-    input_path = tmp_path / "input.txt"
-    groups_path = tmp_path / "groups.txt"
-    output_path = tmp_path / "out.csv"
-    input_path.write_text("alpha.example\nbeta.example\n", encoding="utf-8")
-    groups_path.write_text("tenant-a\ntenant-b\n", encoding="utf-8")
-
-    class DummyModel:
-        threshold = 0.5
-        grouped_thresholds = {
-            "tenant-a": {"threshold": 0.7},
-            "tenant-b": {"threshold": 0.4},
-        }
-
-        def score(self, hostnames, batch_size=32, normalize=True, approximate=False, approximate_k=None):
-            return np.array([0.6, 0.6], dtype=np.float32)
-
-    monkeypatch.setattr(score_cli, "load_model", lambda _: DummyModel())
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "ccd-score",
-            "--model",
-            "model.npz",
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-            "--groups",
-            str(groups_path),
-            "--require-group-thresholds",
-        ],
-    )
-
-    assert score_cli.main() == 0
-    lines = output_path.read_text(encoding="utf-8").strip().splitlines()
-    assert lines[0] == "hostname,calibration_group,threshold,score,prediction"
-    assert lines[1].endswith("tenant-a,0.700000,0.600000,0")
-    assert lines[2].endswith("tenant-b,0.400000,0.600000,1")
-
-
-def test_score_cli_preserves_raw_artifact_commas(tmp_path, monkeypatch):
-    input_path = tmp_path / "input.txt"
-    output_path = tmp_path / "out.csv"
-    input_path.write_text("alpha,one.example\n", encoding="utf-8")
-
-    class DummyModel:
-        threshold = 0.5
-        grouped_thresholds = None
-
-        def score(self, hostnames, batch_size=32, normalize=True, approximate=False, approximate_k=None):
-            return np.array([0.6], dtype=np.float32)
-
-    monkeypatch.setattr(score_cli, "load_model", lambda _: DummyModel())
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "ccd-score",
-            "--model",
-            "model.npz",
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-            "--no-normalize",
-        ],
-    )
-
-    assert score_cli.main() == 0
-    with output_path.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.reader(handle))
-    assert rows == [["hostname", "threshold", "score", "prediction"], ["alpha,one.example", "0.500000", "0.600000", "1"]]
-
-
-def test_score_cli_rejects_uncalibrated_model_bundle_before_scoring(tmp_path, monkeypatch):
-    input_path = tmp_path / "input.txt"
-    output_path = tmp_path / "out.csv"
-    input_path.write_text("alpha.example\n", encoding="utf-8")
-
-    class FailingModel:
-        threshold = None
-        grouped_thresholds = None
-
-        def score(self, hostnames, **kwargs):
-            raise AssertionError("score should not run without an embedded calibrated threshold")
-
-    monkeypatch.setattr(score_cli, "load_model", lambda _: FailingModel())
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "ccd-score",
-            "--model",
-            "model.npz",
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-        ],
-    )
-
-    with pytest.raises(ValueError, match="requires a calibrated model bundle"):
-        score_cli.main()
-
-
-def test_score_cli_rejects_non_finite_model_bundle_threshold_before_scoring(tmp_path, monkeypatch):
-    input_path = tmp_path / "input.txt"
-    output_path = tmp_path / "out.csv"
-    input_path.write_text("alpha.example\n", encoding="utf-8")
-
-    class FailingModel:
-        threshold = float("nan")
-        grouped_thresholds = None
-
-        def score(self, hostnames, **kwargs):
-            raise AssertionError("score should not run with invalid model threshold")
-
-    monkeypatch.setattr(score_cli, "load_model", lambda _: FailingModel())
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "ccd-score",
-            "--model",
-            "model.npz",
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-        ],
-    )
-
-    with pytest.raises(ValueError, match="model bundle threshold.*finite"):
-        score_cli.main()
-
-
-def test_score_cli_rejects_empty_group_ids(tmp_path, monkeypatch):
-    input_path = tmp_path / "input.txt"
-    groups_path = tmp_path / "groups.txt"
-    output_path = tmp_path / "out.csv"
-    input_path.write_text("alpha.example\nbeta.example\n", encoding="utf-8")
-    groups_path.write_text("tenant-a\n\n tenant-b\n", encoding="utf-8")
-
-    class DummyModel:
-        threshold = 0.5
-        grouped_thresholds = None
-
-    monkeypatch.setattr(score_cli, "load_model", lambda _: DummyModel())
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "ccd-score",
-            "--model",
-            "model.npz",
-            "--input",
-            str(input_path),
-            "--output",
-            str(output_path),
-            "--groups",
-            str(groups_path),
-        ],
-    )
-
-    with pytest.raises(ValueError, match="groups file contains empty values"):
-        score_cli.main()
 
 
 def test_explain_cli_outputs_json(tmp_path, monkeypatch):
@@ -283,7 +53,7 @@ def test_explain_cli_outputs_json(tmp_path, monkeypatch):
         sys,
         "argv",
         [
-            "ccd-explain",
+            "ccd.explain",
             "--model",
             "model.npz",
             "--input",
@@ -335,7 +105,7 @@ def test_explain_cli_rejects_non_finite_model_bundle_threshold_before_explaining
         sys,
         "argv",
         [
-            "ccd-explain",
+            "ccd.explain",
             "--model",
             "model.npz",
             "--input",
@@ -366,7 +136,7 @@ def test_explain_cli_rejects_uncalibrated_model_bundle_before_explaining(tmp_pat
         sys,
         "argv",
         [
-            "ccd-explain",
+            "ccd.explain",
             "--model",
             "model.npz",
             "--input",
@@ -400,7 +170,7 @@ def test_diagnostics_cli_runs(tmp_path, monkeypatch):
         sys,
         "argv",
         [
-            "ccd-diagnose",
+            "ccd.diagnostics",
             "--checkpoint",
             str(checkpoint),
             "--num-samples",

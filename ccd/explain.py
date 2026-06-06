@@ -41,12 +41,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run(args: argparse.Namespace) -> int:
     model = load_model(args.model)
-    require_model_uses_trained_caho_checkpoint(model, purpose="ccd-explain")
+    require_model_uses_trained_caho_checkpoint(model, purpose="ccd explain")
     hostnames = read_lines(args.input)
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]
     groups = read_parallel_lines(args.groups, len(hostnames), "groups") if args.groups else None
-    threshold = require_calibrated_threshold(model, purpose="ccd-explain")
+    threshold = require_calibrated_threshold(model, purpose="ccd explain")
     threshold_source = "model_bundle_threshold"
     grouped_thresholds = getattr(model, "grouped_thresholds", None)
     grouped_thresholds_source = "model_bundle_grouped_thresholds" if grouped_thresholds else "none"
