@@ -165,6 +165,8 @@ the benchmark `train` split, prefers resolved labels when present, excludes
 unresolved rows rather than treating them as benign, and uses released
 sink/payload family metadata for positive CAHO orbits when that metadata is
 available.
+The benchmark CAHO loader fails closed if the selected training rows do not
+contain at least one resolved benign and one resolved malicious row.
 
 ## CCD Training
 

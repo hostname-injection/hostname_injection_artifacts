@@ -116,10 +116,20 @@ class BenchmarkCAHOViewDataset:
             max_rows=max_rows,
             cache_chunks=1,
         )
+        self._require_benchmark_training_rows()
         self.augmenter = augmenter or CAHOAugmenter()
         self.include_original = include_original
         self.seed = seed
         self.epoch = 0
+
+    def _require_benchmark_training_rows(self) -> None:
+        label_rows = dict(getattr(self.base.stats, "selected_label_rows", {}) or {})
+        if len(self.base) == 0:
+            raise ValueError("Benchmark CAHO training selected no rows; check benchmark split and labels.")
+        if int(label_rows.get("B", 0)) <= 0:
+            raise ValueError("Benchmark CAHO training requires at least one resolved benign training row.")
+        if int(label_rows.get("M", 0)) <= 0:
+            raise ValueError("Benchmark CAHO training requires at least one resolved malicious training row.")
 
     def __len__(self) -> int:
         return len(self.base)

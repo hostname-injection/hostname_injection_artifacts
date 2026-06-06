@@ -5,7 +5,7 @@ import csv
 import json
 import re
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
@@ -86,6 +86,7 @@ class BenchmarkDatasetStats:
     selected_rows: int
     family_rows: Mapping[str, int]
     chunk_count: int
+    selected_label_rows: Mapping[str, int] = field(default_factory=dict)
 
 
 def normalize_benchmark_label(value: Optional[str]) -> str:
@@ -231,6 +232,7 @@ class HostnameCommandInjectionBenchmarkDataset(Dataset):
 
         self._chunks: List[Tuple[str, Path, int]] = []
         family_rows: Dict[str, int] = {}
+        selected_label_rows: Dict[str, int] = {}
         for fam in self.families:
             dataset = self.manifest["datasets"][fam]
             family_rows[fam] = int(dataset["rows"])
@@ -248,6 +250,7 @@ class HostnameCommandInjectionBenchmarkDataset(Dataset):
                     if self.drop_unknown and label == "U":
                         continue
                     self._selected.append((chunk_index, row_index))
+                    selected_label_rows[label] = selected_label_rows.get(label, 0) + 1
                     if max_rows is not None and len(self._selected) >= max_rows:
                         break
                 if max_rows is not None and len(self._selected) >= max_rows:
@@ -273,6 +276,7 @@ class HostnameCommandInjectionBenchmarkDataset(Dataset):
             selected_rows=self._length,
             family_rows=family_rows,
             chunk_count=len(self._chunks),
+            selected_label_rows=selected_label_rows,
         )
         self._cache: OrderedDict[int, List[Dict[str, str]]] = OrderedDict()
 

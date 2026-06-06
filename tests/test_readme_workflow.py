@@ -51,6 +51,7 @@ def test_root_readme_maps_reviewer_evidence_to_method_surfaces():
         "de-identification release gates",
         "trains only on the benchmark `train` split",
         "excludes unresolved rows rather than treating them as benign",
+        "fails closed if the selected training rows do not contain at least one resolved benign and one resolved malicious row",
     ]:
         assert phrase in normalized
 

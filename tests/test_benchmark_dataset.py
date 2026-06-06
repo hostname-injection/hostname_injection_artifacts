@@ -255,6 +255,7 @@ def test_benchmark_caho_training_view_excludes_unresolved_rows_by_default(tmp_pa
     assert ds.base.drop_unknown is True
     assert ds.base.splits == {"train"}
     assert ds.base.stats.selected_rows == 4
+    assert ds.base.stats.selected_label_rows == {"B": 2, "M": 2}
     assert [row[0] for row in rows] == [
         "good-user",
         "bad-user",
@@ -263,3 +264,21 @@ def test_benchmark_caho_training_view_excludes_unresolved_rows_by_default(tmp_pa
     ]
     assert [row[2] for row in rows] == [0, 1, 0, 1]
     assert [row[3] for row in rows] == ["", "command", "", "query"]
+
+
+def test_benchmark_caho_training_view_fails_closed_without_both_classes(tmp_path):
+    _write_benchmark(tmp_path)
+
+    try:
+        BenchmarkCAHOViewDataset(tmp_path, splits="validation")
+    except ValueError as exc:
+        assert "benign" in str(exc)
+    else:
+        raise AssertionError("Expected missing benign rows to fail closed")
+
+    try:
+        BenchmarkCAHOViewDataset(tmp_path, splits="test")
+    except ValueError as exc:
+        assert "selected no rows" in str(exc)
+    else:
+        raise AssertionError("Expected empty selected split to fail closed")
