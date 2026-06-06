@@ -11,6 +11,7 @@ from ccd.benchmark_training import (
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_USE_GRAD_CACHE,
     CAHO_DEFAULT_WEIGHT_DECAY,
+    CAHO_DEFAULT_CONTRASTIVE_LOSS,
     CAHO_DEFAULT_BINARY_HIDDEN_DIM,
     CAHO_DEFAULT_BINARY_LOSS_WEIGHT,
     CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT,
@@ -90,7 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--weighted-num-augs", type=int, default=2)
     parser.add_argument("--weighted-max-attempts", type=int, default=3)
     parser.add_argument("--weighted-no-retry", action="store_true")
-    parser.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="learnable")
+    parser.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default=CAHO_DEFAULT_CONTRASTIVE_LOSS)
     parser.add_argument("--contrastive-max-scale", type=float, default=100.0)
     parser.add_argument("--contrastive-min-scale", type=float, default=1.0)
     parser.add_argument("--optimize-contrastive-scale", action="store_true")

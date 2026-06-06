@@ -8,6 +8,7 @@ import pytest
 
 from ccd.benchmark_training import (
     CAHO_DEFAULT_EPOCHS,
+    CAHO_DEFAULT_CONTRASTIVE_LOSS,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     BenchmarkChunkShuffleSampler,
@@ -285,6 +286,7 @@ def test_benchmark_caho_94gb_batch_defaults():
     spec.loader.exec_module(module)
     args = module.build_parser().parse_args(["--out", "unused-output"])
     assert args.epochs == CAHO_DEFAULT_EPOCHS
+    assert args.contrastive_loss == CAHO_DEFAULT_CONTRASTIVE_LOSS == "fixed"
     assert args.grad_cache is True
     assert resolve_caho_batch_size(args.batch_size, use_grad_cache=True) == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
     assert args.grad_cache_chunk_size == CAHO_94GB_GRAD_CACHE_CHUNK_SIZE

@@ -33,6 +33,7 @@ from .train import (
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_WEIGHT_DECAY,
     CAHO_DEFAULT_USE_GRAD_CACHE,
+    CAHO_DEFAULT_CONTRASTIVE_LOSS,
     CAHO_DEFAULT_BINARY_HIDDEN_DIM,
     CAHO_DEFAULT_BINARY_LOSS_WEIGHT,
     CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT,
@@ -598,7 +599,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho.add_argument("--min-lr", type=float, default=1e-5)
     train_caho.set_defaults(grad_cache=CAHO_DEFAULT_USE_GRAD_CACHE)
     train_caho.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
-    train_caho.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
+    train_caho.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default=CAHO_DEFAULT_CONTRASTIVE_LOSS)
     train_caho.add_argument("--contrastive-max-scale", type=float, default=100.0)
     train_caho.add_argument("--contrastive-min-scale", type=float, default=1.0)
     train_caho.add_argument("--optimize-contrastive-scale", action="store_true")
@@ -656,7 +657,11 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--min-lr", type=float, default=1e-5)
     train_caho_corpus.set_defaults(grad_cache=CAHO_DEFAULT_USE_GRAD_CACHE)
     train_caho_corpus.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
-    train_caho_corpus.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
+    train_caho_corpus.add_argument(
+        "--contrastive-loss",
+        choices=["fixed", "learnable"],
+        default=CAHO_DEFAULT_CONTRASTIVE_LOSS,
+    )
     train_caho_corpus.add_argument("--contrastive-max-scale", type=float, default=100.0)
     train_caho_corpus.add_argument("--contrastive-min-scale", type=float, default=1.0)
     train_caho_corpus.add_argument("--optimize-contrastive-scale", action="store_true")

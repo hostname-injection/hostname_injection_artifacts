@@ -18,6 +18,7 @@ from ccd.train import (
     CAHO_DEFAULT_WEIGHT_DECAY,
     CAHO_DEFAULT_BINARY_HIDDEN_DIM,
     CAHO_DEFAULT_BINARY_LOSS_WEIGHT,
+    CAHO_DEFAULT_CONTRASTIVE_LOSS,
     CAHO_DEFAULT_CONTRASTIVE_LOSS_WEIGHT,
     caho_training_default_deviations,
 )
@@ -70,6 +71,7 @@ def test_train_caho_defaults_match_paper_recipe():
     assert args.loss == CAHO_DEFAULT_LOSS == "contrastive"
     assert args.augmenter == CAHO_DEFAULT_AUGMENTER == "weighted"
     assert args.grad_cache is CAHO_DEFAULT_USE_GRAD_CACHE is True
+    assert args.contrastive_loss == CAHO_DEFAULT_CONTRASTIVE_LOSS == "fixed"
 
     with pytest.raises(SystemExit):
         parser.parse_args(
@@ -319,6 +321,7 @@ def test_train_caho_corpus_defaults_match_paper_recipe():
     assert args.loss == CAHO_DEFAULT_LOSS == "contrastive"
     assert args.augmenter == CAHO_DEFAULT_AUGMENTER == "weighted"
     assert args.grad_cache is CAHO_DEFAULT_USE_GRAD_CACHE is True
+    assert args.contrastive_loss == CAHO_DEFAULT_CONTRASTIVE_LOSS == "fixed"
 
 
 def test_train_caho_corpus_preserves_all_loaded_rows(tmp_path, monkeypatch):
