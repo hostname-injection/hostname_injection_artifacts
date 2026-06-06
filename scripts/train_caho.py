@@ -12,7 +12,10 @@ from ccd.preprocess import normalize_hostname
 from ccd.train import (
     CAHO_94GB_ACTUAL_BATCH_SIZE,
     CAHO_DEFAULT_EPOCHS,
+    CAHO_DEFAULT_AUGMENTER,
+    CAHO_DEFAULT_LOSS,
     CAHO_DEFAULT_LR,
+    CAHO_DEFAULT_USE_GRAD_CACHE,
     CAHO_DEFAULT_WEIGHT_DECAY,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
@@ -67,15 +70,22 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
     parser.add_argument("--weight-decay", type=float, default=CAHO_DEFAULT_WEIGHT_DECAY)
     parser.add_argument("--temperature", type=float, default=0.07)
-    parser.add_argument("--loss", choices=["supcon", "contrastive"], default="supcon")
-    parser.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default="edit")
+    parser.add_argument("--loss", choices=["supcon", "contrastive"], default=CAHO_DEFAULT_LOSS)
+    parser.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default=CAHO_DEFAULT_AUGMENTER)
     parser.add_argument("--weighted-num-augs", type=int, default=2)
     parser.add_argument("--weighted-max-attempts", type=int, default=3)
     parser.add_argument("--weighted-no-retry", action="store_true")
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
     parser.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     parser.add_argument("--min-lr", type=float, default=1e-5)
-    parser.add_argument("--grad-cache", action="store_true", help="Use GradCache for replay-scale pairwise CAHO batches")
+    parser.add_argument(
+        "--grad-cache",
+        dest="grad_cache",
+        action="store_true",
+        default=CAHO_DEFAULT_USE_GRAD_CACHE,
+        help="Use GradCache for replay-scale pairwise CAHO batches",
+    )
+    parser.add_argument("--no-grad-cache", dest="grad_cache", action="store_false", help="Disable GradCache for debugging only")
     parser.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     parser.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     parser.add_argument("--contrastive-max-scale", type=float, default=100.0)

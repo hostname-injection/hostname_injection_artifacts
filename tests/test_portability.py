@@ -38,15 +38,15 @@ def test_train_caho_corpus_wrapper_uses_current_interpreter():
         lr=1e-4,
         weight_decay=1e-2,
         temperature=0.07,
-        loss="supcon",
-        augmenter="edit",
+        loss="contrastive",
+        augmenter="weighted",
         weighted_num_augs=2,
         weighted_max_attempts=3,
         weighted_no_retry=False,
         max_grad_norm=1.0,
         scheduler="cosine",
         min_lr=1e-5,
-        grad_cache=False,
+        grad_cache=True,
         grad_cache_chunk_size=8192,
         contrastive_loss="fixed",
         contrastive_max_scale=100.0,
@@ -66,6 +66,8 @@ def test_train_caho_corpus_wrapper_uses_current_interpreter():
 
     assert cmd[:3] == [sys.executable, "-m", "ccd.cli"]
     assert "train-caho-corpus" in cmd
+    assert "--grad-cache" in cmd
+    assert "--no-grad-cache" not in cmd
 
 
 def test_standalone_calibrate_script_requires_saved_model_bundle():

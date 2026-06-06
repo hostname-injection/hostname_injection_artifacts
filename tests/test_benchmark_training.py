@@ -522,10 +522,12 @@ def test_benchmark_caho_94gb_batch_defaults():
     regular_module = importlib.util.module_from_spec(regular_spec)
     regular_spec.loader.exec_module(regular_module)
     regular_args = regular_module.build_parser().parse_args(["--out", "unused-output"])
-    gradcache_args = regular_module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
+    no_gradcache_args = regular_module.build_parser().parse_args(["--out", "unused-output", "--no-grad-cache"])
     assert regular_args.epochs == CAHO_DEFAULT_EPOCHS
-    assert resolve_caho_batch_size(regular_args.batch_size, use_grad_cache=False) == CAHO_94GB_ACTUAL_BATCH_SIZE
-    assert resolve_caho_batch_size(gradcache_args.batch_size, use_grad_cache=True) == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
+    assert regular_args.grad_cache is True
+    assert no_gradcache_args.grad_cache is False
+    assert resolve_caho_batch_size(regular_args.batch_size, use_grad_cache=True) == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
+    assert resolve_caho_batch_size(no_gradcache_args.batch_size, use_grad_cache=False) == CAHO_94GB_ACTUAL_BATCH_SIZE
     assert regular_args.grad_cache_chunk_size == CAHO_94GB_GRAD_CACHE_CHUNK_SIZE
 
 

@@ -9,7 +9,15 @@ import ccd.cli as cli_module
 from ccd.certify import DecisionCertificate
 from ccd.config import CCDConfig, ConeConfig
 from ccd.cli import build_parser
-from ccd.train import CAHO_DEFAULT_EPOCHS, CAHO_DEFAULT_LR, CAHO_DEFAULT_WEIGHT_DECAY
+from ccd.train import (
+    CAHO_DEFAULT_AUGMENTER,
+    CAHO_DEFAULT_EPOCHS,
+    CAHO_DEFAULT_LOSS,
+    CAHO_DEFAULT_LR,
+    CAHO_DEFAULT_USE_GRAD_CACHE,
+    CAHO_DEFAULT_WEIGHT_DECAY,
+    caho_training_default_deviations,
+)
 
 
 def test_train_caho_parser_smoke():
@@ -38,6 +46,39 @@ def test_train_caho_parser_smoke():
     assert args.lr == CAHO_DEFAULT_LR
     assert args.weight_decay == CAHO_DEFAULT_WEIGHT_DECAY
     assert args.seed == 13
+
+
+def test_train_caho_defaults_match_paper_recipe():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "train-caho",
+            "--benign",
+            "benign.txt",
+            "--malicious",
+            "malicious.csv",
+            "--out",
+            "caho_encoder",
+        ]
+    )
+
+    assert args.loss == CAHO_DEFAULT_LOSS == "contrastive"
+    assert args.augmenter == CAHO_DEFAULT_AUGMENTER == "weighted"
+    assert args.grad_cache is CAHO_DEFAULT_USE_GRAD_CACHE is True
+
+    disabled = parser.parse_args(
+        [
+            "train-caho",
+            "--benign",
+            "benign.txt",
+            "--malicious",
+            "malicious.csv",
+            "--out",
+            "caho_encoder",
+            "--no-grad-cache",
+        ]
+    )
+    assert disabled.grad_cache is False
 
 
 def test_train_user_logins_command_is_not_available():
@@ -110,6 +151,61 @@ def test_train_caho_corpus_parser_smoke():
     assert args.epochs == CAHO_DEFAULT_EPOCHS
     assert args.lr == CAHO_DEFAULT_LR
     assert args.weight_decay == CAHO_DEFAULT_WEIGHT_DECAY
+
+
+def test_train_caho_corpus_defaults_match_paper_recipe():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "train-caho-corpus",
+            "--benign-dir",
+            "benign_dir",
+            "--malicious-jsonl-dir",
+            "jsonl_dir",
+            "--malicious-txt-dir",
+            "txt_dir",
+            "--out",
+            "caho_encoder",
+        ]
+    )
+
+    assert args.loss == CAHO_DEFAULT_LOSS == "contrastive"
+    assert args.augmenter == CAHO_DEFAULT_AUGMENTER == "weighted"
+    assert args.grad_cache is CAHO_DEFAULT_USE_GRAD_CACHE is True
+
+
+def test_train_caho_corpus_readme_recipe_does_not_trigger_default_warning():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "train-caho-corpus",
+            "--benign-dir",
+            "benign_dir",
+            "--malicious-jsonl-dir",
+            "jsonl_dir",
+            "--malicious-txt-dir",
+            "txt_dir",
+            "--out",
+            "caho_encoder",
+            "--loss",
+            "contrastive",
+            "--augmenter",
+            "weighted",
+            "--grad-cache",
+            "--batch-size",
+            "49152",
+            "--grad-cache-chunk-size",
+            "8192",
+            "--epochs",
+            "20",
+        ]
+    )
+
+    assert caho_training_default_deviations(
+        args,
+        args._caho_training_defaults,
+        args._caho_training_warning_fields,
+    ) == []
 
 
 def test_train_caho_corpus_parser_requires_all_corpus_sources():

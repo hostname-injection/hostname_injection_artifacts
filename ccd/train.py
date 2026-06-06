@@ -17,6 +17,9 @@ CAHO_94GB_GRAD_CACHE_CHUNK_SIZE = 8_192
 CAHO_DEFAULT_EPOCHS = 20
 CAHO_DEFAULT_LR = 1e-4
 CAHO_DEFAULT_WEIGHT_DECAY = 1e-2
+CAHO_DEFAULT_LOSS = "contrastive"
+CAHO_DEFAULT_AUGMENTER = "weighted"
+CAHO_DEFAULT_USE_GRAD_CACHE = True
 CAHO_TRAINING_SETTING_FIELDS = (
     "model",
     "epochs",
@@ -81,6 +84,16 @@ def caho_training_default_deviations(
             continue
         value = getattr(args, field)
         default = defaults[field]
+        if field == "batch_size":
+            use_grad_cache = bool(getattr(args, "grad_cache", defaults.get("grad_cache", False)))
+            try:
+                value_resolved = resolve_caho_batch_size(value, use_grad_cache=use_grad_cache)
+                default_resolved = resolve_caho_batch_size(default, use_grad_cache=use_grad_cache)
+            except Exception:
+                pass
+            else:
+                if value_resolved == default_resolved:
+                    continue
         if _same_training_value(value, default):
             continue
         flag = "--" + field.replace("_", "-")

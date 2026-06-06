@@ -26,12 +26,15 @@ from .priors import build_benign_prior, build_malicious_priors
 from .train import (
     CAHO_94GB_ACTUAL_BATCH_SIZE,
     CAHO_DEFAULT_EPOCHS,
+    CAHO_DEFAULT_AUGMENTER,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+    CAHO_DEFAULT_LOSS,
     CAHODataset,
     CAHOTrainer,
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_WEIGHT_DECAY,
+    CAHO_DEFAULT_USE_GRAD_CACHE,
     CAHO_TRAINING_SETTING_FIELDS,
     ContrastiveTrainer,
     Sample,
@@ -572,15 +575,22 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
     train_caho.add_argument("--weight-decay", type=float, default=CAHO_DEFAULT_WEIGHT_DECAY)
     train_caho.add_argument("--temperature", type=float, default=0.07)
-    train_caho.add_argument("--loss", choices=["supcon", "contrastive"], default="supcon")
-    train_caho.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default="edit")
+    train_caho.add_argument("--loss", choices=["supcon", "contrastive"], default=CAHO_DEFAULT_LOSS)
+    train_caho.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default=CAHO_DEFAULT_AUGMENTER)
     train_caho.add_argument("--weighted-num-augs", type=int, default=2)
     train_caho.add_argument("--weighted-max-attempts", type=int, default=3)
     train_caho.add_argument("--weighted-no-retry", action="store_true")
     train_caho.add_argument("--max-grad-norm", type=float, default=1.0)
     train_caho.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     train_caho.add_argument("--min-lr", type=float, default=1e-5)
-    train_caho.add_argument("--grad-cache", action="store_true", help="Use GradCache for replay-scale pairwise CAHO batches")
+    train_caho.add_argument(
+        "--grad-cache",
+        dest="grad_cache",
+        action="store_true",
+        default=CAHO_DEFAULT_USE_GRAD_CACHE,
+        help="Use GradCache for replay-scale pairwise CAHO batches",
+    )
+    train_caho.add_argument("--no-grad-cache", dest="grad_cache", action="store_false", help="Disable GradCache for debugging only")
     train_caho.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     train_caho.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     train_caho.add_argument("--contrastive-max-scale", type=float, default=100.0)
@@ -629,15 +639,22 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
     train_caho_corpus.add_argument("--weight-decay", type=float, default=CAHO_DEFAULT_WEIGHT_DECAY)
     train_caho_corpus.add_argument("--temperature", type=float, default=0.07)
-    train_caho_corpus.add_argument("--loss", choices=["supcon", "contrastive"], default="supcon")
-    train_caho_corpus.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default="edit")
+    train_caho_corpus.add_argument("--loss", choices=["supcon", "contrastive"], default=CAHO_DEFAULT_LOSS)
+    train_caho_corpus.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default=CAHO_DEFAULT_AUGMENTER)
     train_caho_corpus.add_argument("--weighted-num-augs", type=int, default=2)
     train_caho_corpus.add_argument("--weighted-max-attempts", type=int, default=3)
     train_caho_corpus.add_argument("--weighted-no-retry", action="store_true")
     train_caho_corpus.add_argument("--max-grad-norm", type=float, default=1.0)
     train_caho_corpus.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     train_caho_corpus.add_argument("--min-lr", type=float, default=1e-5)
-    train_caho_corpus.add_argument("--grad-cache", action="store_true", help="Use GradCache for replay-scale pairwise CAHO batches")
+    train_caho_corpus.add_argument(
+        "--grad-cache",
+        dest="grad_cache",
+        action="store_true",
+        default=CAHO_DEFAULT_USE_GRAD_CACHE,
+        help="Use GradCache for replay-scale pairwise CAHO batches",
+    )
+    train_caho_corpus.add_argument("--no-grad-cache", dest="grad_cache", action="store_false", help="Disable GradCache for debugging only")
     train_caho_corpus.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     train_caho_corpus.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     train_caho_corpus.add_argument("--contrastive-max-scale", type=float, default=100.0)

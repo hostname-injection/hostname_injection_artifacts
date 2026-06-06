@@ -6,6 +6,7 @@ import pytest
 
 from ccd.augment import AugmentConfig, CAHOAugmenter, WeightedAugmentConfig
 from ccd.train import (
+    CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHODataset,
     CAHOTrainer,
     CAHO_DEFAULT_LR,
@@ -127,6 +128,11 @@ def test_caho_training_default_deviation_fields_cover_core_training_args():
         SimpleNamespace(epochs=20, lr=CAHO_DEFAULT_LR),
         {"epochs": 20, "lr": CAHO_DEFAULT_LR},
         ("epochs", "lr"),
+    ) == []
+    assert caho_training_default_deviations(
+        SimpleNamespace(batch_size=CAHO_94GB_GRAD_CACHE_BATCH_SIZE, grad_cache=True),
+        {"batch_size": None, "grad_cache": True},
+        ("batch_size",),
     ) == []
 
 
