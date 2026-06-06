@@ -90,7 +90,7 @@ class BenchmarkCAHOViewDataset:
         self,
         root: str | Path,
         *,
-        label_method: BenchmarkLabelMethod | str = BenchmarkLabelMethod.ANY_MALICIOUS_ELSE_BENIGN,
+        label_method: BenchmarkLabelMethod | str = BenchmarkLabelMethod.BOTH_DISAGREE_MALICIOUS,
         normalize_text: bool = False,
         augmenter: Optional[CAHOAugmenter] = None,
         include_original: bool = True,
@@ -101,7 +101,7 @@ class BenchmarkCAHOViewDataset:
             root,
             family=BenchmarkFamily.BOTH,
             label_method=label_method,
-            drop_unknown=False,
+            drop_unknown=True,
             include_explanations=False,
             include_metadata=False,
             return_dict=True,
@@ -499,8 +499,11 @@ def _write_report(out: Path, config: BenchmarkTrainingConfig, train_summary: Map
     report = {
         "config": asdict(config),
         "label_policy": {
-            "method": BenchmarkLabelMethod.ANY_MALICIOUS_ELSE_BENIGN.value,
-            "meaning": "M if GPT-5.5 or Claude Opus 4.8 is M; otherwise B, including U/U.",
+            "method": BenchmarkLabelMethod.BOTH_DISAGREE_MALICIOUS.value,
+            "meaning": (
+                "resolved malicious rows train as positive, resolved benign rows train as benign, "
+                "and unresolved rows are excluded rather than treated as benign"
+            ),
         },
         "contrastive_objective": {
             "name": "supervised_orbit_contrastive_loss",

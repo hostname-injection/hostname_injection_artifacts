@@ -49,6 +49,7 @@ def test_root_readme_maps_reviewer_evidence_to_method_surfaces():
         "finite-edit certification",
         "CLI CAHO-first gates",
         "de-identification release gates",
+        "excludes unresolved rows rather than treating them as benign",
     ]:
         assert phrase in normalized
 

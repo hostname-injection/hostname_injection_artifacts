@@ -156,6 +156,8 @@ def test_benchmark_contrastive_trainer_fit_and_report(tmp_path):
     assert report["config"]["binary_loss_weight"] == 0.5
     assert report["config"]["weight_decay"] == 0.02
     assert report["config"]["seed"] == 17
+    assert report["label_policy"]["method"] == "both-disagree-malicious"
+    assert "unresolved rows are excluded" in report["label_policy"]["meaning"]
     assert report["contrastive_objective"]["name"] == "supervised_orbit_contrastive_loss"
     assert report["contrastive_objective"]["binary_auxiliary_head_views"] == "both_l2_normalized_views"
     assert report["contrastive_objective"]["deterministic_seed"] == 17

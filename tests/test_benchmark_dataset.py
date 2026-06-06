@@ -7,6 +7,7 @@ from ccd.benchmark_dataset import (
     HostnameCommandInjectionBenchmarkDataset,
     resolve_benchmark_label,
 )
+from ccd.benchmark_training import BenchmarkCAHOViewDataset
 
 
 FIELDNAMES = [
@@ -203,3 +204,21 @@ def test_benchmark_dataset_any_malicious_else_benign_has_no_unknowns(tmp_path):
     )
     assert [ds[i]["label_text"] for i in range(len(ds))] == ["B", "M", "B", "B", "M", "B"]
     assert [ds[i]["label"] for i in range(len(ds))] == [0, 1, 0, 0, 1, 0]
+
+
+def test_benchmark_caho_training_view_excludes_unresolved_rows_by_default(tmp_path):
+    _write_benchmark(tmp_path)
+    ds = BenchmarkCAHOViewDataset(tmp_path)
+
+    rows = [ds[i] for i in range(len(ds))]
+
+    assert ds.base.label_method == BenchmarkLabelMethod.BOTH_DISAGREE_MALICIOUS
+    assert ds.base.drop_unknown is True
+    assert ds.base.stats.selected_rows == 4
+    assert [row[0] for row in rows] == [
+        "good-user",
+        "bad-user",
+        "safe.example.com",
+        "evil.$(id).example",
+    ]
+    assert [row[2] for row in rows] == [0, 1, 0, 1]
