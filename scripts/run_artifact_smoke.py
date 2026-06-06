@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
 import subprocess
@@ -15,6 +16,33 @@ DEID_SCRIPTS = ROOT / "deidentification_release" / "scripts"
 sys.path.insert(0, str(DEID_SCRIPTS))
 
 from validate_public_bundle import extract_validated_bundle  # noqa: E402
+
+
+REQUIRED_RUNTIME_MODULES = {
+    "sentence_transformers": "sentence-transformers",
+    "torch": "pytorch",
+    "grad_cache": "GradCache",
+}
+
+
+def check_runtime_deps() -> None:
+    missing: list[str] = []
+    for module_name, package_name in REQUIRED_RUNTIME_MODULES.items():
+        try:
+            importlib.import_module(module_name)
+        except Exception as exc:
+            missing.append(f"{module_name} ({package_name}): {exc}")
+    if not missing:
+        return
+
+    details = "\n".join(f"- {item}" for item in missing)
+    raise SystemExit(
+        "Artifact smoke requires the runtime dependencies from environment.yml. "
+        "Create and activate the ccd conda environment with scripts/install_conda.sh "
+        "before running this check.\n"
+        "Missing or unusable modules:\n"
+        f"{details}"
+    )
 
 
 def run(cmd: list[str], *, env: dict[str, str] | None = None) -> None:
@@ -70,6 +98,8 @@ def main() -> int:
         help="Skip pytest. The detector and release-gate smoke checks still run.",
     )
     args = parser.parse_args()
+
+    check_runtime_deps()
 
     run([sys.executable, "-m", "py_compile", *[str(p) for p in (ROOT / "ccd").glob("*.py")]])
     run([sys.executable, "-m", "py_compile", *[str(p) for p in (ROOT / "scripts").glob("*.py")]])
