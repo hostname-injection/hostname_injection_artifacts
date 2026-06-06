@@ -22,8 +22,8 @@ the reported paper results.
 
 - `ccd/`: CAHO augmentation/training, CCD priors, cone scoring, calibration,
   benign-prior refresh, explanation, and certification logic.
-- `scripts/`: training, scoring, benchmark, validation, and smoke-test entry
-  points.
+- `scripts/`: benchmark CAHO training, public-release export, validation, and
+  smoke-test entry points.
 - `deidentification_release/`: public HIB sample, schema, bundle validation,
   non-linkability checks, and release metric replay.
 - `examples/`: tiny inputs used by the smoke test.
@@ -212,7 +212,8 @@ ccd calibrate \
 The calibration output records the split-conformal order-statistic rank, score
 path, threshold source, and the strict `score > threshold` decision rule.
 `--save-model` is required so later commands consume the same embedded
-threshold and grouped-threshold state.
+threshold and grouped-threshold state. Reviewer-facing calibration, refresh,
+scoring, and explanation commands use the exact all-cone CCD score path.
 
 ## Benign-Prior Refresh
 

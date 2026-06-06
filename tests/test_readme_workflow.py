@@ -64,6 +64,7 @@ def test_root_readme_requires_embedded_calibrated_threshold_for_downstream_comma
     assert "`--save-model` is required" in normalized
     assert "The input model must already contain an embedded calibrated threshold" in normalized
     assert "do not accept ad hoc threshold or calibration-file overrides" in normalized
+    assert "Reviewer-facing calibration, refresh, scoring, and explanation commands use the exact all-cone CCD score path" in normalized
 
 
 def test_root_readme_shows_public_release_pipeline_export():
