@@ -29,7 +29,6 @@ def test_train_caho_corpus_wrapper_uses_current_interpreter():
         jsonl_key="hostname",
         csv_hostname_col="Hostname",
         min_length=5,
-        no_dedup=False,
         malicious_family="corpus",
         model="sentence-transformers/all-MiniLM-L6-v2",
         out="out",

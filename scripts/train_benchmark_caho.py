@@ -57,8 +57,6 @@ BENCHMARK_CAHO_TRAINING_SETTING_FIELDS = (
     "resume",
     "log_every",
     "seed",
-    "max_rows",
-    "max_steps",
 )
 
 
@@ -102,8 +100,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--log-every", type=int, default=100)
     parser.add_argument("--seed", type=int, default=13, help="Deterministic seed for augmentation and training order.")
-    parser.add_argument("--max-rows", type=int, default=None, help="Debug only: limit rows loaded by the benchmark Dataset.")
-    parser.add_argument("--max-steps", type=int, default=None, help="Debug only: stop after this many optimizer steps.")
     return parser
 
 
@@ -138,7 +134,6 @@ def main() -> None:
         normalize_text=args.normalize_text,
         augmenter=augmenter,
         include_original=True,
-        max_rows=args.max_rows,
         seed=args.seed,
     )
     config = BenchmarkTrainingConfig(
@@ -170,7 +165,6 @@ def main() -> None:
         contrastive_loss_weight=args.contrastive_loss_weight,
         binary_hidden_dim=args.binary_hidden_dim,
         log_every=args.log_every,
-        max_steps=args.max_steps,
         seed=args.seed,
     )
     trainer = BenchmarkContrastiveTrainer(
@@ -193,7 +187,6 @@ def main() -> None:
         contrastive_loss_weight=args.contrastive_loss_weight,
         binary_hidden_dim=args.binary_hidden_dim,
         log_every=args.log_every,
-        max_steps=args.max_steps,
         seed=args.seed,
     )
     summary = trainer.fit(dataset, epochs=args.epochs)

@@ -43,8 +43,6 @@ def _build_command(args) -> list[str]:
         cmd += ["--csv-hostname-col", args.csv_hostname_col]
     if args.min_length is not None:
         cmd += ["--min-length", str(args.min_length)]
-    if args.no_dedup:
-        cmd += ["--no-dedup"]
     if args.malicious_family:
         cmd += ["--malicious-family", args.malicious_family]
     if args.model:
@@ -118,7 +116,6 @@ def main() -> int:
     parser.add_argument("--jsonl-key", default="hostname")
     parser.add_argument("--csv-hostname-col", default="Hostname")
     parser.add_argument("--min-length", type=int, default=5)
-    parser.add_argument("--no-dedup", action="store_true")
     parser.add_argument("--malicious-family", default="corpus")
     parser.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     parser.add_argument("--out", required=True)

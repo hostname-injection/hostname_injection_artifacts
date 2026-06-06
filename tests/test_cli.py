@@ -133,6 +133,8 @@ def test_train_caho_corpus_rejects_grad_cache_toggles():
         parser.parse_args([*base, "--grad-cache"])
     with pytest.raises(SystemExit):
         parser.parse_args([*base, "--loss", "unsupported"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--no-dedup"])
 
 
 def test_train_user_logins_command_is_not_available():
@@ -225,6 +227,58 @@ def test_train_caho_corpus_defaults_match_paper_recipe():
     assert args.loss == CAHO_DEFAULT_LOSS == "contrastive"
     assert args.augmenter == CAHO_DEFAULT_AUGMENTER == "weighted"
     assert args.grad_cache is CAHO_DEFAULT_USE_GRAD_CACHE is True
+
+
+def test_train_caho_corpus_preserves_all_loaded_rows(tmp_path, monkeypatch):
+    benign_dir = tmp_path / "benign"
+    jsonl_dir = tmp_path / "jsonl"
+    txt_dir = tmp_path / "txt"
+    for path in (benign_dir, jsonl_dir, txt_dir):
+        path.mkdir()
+    captured = {}
+
+    monkeypatch.setattr(
+        cli_module,
+        "read_hostnames_from_benign_dir",
+        lambda _path: ["alpha.example", "alpha.example"],
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "read_hostnames_from_jsonl_dir",
+        lambda _path, key="hostname": ["beta.example", "beta.example"],
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "read_hostnames_from_txt_dir",
+        lambda _path, include_csv=True, csv_column="Hostname": ["gamma.example", "gamma.example"],
+    )
+    monkeypatch.setattr(cli_module, "_train_caho_samples", lambda args, samples, out: captured.update(samples=samples, out=out))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "train-caho-corpus",
+            "--benign-dir",
+            str(benign_dir),
+            "--malicious-jsonl-dir",
+            str(jsonl_dir),
+            "--malicious-txt-dir",
+            str(txt_dir),
+            "--out",
+            str(tmp_path / "caho_encoder"),
+            "--min-length",
+            "5",
+        ]
+    )
+
+    args.func(args)
+
+    hostnames = [sample.hostname for sample in captured["samples"]]
+    assert hostnames.count("alpha.example") == 2
+    assert hostnames.count("beta.example") == 2
+    assert hostnames.count("gamma.example") == 2
+    assert [sample.is_malicious for sample in captured["samples"]].count(False) == 2
+    assert [sample.is_malicious for sample in captured["samples"]].count(True) == 4
 
 
 def test_train_caho_corpus_readme_recipe_does_not_trigger_default_warning():

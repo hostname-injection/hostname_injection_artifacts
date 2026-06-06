@@ -189,7 +189,7 @@ def cmd_train_caho_corpus(args: argparse.Namespace) -> None:
         raise ValueError(f"--malicious-txt-dir must be an existing directory: {args.malicious_txt_dir}")
 
     benign_hosts = read_hostnames_from_benign_dir(args.benign_dir)
-    benign_hosts = filter_hostnames(benign_hosts, min_length=args.min_length, dedup=not args.no_dedup)
+    benign_hosts = filter_hostnames(benign_hosts, min_length=args.min_length, dedup=False)
 
     malicious_jsonl_hosts = read_hostnames_from_jsonl_dir(args.malicious_jsonl_dir, key=args.jsonl_key)
     malicious_txt_hosts = read_hostnames_from_txt_dir(
@@ -200,14 +200,14 @@ def cmd_train_caho_corpus(args: argparse.Namespace) -> None:
     malicious_hosts = filter_hostnames(
         malicious_jsonl_hosts + malicious_txt_hosts,
         min_length=args.min_length,
-        dedup=not args.no_dedup,
+        dedup=False,
     )
 
     if not benign_hosts:
         raise ValueError("No benign hostnames loaded. Check --benign-dir.")
-    if not filter_hostnames(malicious_jsonl_hosts, min_length=args.min_length, dedup=not args.no_dedup):
+    if not filter_hostnames(malicious_jsonl_hosts, min_length=args.min_length, dedup=False):
         raise ValueError("No JSONL malicious hostnames loaded. Check --malicious-jsonl-dir and --jsonl-key.")
-    if not filter_hostnames(malicious_txt_hosts, min_length=args.min_length, dedup=not args.no_dedup):
+    if not filter_hostnames(malicious_txt_hosts, min_length=args.min_length, dedup=False):
         raise ValueError(
             "No TXT/CSV malicious hostnames loaded. Check --malicious-txt-dir and --csv-hostname-col."
         )
@@ -609,7 +609,6 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--jsonl-key", default="hostname")
     train_caho_corpus.add_argument("--csv-hostname-col", default="Hostname")
     train_caho_corpus.add_argument("--min-length", type=int, default=5)
-    train_caho_corpus.add_argument("--no-dedup", action="store_true")
     train_caho_corpus.add_argument("--malicious-family", default="corpus")
     train_caho_corpus.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     train_caho_corpus.add_argument("--out", required=True, type=Path)

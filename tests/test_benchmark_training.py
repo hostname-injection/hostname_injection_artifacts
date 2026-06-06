@@ -282,6 +282,10 @@ def test_benchmark_caho_94gb_batch_defaults():
         module.build_parser().parse_args(["--out", "unused-output", "--no-grad-cache"])
     with pytest.raises(SystemExit):
         module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
+    with pytest.raises(SystemExit):
+        module.build_parser().parse_args(["--out", "unused-output", "--max-rows", "10"])
+    with pytest.raises(SystemExit):
+        module.build_parser().parse_args(["--out", "unused-output", "--max-steps", "1"])
 
 
 def test_chunk_shuffle_sampler_preserves_all_indices_and_chunk_locality():
