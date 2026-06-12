@@ -73,6 +73,12 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["caho_training_support"]["validation_fixed_fpr_order_statistic_reported"] is True
     assert report["derived"]["caho_training_support"]["deterministic_training_seed_supported"] is True
     assert report["derived"]["caho_training_support"]["adamw_weight_decay_default"] == 0.01
+    assert report["derived"]["caho_training_support"]["standard_caho_adamw_weight_decay_supported"] is True
+    assert report["derived"]["caho_training_support"]["standard_caho_training_defaults"] == {
+        "epochs": 20,
+        "lr": 0.0001,
+        "weight_decay": 0.01,
+    }
     assert report["derived"]["caho_training_support"]["benchmark_binary_training_script_defaults"] == {
         "device": "auto",
         "epochs": 20,

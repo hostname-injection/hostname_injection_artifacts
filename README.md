@@ -37,6 +37,9 @@ This repository provides:
 For evaluator-facing setup, badge scope, and paper-claim mapping, start with
 `BADGE_READINESS.md` and `ARTIFACT_EVALUATION.md`.
 
+A reviewer-viewable dataslice is available at
+https://drive.google.com/drive/folders/1KeKZyIXIqZvEJ4tZAWxE9h4gPoinZCWt?usp=drive_link.
+
 `ARTIFACT_MANIFEST.json` is the machine-readable map from paper claims to files,
 commands, expected outcomes, release gates, and remaining external publication
 items. Check it with:
@@ -110,10 +113,9 @@ Use the provided install script to set up a fresh environment:
 bash scripts/install_conda.sh
 ```
 
-This creates a `ccd` conda environment, installs dependencies with conda, then
-installs the local package in editable mode. GradCache is optional and must be
-installed separately from GitHub (see below). To let the script install
-GradCache during setup, run `INSTALL_GRADCACHE=1 bash scripts/install_conda.sh`.
+This creates a `ccd` conda environment, installs dependencies with conda,
+installs GradCache from GitHub, then installs the local package in editable
+mode.
 
 You can also use the provided `environment.yml`:
 
@@ -122,14 +124,14 @@ conda env create -f environment.yml
 conda activate ccd
 ```
 
-### Optional: GradCache
+### GradCache
 
-GradCache is not on conda or PyPI, so install it directly from GitHub:
+GradCache is required for replay-scale pairwise CAHO training. It is not on
+conda or PyPI, so install it directly from GitHub when you are not using the
+provided setup script or `environment.yml`:
 
 ```bash
-git clone https://github.com/luyug/GradCache /tmp/GradCache
-python -m pip install /tmp/GradCache
-rm -rf /tmp/GradCache
+python -m pip install 'GradCache @ git+https://github.com/luyug/GradCache.git'
 ```
 
 Verify the install:
@@ -145,12 +147,13 @@ conda create -y -n ccd python=3.11
 conda activate ccd
 conda install -y -c conda-forge -c pytorch \
   numpy scipy pytorch sentence-transformers idna pytest sentencepiece scikit-learn
+python -m pip install 'GradCache @ git+https://github.com/luyug/GradCache.git'
 python -m pip install -e .
 ```
 
 ## Quick Start
 
-### 1) Train / fine‑tune CAHO encoder (optional)
+### 1) Train / fine‑tune CAHO encoder
 
 ```bash
 ccd train-caho \
@@ -170,7 +173,10 @@ ccd train-caho \
   --augmenter weighted
 ```
 
-For very large batch sizes, you can enable GradCache:
+CAHO training entry points default to the paper optimizer recipe:
+`--lr 1e-4 --weight-decay 1e-2 --epochs 20`.
+
+For replay-scale pairwise CAHO training, run the GradCache path:
 
 ```bash
 ccd train-caho \
@@ -197,8 +203,9 @@ commodity hardware, use `--device cpu --max-rows ... --max-steps ...`; use
 `--require-cuda` when replaying a GPU training run and you want CPU fallback to
 fail closed. This binary-head trainer intentionally rejects `--grad-cache`
 because the Appendix C objective requires supervised orbit labels inside the
-contrastive loss; GradCache remains available on the regular pairwise CAHO
-trainers.
+contrastive loss; use the regular pairwise CAHO trainers for GradCache CAHO
+runs.
+
 For paper-style model selection, pass a validation-only benchmark root and
 select the checkpoint by validation TPR at the target false-positive rate:
 
@@ -306,7 +313,7 @@ You can also:
 - Run a dry run to see label counts: `--dry-run`
 - Filter low-confidence labels: `--min-confidence 0.9` (or per-model `--min-sonnet-confidence`,
   `--min-opus-confidence`)
-- Fine-tune CAHO first (with optional sampling): `--train-caho --caho-sample 100000`
+- Fine-tune CAHO first with bounded local sampling: `--train-caho --caho-sample 100000`
 
 ### 3) Score hostnames
 

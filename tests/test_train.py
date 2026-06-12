@@ -5,6 +5,10 @@ import pytest
 from ccd.augment import AugmentConfig, CAHOAugmenter, WeightedAugmentConfig
 from ccd.train import (
     CAHODataset,
+    CAHOTrainer,
+    CAHO_DEFAULT_LR,
+    CAHO_DEFAULT_WEIGHT_DECAY,
+    ContrastiveTrainer,
     Sample,
     pairwise_contrastive_loss,
     split_input_fn,
@@ -70,6 +74,27 @@ def test_caho_dataset_seed_replays_augmented_views():
     assert [first[i] for i in range(len(first))] == [second[i] for i in range(len(second))]
     first.set_epoch(1)
     assert first[0] != second[0]
+
+
+def test_caho_trainers_default_to_paper_optimizer_recipe():
+    supcon_trainer = CAHOTrainer(object())
+    contrastive_trainer = ContrastiveTrainer(object())
+
+    assert supcon_trainer.lr == CAHO_DEFAULT_LR == 1e-4
+    assert supcon_trainer.weight_decay == CAHO_DEFAULT_WEIGHT_DECAY == 1e-2
+    assert contrastive_trainer.lr == CAHO_DEFAULT_LR
+    assert contrastive_trainer.weight_decay == CAHO_DEFAULT_WEIGHT_DECAY
+
+
+def test_caho_trainers_reject_invalid_optimizer_hyperparameters():
+    with pytest.raises(ValueError, match="lr"):
+        CAHOTrainer(object(), lr=0.0)
+    with pytest.raises(ValueError, match="weight_decay"):
+        CAHOTrainer(object(), weight_decay=-0.01)
+    with pytest.raises(ValueError, match="lr"):
+        ContrastiveTrainer(object(), lr=float("nan"))
+    with pytest.raises(ValueError, match="weight_decay"):
+        ContrastiveTrainer(object(), weight_decay=-0.01)
 
 
 def test_pairwise_contrastive_loss_aligned():

@@ -14,4 +14,5 @@ dependencies:
   - scikit-learn
   - pip
   - pip:
+      - GradCache @ git+https://github.com/luyug/GradCache.git
       - -e .

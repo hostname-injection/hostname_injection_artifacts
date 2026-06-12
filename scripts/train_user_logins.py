@@ -12,6 +12,8 @@ from ccd.augment import CAHOAugmenter, AugmentConfig, WeightedAugmentConfig
 from ccd.train import (
     CAHO_94GB_ACTUAL_BATCH_SIZE,
     CAHO_DEFAULT_EPOCHS,
+    CAHO_DEFAULT_LR,
+    CAHO_DEFAULT_WEIGHT_DECAY,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     CAHODataset,
@@ -92,7 +94,8 @@ def main() -> None:
             f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
         ),
     )
-    parser.add_argument("--caho-lr", type=float, default=2e-5)
+    parser.add_argument("--caho-lr", type=float, default=CAHO_DEFAULT_LR)
+    parser.add_argument("--caho-weight-decay", type=float, default=CAHO_DEFAULT_WEIGHT_DECAY)
     parser.add_argument("--caho-temperature", type=float, default=0.07)
     parser.add_argument("--caho-loss", choices=["supcon", "contrastive"], default="supcon")
     parser.add_argument("--caho-augmenter", choices=["edit", "weighted", "hybrid"], default="edit")
@@ -102,7 +105,7 @@ def main() -> None:
     parser.add_argument("--caho-max-grad-norm", type=float, default=1.0)
     parser.add_argument("--caho-scheduler", choices=["cosine", "none"], default="cosine")
     parser.add_argument("--caho-min-lr", type=float, default=1e-5)
-    parser.add_argument("--caho-grad-cache", action="store_true", help="Enable GradCache for CAHO training")
+    parser.add_argument("--caho-grad-cache", action="store_true", help="Use GradCache for replay-scale pairwise CAHO training")
     parser.add_argument("--caho-grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     parser.add_argument("--caho-contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     parser.add_argument("--caho-contrastive-max-scale", type=float, default=100.0)
@@ -244,6 +247,7 @@ def main() -> None:
                 batch_size=caho_batch_size,
                 temperature=args.caho_temperature,
                 lr=args.caho_lr,
+                weight_decay=args.caho_weight_decay,
                 max_grad_norm=args.caho_max_grad_norm,
                 scheduler=args.caho_scheduler,
                 min_lr=args.caho_min_lr,
@@ -265,6 +269,7 @@ def main() -> None:
                 batch_size=caho_batch_size,
                 temperature=args.caho_temperature,
                 lr=args.caho_lr,
+                weight_decay=args.caho_weight_decay,
                 seed=args.caho_seed,
             )
         trainer.fit(dataset, epochs=args.caho_epochs)

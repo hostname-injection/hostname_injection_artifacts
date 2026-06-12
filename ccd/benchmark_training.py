@@ -25,6 +25,8 @@ from .train import (
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     CAHO_DEFAULT_EPOCHS,
+    CAHO_DEFAULT_LR,
+    CAHO_DEFAULT_WEIGHT_DECAY,
     ContrastiveLoss,
     pairwise_contrastive_loss,
     resolve_caho_batch_size,
@@ -63,7 +65,7 @@ class BenchmarkTrainingConfig:
     binary_loss_weight: float = 1.0
     contrastive_loss_weight: float = 1.0
     binary_hidden_dim: int = 256
-    weight_decay: float = 0.01
+    weight_decay: float = CAHO_DEFAULT_WEIGHT_DECAY
     log_every: int = 100
     max_steps: Optional[int] = None
     checkpoint_every_steps: int = 5000
@@ -272,7 +274,7 @@ class BenchmarkContrastiveTrainer:
         max_grad_norm: float,
         scheduler: str,
         min_lr: float,
-        weight_decay: float = 0.01,
+        weight_decay: float = CAHO_DEFAULT_WEIGHT_DECAY,
         use_grad_cache: bool,
         grad_cache_chunk_size: int,
         num_workers: int,
@@ -865,7 +867,7 @@ def _minimal_checkpoint_config(out: str) -> BenchmarkTrainingConfig:
         contrastive_max_scale=0.0,
         contrastive_min_scale=0.0,
         optimize_contrastive_scale=False,
-        weight_decay=0.01,
+        weight_decay=CAHO_DEFAULT_WEIGHT_DECAY,
         checkpoint_every_steps=0,
     )
 

@@ -9,7 +9,7 @@ import ccd.cli as cli_module
 from ccd.certify import DecisionCertificate
 from ccd.config import CCDConfig, ConeConfig
 from ccd.cli import build_parser
-from ccd.train import CAHO_DEFAULT_EPOCHS
+from ccd.train import CAHO_DEFAULT_EPOCHS, CAHO_DEFAULT_LR, CAHO_DEFAULT_WEIGHT_DECAY
 
 
 def test_train_caho_parser_smoke():
@@ -35,6 +35,8 @@ def test_train_caho_parser_smoke():
     assert args.augmenter == "weighted"
     assert args.grad_cache is True
     assert args.epochs == CAHO_DEFAULT_EPOCHS
+    assert args.lr == CAHO_DEFAULT_LR
+    assert args.weight_decay == CAHO_DEFAULT_WEIGHT_DECAY
     assert args.seed == 13
 
 
@@ -59,6 +61,8 @@ def test_train_user_logins_parser_smoke():
     assert args.caho_augmenter == "weighted"
     assert args.caho_grad_cache is True
     assert args.caho_epochs == CAHO_DEFAULT_EPOCHS
+    assert args.caho_lr == CAHO_DEFAULT_LR
+    assert args.caho_weight_decay == CAHO_DEFAULT_WEIGHT_DECAY
 
 
 def test_train_priors_parser_smoke():
@@ -105,6 +109,8 @@ def test_train_caho_corpus_parser_smoke():
     assert args.loss == "contrastive"
     assert args.grad_cache is True
     assert args.epochs == CAHO_DEFAULT_EPOCHS
+    assert args.lr == CAHO_DEFAULT_LR
+    assert args.weight_decay == CAHO_DEFAULT_WEIGHT_DECAY
 
 
 def test_score_parser_smoke():

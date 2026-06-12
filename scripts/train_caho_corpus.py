@@ -5,7 +5,12 @@ import argparse
 import subprocess
 import sys
 
-from ccd.train import CAHO_DEFAULT_EPOCHS, CAHO_94GB_GRAD_CACHE_CHUNK_SIZE
+from ccd.train import (
+    CAHO_DEFAULT_EPOCHS,
+    CAHO_DEFAULT_LR,
+    CAHO_DEFAULT_WEIGHT_DECAY,
+    CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+)
 
 
 def _build_command(args) -> list[str]:
@@ -39,6 +44,8 @@ def _build_command(args) -> list[str]:
         cmd += ["--batch-size", str(args.batch_size)]
     if args.lr is not None:
         cmd += ["--lr", str(args.lr)]
+    if args.weight_decay is not None:
+        cmd += ["--weight-decay", str(args.weight_decay)]
     if args.temperature is not None:
         cmd += ["--temperature", str(args.temperature)]
     if args.loss:
@@ -102,7 +109,8 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     parser.add_argument("--epochs", type=int, default=CAHO_DEFAULT_EPOCHS)
     parser.add_argument("--batch-size", type=int, default=None)
-    parser.add_argument("--lr", type=float, default=2e-5)
+    parser.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
+    parser.add_argument("--weight-decay", type=float, default=CAHO_DEFAULT_WEIGHT_DECAY)
     parser.add_argument("--temperature", type=float, default=0.07)
     parser.add_argument("--loss", choices=["supcon", "contrastive"], default="supcon")
     parser.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default="edit")

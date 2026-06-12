@@ -41,7 +41,10 @@ from ccd.train import (
     CAHO_94GB_ACTUAL_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+    CAHO_DEFAULT_LR,
+    CAHO_DEFAULT_WEIGHT_DECAY,
     CAHOTrainer,
+    ContrastiveTrainer,
     resolve_caho_batch_size,
     supcon_loss,
     supervised_orbit_contrastive_loss,
@@ -234,6 +237,8 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
 
     dataset_getitem = inspect.getsource(BenchmarkCAHOViewDataset.__getitem__)
     dataset_init_signature = inspect.signature(BenchmarkCAHOViewDataset)
+    caho_init_signature = inspect.signature(CAHOTrainer)
+    contrastive_init_signature = inspect.signature(ContrastiveTrainer)
     trainer_init_signature = inspect.signature(BenchmarkContrastiveTrainer)
     binary_fit_signature = inspect.signature(BenchmarkBinaryContrastiveTrainer.fit)
     general_trainer_fit = inspect.getsource(CAHOTrainer.fit)
@@ -293,6 +298,8 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         or "embedding_normalization" not in trainer_eval
     ):
         raise ValueError("BenchmarkBinaryContrastiveTrainer validation selection must use auditable fixed-FPR calibration")
+    if "torch.optim.AdamW" not in general_trainer_fit or "weight_decay=self.weight_decay" not in general_trainer_fit:
+        raise ValueError("CAHOTrainer must use AdamW with explicit weight decay")
     if "torch.optim.AdamW" not in trainer_fit:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must use AdamW")
     if "weight_decay=self.weight_decay" not in trainer_fit:
@@ -316,9 +323,24 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
     deployed_weight_decay = require_number(recipe.get("weight_decay"), path="paper_deployed_recipe.weight_decay")
     if deployed_weight_decay != default_weight_decay:
         raise ValueError("paper deployed weight_decay must match the public AdamW default")
+    if default_weight_decay != CAHO_DEFAULT_WEIGHT_DECAY:
+        raise ValueError("CAHO_DEFAULT_WEIGHT_DECAY must match the paper deployed weight_decay")
+    deployed_lr = require_number(recipe.get("learning_rate"), path="paper_deployed_recipe.learning_rate")
+    if deployed_lr != CAHO_DEFAULT_LR:
+        raise ValueError("CAHO_DEFAULT_LR must match the paper deployed learning rate")
+    for name, signature in (
+        ("CAHOTrainer", caho_init_signature),
+        ("ContrastiveTrainer", contrastive_init_signature),
+    ):
+        lr_param = signature.parameters.get("lr")
+        weight_decay_param = signature.parameters.get("weight_decay")
+        if lr_param is None or float(lr_param.default) != deployed_lr:
+            raise ValueError(f"{name} must expose default lr={deployed_lr}")
+        if weight_decay_param is None or float(weight_decay_param.default) != deployed_weight_decay:
+            raise ValueError(f"{name} must expose default weight_decay={deployed_weight_decay}")
     parser_defaults = train_script.build_parser().parse_args(["--out", "unused-output"])
     expected_script_defaults = {
-        "lr": require_number(recipe.get("learning_rate"), path="paper_deployed_recipe.learning_rate"),
+        "lr": deployed_lr,
         "weight_decay": deployed_weight_decay,
         "epochs": int(require_number(recipe.get("max_epochs"), path="paper_deployed_recipe.max_epochs")),
         "device": "auto",
@@ -445,6 +467,12 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         "two_view_dataset_supported": True,
         "adamw_supported": True,
         "adamw_weight_decay_default": default_weight_decay,
+        "standard_caho_adamw_weight_decay_supported": True,
+        "standard_caho_training_defaults": {
+            "epochs": int(require_number(recipe.get("max_epochs"), path="paper_deployed_recipe.max_epochs")),
+            "lr": deployed_lr,
+            "weight_decay": deployed_weight_decay,
+        },
         "l2_normalized_binary_inputs": True,
         "validation_only_model_selection_supported": True,
         "validation_score_source_reported": True,

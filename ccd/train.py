@@ -13,6 +13,8 @@ CAHO_94GB_ACTUAL_BATCH_SIZE = 16_384
 CAHO_94GB_GRAD_CACHE_BATCH_SIZE = 49_152
 CAHO_94GB_GRAD_CACHE_CHUNK_SIZE = 8_192
 CAHO_DEFAULT_EPOCHS = 20
+CAHO_DEFAULT_LR = 1e-4
+CAHO_DEFAULT_WEIGHT_DECAY = 1e-2
 
 
 def resolve_caho_batch_size(batch_size: Optional[int], *, use_grad_cache: bool) -> int:
@@ -28,6 +30,20 @@ def resolve_caho_batch_size(batch_size: Optional[int], *, use_grad_cache: bool) 
         value = int(batch_size)
     if value <= 0:
         raise ValueError("CAHO batch size must be positive")
+    return value
+
+
+def _require_finite_positive(value: float, name: str) -> float:
+    value = float(value)
+    if not np.isfinite(value) or value <= 0.0:
+        raise ValueError(f"{name} must be finite and positive")
+    return value
+
+
+def _require_finite_nonnegative(value: float, name: str) -> float:
+    value = float(value)
+    if not np.isfinite(value) or value < 0.0:
+        raise ValueError(f"{name} must be finite and nonnegative")
     return value
 
 
@@ -266,7 +282,8 @@ class CAHOTrainer:
         model,
         batch_size: int = CAHO_94GB_ACTUAL_BATCH_SIZE,
         temperature: float = 0.07,
-        lr: float = 2e-5,
+        lr: float = CAHO_DEFAULT_LR,
+        weight_decay: float = CAHO_DEFAULT_WEIGHT_DECAY,
         seed: Optional[int] = None,
     ) -> None:
         """Initialize trainer.
@@ -276,12 +293,14 @@ class CAHOTrainer:
             batch_size: Batch size per step.
             temperature: SupCon temperature.
             lr: AdamW learning rate.
+            weight_decay: AdamW weight decay.
             seed: Optional deterministic seed for training order and augmentations.
         """
         self.model = model
         self.batch_size = batch_size
         self.temperature = temperature
-        self.lr = lr
+        self.lr = _require_finite_positive(lr, "lr")
+        self.weight_decay = _require_finite_nonnegative(weight_decay, "weight_decay")
         self.seed = seed
 
     def fit(self, dataset: CAHODataset, epochs: int = CAHO_DEFAULT_EPOCHS) -> None:
@@ -289,7 +308,7 @@ class CAHOTrainer:
         from torch.utils.data import DataLoader
 
         seed_training(self.seed)
-        optim = torch.optim.AdamW(self.model.parameters(), lr=self.lr)
+        optim = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         self.model.train()
 
         def collate(batch):
@@ -343,7 +362,8 @@ class ContrastiveTrainer:
         model,
         batch_size: int = CAHO_94GB_ACTUAL_BATCH_SIZE,
         temperature: float = 0.1,
-        lr: float = 5e-4,
+        lr: float = CAHO_DEFAULT_LR,
+        weight_decay: float = CAHO_DEFAULT_WEIGHT_DECAY,
         max_grad_norm: float = 1.0,
         scheduler: str = "cosine",
         min_lr: float = 1e-5,
@@ -362,7 +382,8 @@ class ContrastiveTrainer:
         self.model = model
         self.batch_size = batch_size
         self.temperature = temperature
-        self.lr = lr
+        self.lr = _require_finite_positive(lr, "lr")
+        self.weight_decay = _require_finite_nonnegative(weight_decay, "weight_decay")
         self.max_grad_norm = max_grad_norm
         self.scheduler = scheduler
         self.min_lr = min_lr
@@ -410,7 +431,11 @@ class ContrastiveTrainer:
             if self.optimize_loss:
                 loss_params = list(self._loss_module.parameters())
 
-        optim = torch.optim.AdamW(list(self.model.parameters()) + loss_params, lr=self.lr)
+        optim = torch.optim.AdamW(
+            list(self.model.parameters()) + loss_params,
+            lr=self.lr,
+            weight_decay=self.weight_decay,
+        )
         self.model.train()
 
         def collate(batch):
@@ -438,7 +463,7 @@ class ContrastiveTrainer:
             except Exception as exc:
                 raise ImportError(
                     "grad-cache is required for --grad-cache training. "
-                    "Install with `pip install grad-cache`."
+                    "Install with `pip install 'GradCache @ git+https://github.com/luyug/GradCache.git'`."
                 ) from exc
 
             def model_embedding(view):

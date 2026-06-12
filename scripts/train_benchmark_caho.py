@@ -8,6 +8,8 @@ from pathlib import Path
 from ccd.benchmark_training import (
     CAHO_94GB_ACTUAL_BATCH_SIZE,
     CAHO_DEFAULT_EPOCHS,
+    CAHO_DEFAULT_LR,
+    CAHO_DEFAULT_WEIGHT_DECAY,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     BenchmarkCAHOViewDataset,
@@ -36,8 +38,8 @@ def build_parser() -> argparse.ArgumentParser:
             f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
         ),
     )
-    parser.add_argument("--lr", type=float, default=2e-5)
-    parser.add_argument("--weight-decay", type=float, default=0.01)
+    parser.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
+    parser.add_argument("--weight-decay", type=float, default=CAHO_DEFAULT_WEIGHT_DECAY)
     parser.add_argument("--temperature", type=float, default=0.07)
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
     parser.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")

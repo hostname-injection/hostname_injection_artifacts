@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tomllib
@@ -39,7 +40,7 @@ def test_artifact_manifest_has_claim_scripts_and_required_files() -> None:
     assert requirements["packaging"]["container_required"] is False
     assert requirements["tracking"]["web_tracking_embedded"] is False
     assert manifest["full_tests"]["command"] == "python -m pytest -q"
-    assert manifest["full_tests"]["last_observed"] == "284 passed, 1 skipped"
+    assert manifest["full_tests"]["last_observed"] == "287 passed"
     assert (ROOT / manifest["badge_readiness"]).exists()
     assert manifest["claims"]
     claim_text = " ".join(claim["claim"] for claim in manifest["claims"])
@@ -121,7 +122,9 @@ def test_dependency_files_cover_artifact_smoke_and_claim_map() -> None:
     assert any(dep.startswith("scipy") for dep in deps)
     assert any(dep.startswith("torch") for dep in deps)
     assert any(dep.startswith("sentence-transformers") for dep in deps)
+    assert any(dep.startswith("sentencepiece") for dep in deps)
     assert any(dep.startswith("idna") for dep in deps)
+    assert any(dep.startswith("GradCache @ git+https://github.com/luyug/GradCache") for dep in deps)
     assert any(dep.startswith("pytest") for dep in artifact_deps)
     assert any(dep.startswith("sentencepiece") for dep in artifact_deps)
     assert any(dep.startswith("scikit-learn") for dep in artifact_deps)
@@ -131,6 +134,7 @@ def test_dependency_files_cover_artifact_smoke_and_claim_map() -> None:
 
     requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
     assert "-e .[artifact]" in requirements
+    assert "GradCache @ git+https://github.com/luyug/GradCache.git" in requirements
 
     environment = (ROOT / "environment.yml").read_text(encoding="utf-8")
     for package in (
@@ -145,10 +149,18 @@ def test_dependency_files_cover_artifact_smoke_and_claim_map() -> None:
         "scikit-learn",
     ):
         assert package in environment
+    assert "GradCache @ git+https://github.com/luyug/GradCache.git" in environment
 
     install_script = (ROOT / "scripts/install_conda.sh").read_text(encoding="utf-8")
-    assert 'INSTALL_GRADCACHE="${INSTALL_GRADCACHE:-0}"' in install_script
+    assert "GradCache @ git+https://github.com/luyug/GradCache.git" in install_script
+    assert "INSTALL_GRADCACHE" not in install_script
     assert "scikit-learn" in install_script
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "Train / fine‑tune CAHO encoder (optional)" not in readme
+    assert "Optional: GradCache" not in readme
+    assert "GradCache is optional" not in readme
+    assert re.search(r"(?is)(GradCache.{0,120}optional|optional.{0,120}GradCache)", readme) is None
 
 
 def test_artifact_readiness_audit_quick_path_passes() -> None:

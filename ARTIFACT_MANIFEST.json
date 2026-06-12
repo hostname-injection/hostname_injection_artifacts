@@ -136,7 +136,7 @@
   },
   "full_tests": {
     "command": "python -m pytest -q",
-    "last_observed": "284 passed, 1 skipped"
+    "last_observed": "287 passed"
   },
   "public_release_bundle": {
     "bundle": "deidentification_release/data/release/hib_release_public_bundle.tar.gz",

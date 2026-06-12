@@ -12,6 +12,8 @@ from ccd.preprocess import normalize_hostname
 from ccd.train import (
     CAHO_94GB_ACTUAL_BATCH_SIZE,
     CAHO_DEFAULT_EPOCHS,
+    CAHO_DEFAULT_LR,
+    CAHO_DEFAULT_WEIGHT_DECAY,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     CAHODataset,
@@ -59,7 +61,8 @@ def main() -> None:
             f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
         ),
     )
-    parser.add_argument("--lr", type=float, default=2e-5)
+    parser.add_argument("--lr", type=float, default=CAHO_DEFAULT_LR)
+    parser.add_argument("--weight-decay", type=float, default=CAHO_DEFAULT_WEIGHT_DECAY)
     parser.add_argument("--temperature", type=float, default=0.07)
     parser.add_argument("--loss", choices=["supcon", "contrastive"], default="supcon")
     parser.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default="edit")
@@ -69,7 +72,7 @@ def main() -> None:
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
     parser.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     parser.add_argument("--min-lr", type=float, default=1e-5)
-    parser.add_argument("--grad-cache", action="store_true", help="Enable GradCache for large batches")
+    parser.add_argument("--grad-cache", action="store_true", help="Use GradCache for replay-scale pairwise CAHO batches")
     parser.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     parser.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     parser.add_argument("--contrastive-max-scale", type=float, default=100.0)
@@ -141,6 +144,7 @@ def main() -> None:
             batch_size=args.batch_size,
             temperature=args.temperature,
             lr=args.lr,
+            weight_decay=args.weight_decay,
             max_grad_norm=args.max_grad_norm,
             scheduler=args.scheduler,
             min_lr=args.min_lr,
@@ -157,7 +161,14 @@ def main() -> None:
             seed=args.seed,
         )
     else:
-        trainer = CAHOTrainer(model, batch_size=args.batch_size, temperature=args.temperature, lr=args.lr, seed=args.seed)
+        trainer = CAHOTrainer(
+            model,
+            batch_size=args.batch_size,
+            temperature=args.temperature,
+            lr=args.lr,
+            weight_decay=args.weight_decay,
+            seed=args.seed,
+        )
     trainer.fit(dataset, epochs=args.epochs)
 
     if not args.no_save_final:
