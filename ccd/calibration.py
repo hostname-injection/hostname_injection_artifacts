@@ -18,7 +18,16 @@ def _coerce_score_vector(benign_scores: Sequence[float] | np.ndarray) -> np.ndar
         raise ValueError("benign_scores must be a 1D array")
     if len(scores) == 0:
         raise ValueError("benign_scores cannot be empty")
+    if not np.isfinite(scores).all():
+        raise ValueError("benign_scores must be finite")
     return scores
+
+
+def coerce_finite_threshold(value: float | int | str, *, name: str = "threshold") -> float:
+    threshold = float(value)
+    if not math.isfinite(threshold):
+        raise ValueError(f"{name} must be finite")
+    return threshold
 
 
 def calibration_order_statistic_rank(n: int, alpha: float) -> int:
@@ -68,13 +77,9 @@ def calibrate_thresholds_by_group(
     alpha: float,
 ) -> dict[str, dict[str, Any]]:
     """Split-conformal fixed-FPR thresholds for tenant/window groups."""
-    scores = np.asarray(benign_scores, dtype=np.float64)
-    if scores.ndim != 1:
-        raise ValueError("benign_scores must be a 1D array")
+    scores = _coerce_score_vector(benign_scores)
     if len(scores) != len(groups):
         raise ValueError("benign_scores and groups must have the same length")
-    if len(scores) == 0:
-        raise ValueError("benign_scores cannot be empty")
 
     grouped: dict[str, list[float]] = {}
     for score, group in zip(scores, groups):
@@ -117,18 +122,12 @@ def threshold_for_group(
             if "threshold" not in value:
                 raise ValueError(f"threshold for group {group_name!r} is missing")
             value = value.get("threshold")
-        threshold = float(value)
-        if not math.isfinite(threshold):
-            raise ValueError(f"threshold for group {group_name!r} must be finite")
-        return threshold
+        return coerce_finite_threshold(value, name=f"threshold for group {group_name!r}")
     if missing == "error":
         raise KeyError(f"no threshold for calibration group {group_name!r}")
     if default_threshold is None:
         raise KeyError(f"no threshold for calibration group {group_name!r} and no default threshold")
-    threshold = float(default_threshold)
-    if not math.isfinite(threshold):
-        raise ValueError("default_threshold must be finite")
-    return threshold
+    return coerce_finite_threshold(default_threshold, name="default_threshold")
 
 
 def _order_statistic_rank(n: int, alpha: float) -> int:
@@ -142,8 +141,14 @@ def conformal_p_value(score: float, benign_scores: np.ndarray) -> float:
     benign-tail probability counts calibration scores at least as large as the
     query score.
     """
+    score = coerce_finite_threshold(score, name="score")
+    benign_scores = np.asarray(benign_scores, dtype=np.float64)
+    if benign_scores.ndim != 1:
+        raise ValueError("benign_scores must be a 1D array")
     n = len(benign_scores)
     if n == 0:
         return 1.0
+    if not np.isfinite(benign_scores).all():
+        raise ValueError("benign_scores must be finite")
     count = int(np.sum(benign_scores >= score))
     return (1 + count) / (n + 1)

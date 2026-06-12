@@ -298,6 +298,40 @@ def test_score_csv_preserves_raw_artifact_commas(tmp_path, monkeypatch):
     assert rows == [["hostname", "threshold", "score", "prediction"], ["alpha,one.example", "0.500000", "0.600000", "1"]]
 
 
+def test_score_rejects_non_finite_calibration_threshold_before_scoring(tmp_path, monkeypatch):
+    queries = tmp_path / "queries.txt"
+    queries.write_text("alpha.example\n", encoding="utf-8")
+    calibration = tmp_path / "calibration.json"
+    calibration.write_text('{"threshold": NaN}', encoding="utf-8")
+    output = tmp_path / "scores.csv"
+
+    class FailingModel:
+        threshold = 0.5
+        grouped_thresholds = None
+
+        def score(self, hostnames, **_kwargs):
+            raise AssertionError("score should not run with invalid calibration threshold")
+
+    monkeypatch.setattr(cli_module, "load_model", lambda _path: FailingModel())
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "score",
+            "--model",
+            "model.npz",
+            "--input",
+            str(queries),
+            "--output",
+            str(output),
+            "--calibration",
+            str(calibration),
+        ]
+    )
+    with pytest.raises(ValueError, match="threshold.*finite"):
+        args.func(args)
+
+
 def test_score_uses_grouped_thresholds_from_model_bundle(tmp_path, monkeypatch):
     queries = tmp_path / "queries.txt"
     queries.write_text("alpha.example\nbeta.example\n", encoding="utf-8")

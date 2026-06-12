@@ -3,6 +3,7 @@ import numpy as np
 from ccd.calibration import (
     calibrate_threshold,
     calibrate_thresholds_by_group,
+    conformal_p_value,
     split_conformal_threshold_metadata,
     threshold_for_group,
 )
@@ -23,6 +24,20 @@ def test_calibrate_threshold_requires_scores():
         return
 
     assert False, "Expected ValueError for empty calibration set"
+
+
+def test_calibrate_threshold_rejects_non_finite_scores():
+    for scores in (
+        np.array([0.1, float("nan")]),
+        np.array([0.1, float("inf")]),
+    ):
+        try:
+            calibrate_threshold(scores, alpha=0.2)
+        except ValueError as exc:
+            assert "finite" in str(exc)
+            continue
+
+        assert False, "Expected ValueError for non-finite calibration scores"
 
 
 def test_calibrate_threshold_requires_valid_alpha():
@@ -69,6 +84,16 @@ def test_calibrate_thresholds_by_group_rejects_mismatched_lengths():
     assert False, "Expected ValueError for mismatched score/group lengths"
 
 
+def test_calibrate_thresholds_by_group_rejects_non_finite_scores():
+    try:
+        calibrate_thresholds_by_group(np.array([0.1, float("nan")]), ["tenant-a", "tenant-a"], alpha=0.5)
+    except ValueError as exc:
+        assert "finite" in str(exc)
+        return
+
+    assert False, "Expected ValueError for non-finite grouped calibration scores"
+
+
 def test_threshold_for_group_uses_grouped_threshold_then_default():
     grouped = {
         "tenant-a": {"threshold": 0.7},
@@ -86,3 +111,17 @@ def test_threshold_for_group_uses_grouped_threshold_then_default():
         return
 
     assert False, "Expected KeyError for missing grouped threshold"
+
+
+def test_conformal_p_value_rejects_non_finite_scores():
+    for call in (
+        lambda: conformal_p_value(float("nan"), np.array([0.1, 0.2])),
+        lambda: conformal_p_value(0.1, np.array([0.1, float("inf")])),
+    ):
+        try:
+            call()
+        except ValueError as exc:
+            assert "finite" in str(exc)
+            continue
+
+        assert False, "Expected ValueError for non-finite p-value inputs"

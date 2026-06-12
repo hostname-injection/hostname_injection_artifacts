@@ -28,6 +28,7 @@ from .train import CAHODataset, CAHOTrainer, ContrastiveTrainer, Sample
 import numpy as np
 from .calibration import (
     calibrate_thresholds_by_group,
+    coerce_finite_threshold,
     split_conformal_threshold_metadata,
     threshold_for_group,
 )
@@ -301,6 +302,14 @@ def cmd_score(args: argparse.Namespace) -> None:
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]
     groups = _read_parallel_lines(args.groups, len(hostnames), field_name="groups") if args.groups else None
+    threshold = coerce_finite_threshold(
+        args.threshold if args.threshold is not None else (model.threshold if model.threshold is not None else 0.0)
+    )
+    grouped_thresholds = getattr(model, "grouped_thresholds", None)
+    if args.calibration:
+        calib = json.loads(args.calibration.read_text())
+        threshold = coerce_finite_threshold(calib.get("threshold", threshold))
+        grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
 
     scores = model.score(
         hostnames,
@@ -309,12 +318,6 @@ def cmd_score(args: argparse.Namespace) -> None:
         approximate=args.approximate,
         approximate_k=args.approximate_k,
     )
-    threshold = args.threshold if args.threshold is not None else (model.threshold or 0.0)
-    grouped_thresholds = getattr(model, "grouped_thresholds", None)
-    if args.calibration:
-        calib = json.loads(args.calibration.read_text())
-        threshold = float(calib.get("threshold", threshold))
-        grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
     if groups is not None:
         row_thresholds = np.array(
             [
@@ -436,7 +439,9 @@ def cmd_refresh_benign(args: argparse.Namespace) -> None:
 def cmd_certify(args: argparse.Namespace) -> None:
     model = load_model(args.model)
     hostnames = _read_lines(args.input)
-    threshold = args.threshold if args.threshold is not None else (model.threshold or 0.0)
+    threshold = coerce_finite_threshold(
+        args.threshold if args.threshold is not None else (model.threshold if model.threshold is not None else 0.0)
+    )
     threshold_source = (
         "cli_threshold"
         if args.threshold is not None
@@ -447,7 +452,7 @@ def cmd_certify(args: argparse.Namespace) -> None:
     if args.calibration:
         calib = json.loads(args.calibration.read_text())
         if "threshold" in calib:
-            threshold = float(calib["threshold"])
+            threshold = coerce_finite_threshold(calib["threshold"])
             threshold_source = "calibration_file_threshold"
         if "grouped_thresholds" in calib:
             grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)

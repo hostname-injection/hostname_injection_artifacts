@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .calibration import threshold_for_group
+from .calibration import coerce_finite_threshold, threshold_for_group
 from .csv_io import write_score_csv
 from .io import load_model
 from .line_io import read_nonempty_lines, read_parallel_lines
@@ -49,6 +49,15 @@ def main() -> int:
         hostnames = [normalize_hostname(h) for h in hostnames]
     groups = read_parallel_lines(args.groups, len(hostnames), "groups") if args.groups else None
 
+    threshold = coerce_finite_threshold(
+        args.threshold if args.threshold is not None else (model.threshold if model.threshold is not None else 0.0)
+    )
+    grouped_thresholds = getattr(model, "grouped_thresholds", None)
+    if args.calibration:
+        calib = json.loads(args.calibration.read_text())
+        threshold = coerce_finite_threshold(calib.get("threshold", threshold))
+        grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
+
     scores = model.score(
         hostnames,
         batch_size=args.batch_size,
@@ -56,12 +65,6 @@ def main() -> int:
         approximate=args.approximate,
         approximate_k=args.approximate_k,
     )
-    threshold = args.threshold if args.threshold is not None else (model.threshold or 0.0)
-    grouped_thresholds = getattr(model, "grouped_thresholds", None)
-    if args.calibration:
-        calib = json.loads(args.calibration.read_text())
-        threshold = float(calib.get("threshold", threshold))
-        grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
     if groups is not None:
         row_thresholds = np.array(
             [

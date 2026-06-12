@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import List
 
-from .calibration import SPLIT_CONFORMAL_DECISION_RULE
+from .calibration import SPLIT_CONFORMAL_DECISION_RULE, coerce_finite_threshold
 from .io import load_model
 from .line_io import read_nonempty_lines, read_parallel_lines
 from .preprocess import normalize_hostname
@@ -49,14 +49,14 @@ def main() -> int:
     groups = read_parallel_lines(args.groups, len(hostnames), "groups") if args.groups else None
     threshold_source = "model_bundle_threshold" if model.threshold is not None else "default_zero_threshold"
     if args.threshold is not None:
-        model.threshold = args.threshold
+        model.threshold = coerce_finite_threshold(args.threshold)
         threshold_source = "cli_threshold"
     grouped_thresholds = getattr(model, "grouped_thresholds", None)
     grouped_thresholds_source = "model_bundle_grouped_thresholds" if grouped_thresholds else "none"
     if args.calibration:
         calib = json.loads(args.calibration.read_text())
         if "threshold" in calib:
-            model.threshold = float(calib["threshold"])
+            model.threshold = coerce_finite_threshold(calib["threshold"])
             threshold_source = "calibration_file_threshold"
         if "grouped_thresholds" in calib:
             model.grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
@@ -88,7 +88,7 @@ def main() -> int:
         "model": str(args.model),
         "count": len(explanations),
         "top_k": args.top_k,
-        "threshold": float(model.threshold if model.threshold is not None else 0.0),
+        "threshold": coerce_finite_threshold(model.threshold if model.threshold is not None else 0.0),
         "threshold_source": threshold_source,
         "grouped_thresholds_source": grouped_thresholds_source,
         "grouped_thresholds_used": groups is not None,

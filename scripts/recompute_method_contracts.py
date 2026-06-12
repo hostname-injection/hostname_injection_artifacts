@@ -483,6 +483,8 @@ def validate_code_path_evidence() -> dict[str, bool]:
     if "log_malicious_over_benign" not in explain_embeddings_source or "min(mal_vals" not in explain_embeddings_source:
         raise ValueError("CCDModel.explain_embeddings must report per-family log-ratio cone evidence")
     explain_cli_source = (ROOT / "ccd" / "explain.py").read_text(encoding="utf-8")
+    score_cli_source = (ROOT / "ccd" / "score_cli.py").read_text(encoding="utf-8")
+    main_cli_source = (ROOT / "ccd" / "cli.py").read_text(encoding="utf-8")
     for token in (
         "threshold_source",
         "grouped_thresholds_source",
@@ -492,6 +494,9 @@ def validate_code_path_evidence() -> dict[str, bool]:
     ):
         if token not in explain_cli_source:
             raise ValueError(f"explanation JSON must record {token} scope metadata")
+    for source, name in ((score_cli_source, "score_cli.py"), (main_cli_source, "ccd/cli.py"), (explain_cli_source, "explain.py")):
+        if "coerce_finite_threshold" not in source:
+            raise ValueError(f"{name} must reject non-finite CLI/calibration thresholds")
     predict_signature = inspect.signature(CCDModel.predict)
     for param in ("calibration_groups", "missing_group_threshold"):
         if param not in predict_signature.parameters:
@@ -508,6 +513,14 @@ def validate_code_path_evidence() -> dict[str, bool]:
         or threshold_metadata["calibration_scores"] != "benign_only"
     ):
         raise ValueError("split-conformal threshold metadata must record rank and strict decision rule")
+    for bad_scores in ([0.1, float("nan")], [0.1, float("inf")]):
+        try:
+            split_conformal_threshold_metadata(bad_scores, alpha=0.2)
+        except ValueError as exc:
+            if "finite" not in str(exc):
+                raise
+        else:
+            raise ValueError("split-conformal calibration must reject non-finite benign scores")
     grouped_thresholds = calibrate_thresholds_by_group(
         [0.1, 0.4, 0.2, 0.8],
         ["tenant-a", "tenant-a", "tenant-b", "tenant-b"],
@@ -641,6 +654,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "score_paths_normalize_unit_embeddings": True,
         "mixture_weights_normalized": True,
         "split_conformal_calibration_available": True,
+        "split_conformal_rejects_non_finite_scores": True,
         "split_conformal_order_statistic_reported": True,
         "grouped_split_conformal_calibration_available": True,
         "tenant_window_threshold_resolution_available": True,

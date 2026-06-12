@@ -629,7 +629,8 @@ ccd calibrate \
 order-statistic rank, the strict `score > threshold` decision rule, and the score
 path. The optional `--save-model` output embeds global or grouped thresholds in a
 model bundle, so later `score` and `certify` commands can use the frozen
-threshold without a separate calibration file.
+threshold without a separate calibration file. Calibration fails closed if any
+benign calibration score or loaded threshold is non-finite.
 
 To calibrate per tenant/window while preserving a global fallback threshold,
 pass one group id per benign calibration row:
