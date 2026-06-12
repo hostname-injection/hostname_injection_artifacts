@@ -142,6 +142,69 @@ def test_enumerate_edit_ball_includes_origin_and_radius_neighbors():
     assert "aB.com" in ball
 
 
+def test_certificate_methods_reject_negative_radius():
+    for call in (
+        lambda: enumerate_edit_ball("ab.com", radius=-1, edit_model=EditModel(edits=["E5_case"])),
+        lambda: certify_by_margin_bound(1.0, 0.0, 0.1, radius=-1),
+        lambda: certify_by_calibrated_margin(
+            score=1.0,
+            threshold=0.0,
+            radius=-1,
+            effective_count=1.0,
+            benign_prior=np.array([0.8, 0.2], dtype=np.float32),
+            malicious_priors={"m": np.array([0.2, 0.8], dtype=np.float32)},
+            sketch_lipschitz=0.1,
+            embedding_rotation_bound=0.1,
+        ),
+        lambda: certify_by_enumeration("ab.com", lambda _text: 1.0, threshold=0.0, radius=-1),
+    ):
+        try:
+            call()
+        except ValueError as exc:
+            assert "radius" in str(exc)
+            continue
+
+        assert False, "Expected ValueError for negative certificate radius"
+
+
+def test_margin_bound_rejects_non_finite_inputs():
+    for args in (
+        (float("nan"), 0.0, 0.1),
+        (1.0, float("inf"), 0.1),
+        (1.0, 0.0, float("inf")),
+    ):
+        try:
+            certify_by_margin_bound(*args, radius=1)
+        except ValueError as exc:
+            assert "finite" in str(exc)
+            continue
+
+        assert False, "Expected ValueError for non-finite margin-bound input"
+
+
+def test_enumeration_rejects_non_finite_scores_and_threshold():
+    edit_model = EditModel(edits=["E5_case"])
+
+    for call in (
+        lambda: certify_by_enumeration("ab.com", lambda _text: 1.0, threshold=float("nan"), radius=1),
+        lambda: certify_by_enumeration("ab.com", lambda _text: float("nan"), threshold=0.0, radius=1),
+        lambda: certify_by_enumeration(
+            "ab.com",
+            lambda text: float("inf") if text.startswith("A") else 1.0,
+            threshold=0.0,
+            radius=1,
+            edit_model=edit_model,
+        ),
+    ):
+        try:
+            call()
+        except ValueError as exc:
+            assert "finite" in str(exc)
+            continue
+
+        assert False, "Expected ValueError for non-finite enumeration input"
+
+
 def test_certify_by_margin_bound_positive_and_benign():
     positive = certify_by_margin_bound(1.5, 1.0, 0.4, radius=2)
     benign = certify_by_margin_bound(0.2, 1.0, 0.8, radius=2)

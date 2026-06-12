@@ -523,6 +523,17 @@ def validate_code_path_evidence() -> dict[str, bool]:
     for param in ("method", "sketch_lipschitz", "embedding_rotation_bound"):
         if param not in certify_signature.parameters:
             raise ValueError(f"CCDModel.certify must expose {param} for CMC/SEC certification")
+    for certificate_call in (
+        lambda: enumerate_edit_ball("ab.com", radius=-1),
+        lambda: refresh_model.certify("ab.com", radius=-1),
+    ):
+        try:
+            certificate_call()
+        except ValueError as exc:
+            if "radius" not in str(exc):
+                raise
+        else:
+            raise ValueError("certificate paths must reject negative edit radius")
     cli_source = (ROOT / "ccd" / "cli.py").read_text(encoding="utf-8")
     for token in (
         "threshold_source",
@@ -577,6 +588,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "exact_certificate_enumeration_available": True,
         "calibrated_margin_certificate_available": True,
         "combined_cmc_then_enumeration_certificate_available": True,
+        "certificate_radius_validation_available": True,
         "certificate_records_normalizer_and_threshold_scope": True,
         "exact_score_bypasses_lsh_by_default": True,
         "exact_full_axis_scan_for_deployed_top_r_statistic": True,

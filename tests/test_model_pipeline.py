@@ -484,3 +484,27 @@ def test_model_certify_requires_bounds_for_calibrated_margin():
         return
 
     assert False, "Expected ValueError when calibrated-margin bounds are missing"
+
+
+def test_model_certify_rejects_negative_radius_before_scoring():
+    class FailingEncoder:
+        def encode(self, texts, batch_size=32, normalize=True):
+            raise AssertionError("encoder should not be called for invalid radius")
+
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=FailingEncoder(),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=0.0,
+    )
+
+    try:
+        model.certify("example.com", radius=-1)
+    except ValueError as exc:
+        assert "radius" in str(exc)
+        return
+
+    assert False, "Expected ValueError for negative certificate radius"

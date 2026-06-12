@@ -56,6 +56,18 @@ class DecisionCertificate:
     counterexample: Optional[str] = None
 
 
+def _validate_certificate_radius(radius: int) -> None:
+    if radius < 0:
+        raise ValueError("radius must be non-negative")
+
+
+def _require_finite(value: float, name: str) -> float:
+    value = float(value)
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be finite")
+    return value
+
+
 def _selected_edit_names(edit_model: Optional[EditModel]) -> List[str]:
     if edit_model is None:
         return list(DEFAULT_EDITS.keys())
@@ -247,8 +259,7 @@ def enumerate_edit_ball(
     max_nodes: int = 10000,
 ) -> List[str]:
     """Deterministically enumerate the manifest edit ball up to ``radius``."""
-    if radius < 0:
-        raise ValueError("radius must be non-negative")
+    _validate_certificate_radius(radius)
     if max_nodes <= 0:
         raise ValueError("max_nodes must be positive")
 
@@ -278,6 +289,10 @@ def certify_by_margin_bound(
     radius: int,
 ) -> DecisionCertificate:
     """Certify a decision from an externally supplied score-movement bound."""
+    _validate_certificate_radius(radius)
+    score = _require_finite(score, "score")
+    threshold = _require_finite(threshold, "threshold")
+    delta_bound = _require_finite(delta_bound, "delta_bound")
     if delta_bound < 0.0:
         raise ValueError("delta_bound must be non-negative")
     prediction = score > threshold
@@ -342,6 +357,7 @@ def certify_by_calibrated_margin(
     eps: float = 1e-12,
 ) -> DecisionCertificate:
     """Certify with the CMC bound from Appendix C."""
+    _validate_certificate_radius(radius)
     delta = calibrated_margin_delta(
         effective_count=effective_count,
         log_ratio_bound=log_ratio_envelope(benign_prior, malicious_priors, eps=eps),
@@ -374,15 +390,17 @@ def certify_by_enumeration(
     max_nodes: int = 10000,
 ) -> DecisionCertificate:
     """Certify stability by exact deterministic edit-ball closure."""
+    _validate_certificate_radius(radius)
+    threshold = _require_finite(threshold, "threshold")
     normalize = normalizer or (lambda s: s)
-    base_score = float(score_fn(normalize(host)))
+    base_score = _require_finite(score_fn(normalize(host)), "base_score")
     prediction = base_score > threshold
     margin = base_score - threshold
     max_movement = 0.0
     checked = 0
 
     for candidate in enumerate_edit_ball(host, radius, edit_model=edit_model, max_nodes=max_nodes):
-        candidate_score = float(score_fn(normalize(candidate)))
+        candidate_score = _require_finite(score_fn(normalize(candidate)), "candidate_score")
         checked += 1
         max_movement = max(max_movement, abs(candidate_score - base_score))
         candidate_prediction = candidate_score > threshold

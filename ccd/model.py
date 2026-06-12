@@ -314,6 +314,8 @@ class CCDModel:
 
         if method not in {"enumeration", "calibrated-margin", "combined"}:
             raise ValueError("method must be one of: enumeration, calibrated-margin, combined")
+        if radius < 0:
+            raise ValueError("radius must be non-negative")
 
         threshold = float(threshold if threshold is not None else (self.threshold or 0.0))
         normalizer = normalize_hostname if normalize else (lambda s: s)
