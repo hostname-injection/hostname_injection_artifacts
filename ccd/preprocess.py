@@ -5,13 +5,19 @@ import unicodedata
 from urllib.parse import urlsplit
 
 
-_PERCENT_RE = re.compile(r"%([0-9A-Fa-f]{2})")
+_PERCENT_RUN_RE = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
 
 
 def _percent_decode(s: str) -> str:
     def repl(m):
-        return chr(int(m.group(1), 16))
-    return _PERCENT_RE.sub(repl, s)
+        token = m.group(0)
+        raw = bytes(int(part, 16) for part in token.split("%") if part)
+        try:
+            return raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return "".join(chr(byte) for byte in raw)
+
+    return _PERCENT_RUN_RE.sub(repl, s)
 
 
 def _strip_scheme_and_path(host: str) -> str:

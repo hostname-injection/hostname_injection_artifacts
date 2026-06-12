@@ -535,6 +535,7 @@ def cmd_certify(args: argparse.Namespace) -> None:
             "function": "ccd.preprocess.normalize_hostname" if not args.no_normalize else None,
             "unicode_form": "NFKC" if not args.no_normalize else None,
             "decode_percent": True if not args.no_normalize else None,
+            "decode_utf8_percent_runs": True if not args.no_normalize else None,
             "idna_roundtrip": True if not args.no_normalize else None,
         },
         "edit_manifest": {

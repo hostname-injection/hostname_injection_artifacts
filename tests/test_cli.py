@@ -510,6 +510,7 @@ def test_certify_writes_scope_and_combined_method_args(tmp_path, monkeypatch):
         "function": "ccd.preprocess.normalize_hostname",
         "unicode_form": "NFKC",
         "decode_percent": True,
+        "decode_utf8_percent_runs": True,
         "idna_roundtrip": True,
     }
     assert payload["edit_manifest"]["version"] == "Eraw-public-v1"

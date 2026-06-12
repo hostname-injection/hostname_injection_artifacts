@@ -28,6 +28,7 @@ from ccd.encoder import CahoEncoder
 from ccd.io import MODEL_FORMAT_VERSION, ModelBundle
 from ccd.line_io import read_parallel_lines
 from ccd.model import CCDModel
+from ccd.preprocess import normalize_hostname
 from ccd.scoring import ccd_score_logpriors, mixture_log_weights
 from ccd.train import CAHOTrainer, supcon_loss, supervised_orbit_contrastive_loss
 
@@ -358,6 +359,10 @@ def validate_bundle_contracts(required_value: object) -> dict[str, Any]:
 
 
 def validate_code_path_evidence() -> dict[str, bool]:
+    if normalize_hostname("caf%C3%A9.example") != "café.example":
+        raise ValueError("normalizer must decode complete UTF-8 percent runs before IDNA round-trip")
+    if normalize_hostname("%FF.example", idna_roundtrip=False) != "ÿ.example":
+        raise ValueError("normalizer must retain mixed percent-decoding residue fallback")
     if not callable(ccd_score_logpriors):
         raise ValueError("ccd_score_logpriors must be callable")
     if not callable(mixture_log_weights):
@@ -457,7 +462,13 @@ def validate_code_path_evidence() -> dict[str, bool]:
         if param not in certify_signature.parameters:
             raise ValueError(f"CCDModel.certify must expose {param} for CMC/SEC certification")
     cli_source = (ROOT / "ccd" / "cli.py").read_text(encoding="utf-8")
-    for token in ("threshold_source", "grouped_thresholds_source", '"normalizer"', "ccd.preprocess.normalize_hostname"):
+    for token in (
+        "threshold_source",
+        "grouped_thresholds_source",
+        '"normalizer"',
+        "ccd.preprocess.normalize_hostname",
+        "decode_utf8_percent_runs",
+    ):
         if token not in cli_source:
             raise ValueError(f"certificate JSON must record {token} scope metadata")
     cone_sketch_signature = inspect.signature(ConePartition.cone_sketch)
@@ -488,6 +499,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         raise ValueError("CCDModel._score_embeddings_topk must route through the normalized vector top-k score path")
     return {
         "eq1_logsumexp_score_path_available": True,
+        "normalizer_decodes_utf8_percent_runs": True,
         "score_paths_normalize_unit_embeddings": True,
         "mixture_weights_normalized": True,
         "split_conformal_calibration_available": True,
