@@ -3,7 +3,14 @@ import random
 import pytest
 
 from ccd.augment import AugmentConfig, CAHOAugmenter, WeightedAugmentConfig
-from ccd.train import CAHODataset, Sample, pairwise_contrastive_loss, split_input_fn, supervised_orbit_contrastive_loss
+from ccd.train import (
+    CAHODataset,
+    Sample,
+    pairwise_contrastive_loss,
+    split_input_fn,
+    supcon_loss,
+    supervised_orbit_contrastive_loss,
+)
 
 
 def _make_weighted_augmenter() -> CAHOAugmenter:
@@ -78,6 +85,19 @@ def test_pairwise_contrastive_loss_misaligned():
     embeddings2 = torch.flip(embeddings1, dims=[0])
     loss = pairwise_contrastive_loss(embeddings1, embeddings2, temperature=0.1)
     assert loss.item() > 1.0
+
+
+def test_supcon_loss_uses_same_sample_views_as_positives():
+    np = pytest.importorskip("numpy")
+    features = np.array(
+        [
+            [[1.0, 0.0], [1.0, 0.0]],
+            [[0.0, 1.0], [0.0, 1.0]],
+        ],
+        dtype=np.float32,
+    )
+
+    assert supcon_loss(features, [0, 1], temperature=0.1) < 0.01
 
 
 def test_supervised_orbit_contrastive_loss_backpropagates():

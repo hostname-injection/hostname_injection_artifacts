@@ -74,16 +74,16 @@ def supcon_loss(features: np.ndarray, labels: List[int], temperature: float = 0.
     feats = torch.tensor(features, device=device, dtype=torch.float32)
     batch, n_views, dim = feats.shape
     feats = F.normalize(feats, dim=-1)
-    feats = feats.view(batch * n_views, dim)
+    feats = feats.permute(1, 0, 2).reshape(batch * n_views, dim)
 
-    labels_t = torch.tensor(labels, device=device).view(batch, 1)
-    mask = torch.eq(labels_t, labels_t.T).float()
+    labels_t = torch.tensor(labels, device=device).view(-1)
+    labels_t = labels_t.repeat(n_views)
+    mask = labels_t.view(-1, 1).eq(labels_t.view(1, -1)).float()
 
     logits = feats @ feats.T / temperature
     logits_max, _ = torch.max(logits, dim=1, keepdim=True)
     logits = logits - logits_max.detach()
 
-    mask = mask.repeat(n_views, n_views)
     logits_mask = torch.ones_like(mask)
     logits_mask.fill_diagonal_(0)
     mask = mask * logits_mask
@@ -301,28 +301,12 @@ class CAHOTrainer:
 
                 feats1 = self.model(self.model.tokenize(v1))["sentence_embedding"]
                 feats2 = self.model(self.model.tokenize(v2))["sentence_embedding"]
-                feats = torch.stack([feats1, feats2], dim=1)
-
-                feats = torch.nn.functional.normalize(feats, dim=-1)
-                b, n, d = feats.shape
-                feats_flat = feats.view(b * n, d)
-                labels_t = torch.tensor(label_ids, device=feats.device).view(b, 1)
-                mask = torch.eq(labels_t, labels_t.T).float()
-
-                logits = feats_flat @ feats_flat.T / self.temperature
-                logits_max, _ = torch.max(logits, dim=1, keepdim=True)
-                logits = logits - logits_max.detach()
-
-                mask = mask.repeat(n, n)
-                logits_mask = torch.ones_like(mask)
-                logits_mask.fill_diagonal_(0)
-                mask = mask * logits_mask
-
-                exp_logits = torch.exp(logits) * logits_mask
-                log_prob = logits - torch.log(exp_logits.sum(dim=1, keepdim=True) + 1e-12)
-                mean_log_prob_pos = (mask * log_prob).sum(dim=1) / (mask.sum(dim=1) + 1e-12)
-                loss_t = -mean_log_prob_pos
-                loss_t = loss_t.view(n, b).mean()
+                loss_t = supervised_orbit_contrastive_loss(
+                    feats1,
+                    feats2,
+                    label_ids,
+                    temperature=self.temperature,
+                )
 
                 optim.zero_grad()
                 loss_t.backward()

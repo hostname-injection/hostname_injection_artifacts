@@ -47,6 +47,7 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["caho_training_support"]["binary_gradcache_fails_closed"] is True
     assert report["derived"]["caho_training_support"]["contrastive_loss_supported"] is True
     assert report["derived"]["caho_training_support"]["supervised_orbit_contrastive_supported"] is True
+    assert report["derived"]["caho_training_support"]["general_supcon_view_alignment"] is True
     assert report["derived"]["caho_training_support"]["benign_orbit_labels_preserve_diversity"] is True
     assert report["derived"]["caho_training_support"]["l2_normalized_binary_inputs"] is True
     assert report["derived"]["caho_training_support"]["deterministic_training_seed_supported"] is True

@@ -29,7 +29,7 @@ from ccd.io import MODEL_FORMAT_VERSION, ModelBundle
 from ccd.line_io import read_parallel_lines
 from ccd.model import CCDModel
 from ccd.scoring import ccd_score_logpriors, mixture_log_weights
-from ccd.train import supervised_orbit_contrastive_loss
+from ccd.train import CAHOTrainer, supcon_loss, supervised_orbit_contrastive_loss
 
 
 EXPECTED_TABLE1_LAYERS = ("cone_count_model", "split_calibration", "edit_closure")
@@ -201,6 +201,8 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
     dataset_getitem = inspect.getsource(BenchmarkCAHOViewDataset.__getitem__)
     dataset_init_signature = inspect.signature(BenchmarkCAHOViewDataset)
     trainer_init_signature = inspect.signature(BenchmarkContrastiveTrainer)
+    general_trainer_fit = inspect.getsource(CAHOTrainer.fit)
+    supcon_source = inspect.getsource(supcon_loss)
     trainer_fit = inspect.getsource(BenchmarkBinaryContrastiveTrainer.fit)
     report_source = inspect.getsource(BenchmarkBinaryContrastiveTrainer.save.__globals__["_write_report"])
     trainer_loss = inspect.getsource(BenchmarkContrastiveTrainer._contrastive_loss)
@@ -221,6 +223,10 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("supervised_orbit_contrastive_loss must be callable")
     if "supervised_orbit_contrastive_loss" not in trainer_loss or "_orbit_labels" not in trainer_loss:
         raise ValueError("BenchmarkContrastiveTrainer must use supervised orbit contrastive labels")
+    if "supervised_orbit_contrastive_loss" not in general_trainer_fit:
+        raise ValueError("CAHOTrainer supcon path must use two-view supervised orbit labels")
+    if "permute(1, 0, 2)" not in supcon_source or "labels_t.repeat(n_views)" not in supcon_source:
+        raise ValueError("supcon_loss must align labels with view-major flattened features")
     if "F.normalize" not in trainer_fit:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must L2-normalize classifier inputs")
     if "torch.cat([F.normalize(e1, dim=1), F.normalize(e2, dim=1)]" not in trainer_fit:
@@ -299,6 +305,7 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         "l2_normalized_binary_inputs": True,
         "contrastive_loss_supported": True,
         "supervised_orbit_contrastive_supported": True,
+        "general_supcon_view_alignment": True,
         "benign_orbit_labels_preserve_diversity": True,
         "deterministic_training_seed_supported": True,
         "benchmark_binary_training_script_defaults": observed_script_defaults,
