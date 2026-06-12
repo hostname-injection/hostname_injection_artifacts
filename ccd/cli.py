@@ -438,11 +438,21 @@ def cmd_certify(args: argparse.Namespace) -> None:
     model = load_model(args.model)
     hostnames = _read_lines(args.input)
     threshold = args.threshold if args.threshold is not None else (model.threshold or 0.0)
+    threshold_source = (
+        "cli_threshold"
+        if args.threshold is not None
+        else ("model_bundle_threshold" if model.threshold is not None else "default_zero_threshold")
+    )
     grouped_thresholds = getattr(model, "grouped_thresholds", None)
+    grouped_thresholds_source = "model_bundle_grouped_thresholds" if grouped_thresholds else "none"
     if args.calibration:
         calib = json.loads(args.calibration.read_text())
-        threshold = float(calib.get("threshold", threshold))
-        grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
+        if "threshold" in calib:
+            threshold = float(calib["threshold"])
+            threshold_source = "calibration_file_threshold"
+        if "grouped_thresholds" in calib:
+            grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
+            grouped_thresholds_source = "calibration_file_grouped_thresholds" if grouped_thresholds else "none"
     groups = _read_parallel_lines(args.groups, len(hostnames), field_name="groups") if args.groups else None
 
     edit_model = None
@@ -454,9 +464,15 @@ def cmd_certify(args: argparse.Namespace) -> None:
     certificates = []
     for index, hostname in enumerate(hostnames):
         row_threshold = threshold
+        row_threshold_source = threshold_source
         if groups is not None:
+            group_name = str(groups[index]).strip()
+            if grouped_thresholds and group_name in grouped_thresholds:
+                row_threshold_source = grouped_thresholds_source
+            elif not args.require_group_thresholds:
+                row_threshold_source = f"{threshold_source}_fallback"
             row_threshold = threshold_for_group(
-                groups[index],
+                group_name,
                 threshold,
                 grouped_thresholds,
                 missing="error" if args.require_group_thresholds else "default",
@@ -477,6 +493,7 @@ def cmd_certify(args: argparse.Namespace) -> None:
         row = asdict(cert)
         row["hostname"] = hostname
         row["normalized_hostname"] = normalize_hostname(hostname) if not args.no_normalize else hostname
+        row["threshold_source"] = row_threshold_source
         if groups is not None:
             row["calibration_group"] = groups[index]
         certificates.append(row)
@@ -484,6 +501,8 @@ def cmd_certify(args: argparse.Namespace) -> None:
     payload = {
         "radius": args.radius,
         "threshold": threshold,
+        "threshold_source": threshold_source,
+        "grouped_thresholds_source": grouped_thresholds_source,
         "grouped_thresholds_used": groups is not None,
         "cert_method": args.cert_method,
         "score_path": {
@@ -500,6 +519,13 @@ def cmd_certify(args: argparse.Namespace) -> None:
             "lsh_bypassed": True,
             "approximate": False,
             "normalized_inputs": not args.no_normalize,
+        },
+        "normalizer": {
+            "enabled": not args.no_normalize,
+            "function": "ccd.preprocess.normalize_hostname" if not args.no_normalize else None,
+            "unicode_form": "NFKC" if not args.no_normalize else None,
+            "decode_percent": True if not args.no_normalize else None,
+            "idna_roundtrip": True if not args.no_normalize else None,
         },
         "edit_manifest": {
             "version": edit_manifest.version,

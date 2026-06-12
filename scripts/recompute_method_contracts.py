@@ -357,6 +357,10 @@ def validate_code_path_evidence() -> dict[str, bool]:
     for param in ("method", "sketch_lipschitz", "embedding_rotation_bound"):
         if param not in certify_signature.parameters:
             raise ValueError(f"CCDModel.certify must expose {param} for CMC/SEC certification")
+    cli_source = (ROOT / "ccd" / "cli.py").read_text(encoding="utf-8")
+    for token in ("threshold_source", "grouped_thresholds_source", '"normalizer"', "ccd.preprocess.normalize_hostname"):
+        if token not in cli_source:
+            raise ValueError(f"certificate JSON must record {token} scope metadata")
     cone_sketch_signature = inspect.signature(ConePartition.cone_sketch)
     use_lsh_param = cone_sketch_signature.parameters.get("use_lsh")
     if use_lsh_param is None or use_lsh_param.default is not False:
@@ -377,6 +381,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "exact_certificate_enumeration_available": True,
         "calibrated_margin_certificate_available": True,
         "combined_cmc_then_enumeration_certificate_available": True,
+        "certificate_records_normalizer_and_threshold_scope": True,
         "exact_score_bypasses_lsh_by_default": True,
         "exact_full_axis_scan_for_deployed_top_r_statistic": True,
         "benign_reference_refresh_available": True,

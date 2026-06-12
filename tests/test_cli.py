@@ -489,13 +489,23 @@ def test_certify_writes_scope_and_combined_method_args(tmp_path, monkeypatch):
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["cert_method"] == "combined"
     assert payload["grouped_thresholds_used"] is True
+    assert payload["threshold_source"] == "model_bundle_threshold"
+    assert payload["grouped_thresholds_source"] == "model_bundle_grouped_thresholds"
     assert payload["score_path"]["exact_all_cones"] is True
     assert "all cone axes are scanned exactly" in payload["score_path"]["exact_all_cones_meaning"]
     assert payload["score_path"]["score_statistic"] == "deployed_top_r_cone_sketch"
     assert payload["score_path"]["lsh_bypassed"] is True
+    assert payload["normalizer"] == {
+        "enabled": True,
+        "function": "ccd.preprocess.normalize_hostname",
+        "unicode_form": "NFKC",
+        "decode_percent": True,
+        "idna_roundtrip": True,
+    }
     assert payload["edit_manifest"]["version"] == "Eraw-public-v1"
     assert payload["certificates"][0]["normalized_hostname"] == "www.example.com"
     assert payload["certificates"][0]["calibration_group"] == "tenant-a"
+    assert payload["certificates"][0]["threshold_source"] == "model_bundle_grouped_thresholds"
     assert payload["certificates"][0]["method"] == "calibrated_margin"
 
 
