@@ -1,0 +1,18 @@
+{
+  "fields": [
+    "public_row_id",
+    "released_artifact",
+    "released_canonical_artifact",
+    "source_family",
+    "time_bucket",
+    "split",
+    "label",
+    "evidence_tier",
+    "sink_family",
+    "obfuscation_family",
+    "released_length_bucket",
+    "character_class_mask",
+    "detector_outputs",
+    "row_integrity_hash"
+  ]
+}

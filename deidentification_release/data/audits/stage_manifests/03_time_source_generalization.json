@@ -1,0 +1,14 @@
+{
+  "created_at_utc": "2026-06-11T22:20:29Z",
+  "exact_timestamps_released": false,
+  "policy_version": "non-linkable-release-policy-v1.0",
+  "release_version": "hib-v1.0",
+  "source_family_values": {
+    "dns_host": 150
+  },
+  "stage": "time_source_generalization",
+  "status": "complete",
+  "time_bucket_values": {
+    "withheld": 150
+  }
+}

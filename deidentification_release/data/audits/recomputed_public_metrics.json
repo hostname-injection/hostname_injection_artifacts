@@ -1,0 +1,210 @@
+{
+  "by_evidence_tier": {
+    "none": 100,
+    "sink_evaluated": 50
+  },
+  "by_label": {
+    "resolved_benign": 100,
+    "verified_executable_semantics": 50
+  },
+  "by_sink_family": {
+    "query": 150
+  },
+  "by_source_family": {
+    "dns_host": 150
+  },
+  "by_split": {
+    "calibration": 14,
+    "test": 21,
+    "train": 105,
+    "validation": 10
+  },
+  "calibration": {
+    "alpha": 0.0001,
+    "benign_calibration_rows": 9,
+    "calibration_group_counts": {
+      "public_group_a": 75,
+      "public_group_b": 75
+    },
+    "calibration_group_fields_considered": [
+      "public_calibration_group",
+      "calibration_group",
+      "public_calibration_bucket",
+      "calibration_bucket"
+    ],
+    "grouped_thresholds": {
+      "public_group_a": {
+        "order_statistic_rank": 6,
+        "order_statistic_sample_count": 6,
+        "threshold": 0.5
+      },
+      "public_group_b": {
+        "order_statistic_rank": 3,
+        "order_statistic_sample_count": 3,
+        "threshold": 0.58
+      }
+    },
+    "n_calibration_groups": 2,
+    "order_statistic_rank": 9,
+    "order_statistic_sample_count": 9,
+    "score_field_hits_on_calibration_rows": {
+      "detector_outputs.ccd_score_public": 9
+    },
+    "score_fields_considered": [
+      "ccd_score",
+      "ccd_score_public",
+      "ccd_public_score",
+      "score"
+    ],
+    "scored_benign_calibration_rows": 9,
+    "split_conformal_rule": "ceil((1-alpha)*(n+1))-th sorted benign calibration score, clamped to [1,n]",
+    "threshold": 0.58,
+    "threshold_source": "recomputed_from_public_grouped_calibration_scores"
+  },
+  "detector_overlap": {
+    "by_label": {
+      "resolved_benign": {
+        "ccd_false_regex_false": 76,
+        "ccd_false_regex_true": 18,
+        "ccd_true_regex_false": 4,
+        "ccd_true_regex_true": 2,
+        "rows_with_both_predictions": 100
+      },
+      "verified_executable_semantics": {
+        "ccd_false_regex_false": 1,
+        "ccd_false_regex_true": 3,
+        "ccd_true_regex_false": 15,
+        "ccd_true_regex_true": 31,
+        "rows_with_both_predictions": 50
+      }
+    },
+    "ccd_flag_counts": {
+      "False": 98,
+      "True": 52
+    },
+    "ccd_score_bin_counts": {
+      "public_score": 150
+    },
+    "effective_ccd_flag_sources": {
+      "released_ccd_flag": 150
+    },
+    "negatives": {
+      "ccd_false_regex_false": 76,
+      "ccd_false_regex_true": 18,
+      "ccd_true_regex_false": 4,
+      "ccd_true_regex_true": 2,
+      "rows_with_both_predictions": 100
+    },
+    "overall": {
+      "ccd_false_regex_false": 77,
+      "ccd_false_regex_true": 21,
+      "ccd_true_regex_false": 19,
+      "ccd_true_regex_true": 33,
+      "rows_with_both_predictions": 150
+    },
+    "positives": {
+      "ccd_false_regex_false": 1,
+      "ccd_false_regex_true": 3,
+      "ccd_true_regex_false": 15,
+      "ccd_true_regex_true": 31,
+      "rows_with_both_predictions": 50
+    },
+    "regex_waf_flag_counts": {
+      "False": 96,
+      "True": 54
+    },
+    "resolved": {
+      "ccd_false_regex_false": 77,
+      "ccd_false_regex_true": 21,
+      "ccd_true_regex_false": 19,
+      "ccd_true_regex_true": 33,
+      "rows_with_both_predictions": 150
+    }
+  },
+  "fixed_fpr_replay": {
+    "fn": 4,
+    "fp": 6,
+    "fpr": 0.06593406593406594,
+    "grouped_thresholds": {
+      "public_group_a": {
+        "order_statistic_rank": 6,
+        "order_statistic_sample_count": 6,
+        "threshold": 0.5
+      },
+      "public_group_b": {
+        "order_statistic_rank": 3,
+        "order_statistic_sample_count": 3,
+        "threshold": 0.58
+      }
+    },
+    "metric_negative_rows_with_predictions": 91,
+    "metric_positive_rows_with_predictions": 45,
+    "metric_rows_with_predictions": 136,
+    "reason": null,
+    "requested_fpr": 0.0001,
+    "rows_with_predictions": 150,
+    "status": "available",
+    "threshold": null,
+    "threshold_source": "recomputed_from_public_grouped_calibration_scores",
+    "tn": 85,
+    "tp": 41,
+    "tpr": 0.9111111111111111
+  },
+  "label_accounting": {
+    "metric_negative_rows": 91,
+    "metric_positive_rows": 45,
+    "metric_protocol": "exclude unresolved rows and calibration split rows from TPR/FPR denominators",
+    "metric_resolved_rows": 136,
+    "negative_label": "resolved_benign",
+    "negative_rows": 100,
+    "other_resolved_rows": 0,
+    "positive_label": "verified_executable_semantics",
+    "positive_rows": 50,
+    "resolved_rows": 150,
+    "unresolved_excluded_from_tpr_fpr": true,
+    "unresolved_label": "unresolved",
+    "unresolved_rows": 0
+  },
+  "n_rows": 150,
+  "public_anchor_replay_checks": {
+    "included": false,
+    "reason": "No public anchor replay subset is included in this release artifact."
+  },
+  "resolved_row_replay": {
+    "ccd_flag_metrics": {
+      "fn": 4,
+      "fp": 6,
+      "fpr": 0.06593406593406594,
+      "metric_negative_rows_with_predictions": 91,
+      "metric_positive_rows_with_predictions": 45,
+      "metric_rows_with_predictions": 136,
+      "rows_with_predictions": 150,
+      "tn": 85,
+      "tp": 41,
+      "tpr": 0.9111111111111111
+    },
+    "ccd_fpr": 0.06593406593406594,
+    "ccd_scored_rows": 150,
+    "ccd_tpr": 0.9111111111111111,
+    "metric_negative_rows": 91,
+    "metric_positive_rows": 45,
+    "negative_rows": 100,
+    "positive_rows": 50,
+    "regex_waf_fpr": 0.18681318681318682,
+    "regex_waf_metrics": {
+      "fn": 14,
+      "fp": 17,
+      "fpr": 0.18681318681318682,
+      "metric_negative_rows_with_predictions": 91,
+      "metric_positive_rows_with_predictions": 45,
+      "metric_rows_with_predictions": 136,
+      "rows_with_predictions": 150,
+      "tn": 74,
+      "tp": 31,
+      "tpr": 0.6888888888888889
+    },
+    "regex_waf_tpr": 0.6888888888888889
+  },
+  "resolved_rows": 150,
+  "unresolved_rows": 0
+}

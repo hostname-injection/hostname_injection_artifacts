@@ -1,0 +1,10 @@
+{
+  "created_at_utc": "2026-06-11T22:20:29Z",
+  "id_source": "private_row_id_hmac_only",
+  "policy_version": "non-linkable-release-policy-v1.0",
+  "public_order_shuffled_with_private_key": true,
+  "release_version": "hib-v1.0",
+  "row_ids_derived_from_hostname": false,
+  "stage": "public_row_ids_and_shuffle",
+  "status": "complete"
+}

@@ -1,0 +1,342 @@
+import numpy as np
+
+from ccd.calibration import calibrate_threshold, conformal_p_value
+from ccd.cone import ConePartition
+from ccd.config import CCDConfig, ConeConfig, EncoderConfig
+from ccd.encoder import CahoEncoder
+from ccd.edit_model import EditModel
+from ccd.io import ModelBundle, load_model, save_model
+from ccd.model import CCDModel
+from ccd.priors import build_benign_prior, build_malicious_priors
+from ccd.scoring import ccd_scores, soft_mixture_score
+
+
+def _identity_cones():
+    axes = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+    config = ConeConfig(dim=2, num_cones=2, active_cones=1, temperature=1.0, use_lsh=False)
+    return ConePartition.build(config, axes=axes)
+
+
+def test_ccd_scores_signs():
+    cones = _identity_cones()
+    benign_prior = np.array([0.9, 0.1], dtype=np.float32)
+    malicious_priors = {"m": np.array([0.1, 0.9], dtype=np.float32)}
+    embeddings = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+
+    scores = ccd_scores(embeddings, cones, benign_prior, malicious_priors)
+    assert scores[0] < 0.0
+    assert scores[1] > 0.0
+
+
+def test_soft_mixture_score_basic():
+    cones = _identity_cones()
+    benign_prior = np.array([0.9, 0.1], dtype=np.float32)
+    malicious_priors = {"m1": np.array([0.1, 0.9], dtype=np.float32)}
+    score = soft_mixture_score(np.array([1.0, 0.0], dtype=np.float32), cones, benign_prior, malicious_priors)
+    assert score < 0.0
+
+
+def test_build_priors_prefers_cone():
+    cones = _identity_cones()
+    embeddings = np.array([[1.0, 0.0], [1.0, 0.0]], dtype=np.float32)
+    benign_prior = build_benign_prior(embeddings, cones)
+    malicious_priors = build_malicious_priors({"fam": embeddings}, cones)
+    assert benign_prior[0] > benign_prior[1]
+    assert malicious_priors["fam"][0] > malicious_priors["fam"][1]
+
+
+def test_save_load_roundtrip(tmp_path):
+    axes = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+    benign_prior = np.array([0.7, 0.3], dtype=np.float32)
+    malicious_priors = {"fam": np.array([0.2, 0.8], dtype=np.float32)}
+    config = CCDConfig()
+
+    bundle = ModelBundle(
+        axes=axes,
+        benign_prior=benign_prior,
+        malicious_priors=malicious_priors,
+        config=config,
+        threshold=0.42,
+        grouped_thresholds={"tenant-a": {"threshold": 0.73, "num_samples": 2}},
+    )
+    path = tmp_path / "model.npz"
+    save_model(path, bundle)
+
+    model = load_model(path)
+    assert np.allclose(model.cones.axes, axes)
+    assert np.allclose(model.benign_prior, benign_prior)
+    assert np.allclose(model.malicious_priors["fam"], malicious_priors["fam"])
+    assert model.config.to_dict() == config.to_dict()
+    assert model.threshold == 0.42
+    assert model.grouped_thresholds == {"tenant-a": {"threshold": 0.73, "num_samples": 2}}
+
+
+def test_calibration_and_p_value():
+    scores = np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32)
+    threshold = calibrate_threshold(scores, alpha=0.25)
+    assert threshold in scores
+    p_val = conformal_p_value(0.3, scores)
+    assert 0.0 < p_val <= 1.0
+    assert conformal_p_value(0.4, scores) < conformal_p_value(0.1, scores)
+
+
+def test_refresh_benign_reference_updates_only_pb_and_threshold():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.95, 0.05], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=9.0,
+    )
+    old_axes = model.cones.axes.copy()
+    old_malicious = model.malicious_priors["m"].copy()
+    old_score = float(model.score_embeddings(np.array([[0.0, 1.0]], dtype=np.float32))[0])
+
+    benign_window = np.array([[0.0, 1.0], [0.0, 1.0], [1.0, 0.0]], dtype=np.float32)
+    report = model.refresh_benign_reference(benign_window, alpha=0.5)
+    new_score = float(model.score_embeddings(np.array([[0.0, 1.0]], dtype=np.float32))[0])
+
+    assert report["refresh_scope"]["benign_prior_updated"] is True
+    assert report["refresh_scope"]["malicious_priors_fixed"] is True
+    assert report["num_samples"] == 3
+    assert report["old_threshold"] == 9.0
+    assert report["benign_prior_l1_delta"] > 0.0
+    assert np.allclose(model.cones.axes, old_axes)
+    assert np.allclose(model.malicious_priors["m"], old_malicious)
+    assert model.benign_prior[1] > model.benign_prior[0]
+    assert model.threshold == report["threshold"]
+    assert new_score != old_score
+
+
+def test_refresh_benign_reference_updates_grouped_thresholds_when_groups_supplied():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.95, 0.05], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=9.0,
+        grouped_thresholds={"old": {"threshold": 9.0}},
+    )
+
+    benign_window = np.array([[0.0, 1.0], [0.0, 1.0], [1.0, 0.0], [1.0, 0.0]], dtype=np.float32)
+    report = model.refresh_benign_reference(
+        benign_window,
+        alpha=0.5,
+        calibration_groups=["tenant-a", "tenant-a", "tenant-b", "tenant-b"],
+    )
+
+    assert report["threshold_source"] == "grouped_benign_refresh_scores"
+    assert report["old_n_calibration_groups"] == 1
+    assert report["n_calibration_groups"] == 2
+    assert report["refresh_scope"]["grouped_thresholds_updated"] is True
+    assert set(model.grouped_thresholds or {}) == {"tenant-a", "tenant-b"}
+    assert model.grouped_thresholds == report["grouped_thresholds"]
+
+
+def test_update_benign_prior_rejects_empty_embeddings():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.5, 0.5], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+    )
+
+    try:
+        model.update_benign_prior(np.empty((0, 2), dtype=np.float32))
+    except ValueError as exc:
+        assert "cannot be empty" in str(exc)
+        return
+
+    assert False, "Expected ValueError for an empty benign refresh window"
+
+
+def test_model_score_normalization():
+    class DummyEncoder:
+        def __init__(self):
+            self.seen = None
+
+        def encode(self, texts, batch_size=32, normalize=True):
+            self.seen = list(texts)
+            return np.array([[1.0, 0.0] for _ in texts], dtype=np.float32)
+
+    encoder = DummyEncoder()
+    cones = _identity_cones()
+    benign_prior = np.array([0.9, 0.1], dtype=np.float32)
+    malicious_priors = {"m": np.array([0.1, 0.9], dtype=np.float32)}
+    model = CCDModel(
+        config=CCDConfig(),
+        encoder=encoder,
+        cones=cones,
+        benign_prior=benign_prior,
+        malicious_priors=malicious_priors,
+    )
+
+    host = "HTTP://WWW.Example.COM/path"
+    model.score([host], normalize=True)
+    assert encoder.seen == ["www.example.com"]
+    model.score([host], normalize=False)
+    assert encoder.seen == [host]
+
+
+def test_score_raises_with_no_malicious_priors():
+    cones = _identity_cones()
+    benign_prior = np.array([0.5, 0.5], dtype=np.float32)
+    model = CCDModel(
+        config=CCDConfig(),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=benign_prior,
+        malicious_priors={},
+    )
+    try:
+        _ = model.score_embeddings(np.array([[1.0, 0.0]], dtype=np.float32))
+    except ValueError:
+        return
+    assert False, "Expected ValueError when malicious_priors is empty"
+
+
+def test_ccd_model_from_embeddings_end_to_end():
+    config = CCDConfig()
+    config.cone = ConeConfig(dim=2, num_cones=2, active_cones=1, temperature=1.0, use_lsh=False)
+
+    benign_emb = np.array([[1.0, 0.0], [0.9, 0.1]], dtype=np.float32)
+    malicious_emb = {"cmdi": np.array([[0.0, 1.0], [0.1, 0.9]], dtype=np.float32)}
+    axes = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+
+    model = CCDModel.from_embeddings(
+        benign_embeddings=benign_emb,
+        malicious_embeddings_by_family=malicious_emb,
+        config=config,
+        axes=axes,
+    )
+    test_embeddings = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+    scores = model.score_embeddings(test_embeddings)
+    assert scores[0] < 0.0
+    assert scores[1] > 0.0
+
+
+def test_score_empty_inputs():
+    config = CCDConfig()
+    cones = ConePartition.build(config.cone)
+    benign_prior = np.ones(cones.config.num_cones, dtype=np.float32) / cones.config.num_cones
+    malicious_prior = np.ones(cones.config.num_cones, dtype=np.float32) / cones.config.num_cones
+    model = CCDModel(
+        config=config,
+        encoder=CahoEncoder(config.encoder),
+        cones=cones,
+        benign_prior=benign_prior,
+        malicious_priors={"m": malicious_prior},
+    )
+
+    scores = model.score([], batch_size=8, normalize=True)
+    assert isinstance(scores, np.ndarray)
+    assert scores.size == 0
+
+
+def test_approximate_k_validation():
+    config = CCDConfig()
+    cones = ConePartition.build(config.cone)
+    benign_prior = np.ones(cones.config.num_cones, dtype=np.float32) / cones.config.num_cones
+    malicious_prior = np.ones(cones.config.num_cones, dtype=np.float32) / cones.config.num_cones
+    model = CCDModel(
+        config=config,
+        encoder=CahoEncoder(config.encoder),
+        cones=cones,
+        benign_prior=benign_prior,
+        malicious_priors={"m": malicious_prior},
+    )
+
+    try:
+        _ = model.score_embeddings(np.array([[1.0, 0.0]], dtype=np.float32), approximate_k=0)
+    except ValueError:
+        return
+    assert False, "Expected ValueError for approximate_k <= 0"
+
+
+def test_model_certify_uses_exact_score_path():
+    class PositiveEncoder:
+        def encode(self, texts, batch_size=32, normalize=True):
+            return np.array([[0.0, 1.0] for _ in texts], dtype=np.float32)
+
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=PositiveEncoder(),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=0.0,
+    )
+
+    cert = model.certify(
+        "Example.com",
+        radius=1,
+        edit_model=EditModel(edits=["E5_case"]),
+    )
+
+    assert cert.certified is True
+    assert cert.prediction is True
+    assert cert.method == "enumeration"
+
+
+def test_model_certify_supports_calibrated_margin_and_combined_fallback():
+    class PositiveEncoder:
+        def encode(self, texts, batch_size=32, normalize=True):
+            return np.array([[0.0, 1.0] for _ in texts], dtype=np.float32)
+
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=PositiveEncoder(),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=0.0,
+    )
+
+    cmc = model.certify(
+        "Example.com",
+        radius=1,
+        method="calibrated-margin",
+        sketch_lipschitz=0.1,
+        embedding_rotation_bound=0.1,
+    )
+    fallback = model.certify(
+        "Example.com",
+        radius=1,
+        method="combined",
+        edit_model=EditModel(edits=["E5_case"]),
+        sketch_lipschitz=10.0,
+        embedding_rotation_bound=10.0,
+    )
+
+    assert cmc.certified is True
+    assert cmc.method == "calibrated_margin"
+    assert fallback.certified is True
+    assert fallback.method == "enumeration"
+
+
+def test_model_certify_requires_bounds_for_calibrated_margin():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=0.0,
+    )
+
+    try:
+        model.certify("example.com", radius=1, method="calibrated-margin")
+    except ValueError as exc:
+        assert "sketch_lipschitz" in str(exc)
+        return
+
+    assert False, "Expected ValueError when calibrated-margin bounds are missing"

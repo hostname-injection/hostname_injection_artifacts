@@ -1,0 +1,12 @@
+release_version: hib-v1.0
+row_id_secret: replace-with-private-row-id-hmac-secret
+artifact_secret: replace-with-private-artifact-hmac-secret
+shuffle_secret: replace-with-private-shuffle-hmac-secret
+security_approval: pending
+privacy_approval: pending
+legal_or_data_owner_approval: pending
+# The scripts also accept these secrets from environment variables so long
+# production commands do not expose them in argv:
+# HIB_DEID_ROW_ID_SECRET
+# HIB_DEID_ARTIFACT_SECRET
+# HIB_DEID_SHUFFLE_SECRET

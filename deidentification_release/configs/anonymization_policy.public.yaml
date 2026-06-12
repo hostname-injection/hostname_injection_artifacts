@@ -1,0 +1,78 @@
+release_version: hib-v1.0
+policy_version: non-linkable-release-policy-v1.0
+public_release_principles:
+  - preserve_attack_relevant_structure
+  - remove_direct_identifiers
+  - prevent_cross_row_hostname_linkage
+  - prevent_tenant_or_website_access_pattern_reconstruction
+  - neutralize_live_callbacks_and_executable_payloads
+  - avoid_intent_signaling_synthetic_hostnames
+forbidden_public_fields:
+  - raw_hostname
+  - raw_canonical_hostname
+  - dedup_hostname_id
+  - unique_host_hash
+  - stable_hostname_hash
+  - tenant_surrogate
+  - raw_tenant_id
+  - stable_tenant_time_series_id
+  - exact_timestamp
+  - private_mapping_key
+replacement_namespaces:
+  dns_suffixes:
+    - invalid
+    - example
+    - test
+  ipv4_documentation_ranges:
+    - 192.0.2.0/24
+    - 198.51.100.0/24
+    - 203.0.113.0/24
+  ipv6_documentation_ranges:
+    - 2001:db8::/32
+minimum_public_k:
+  time_source_label_tier_sink: 50
+utility_thresholds:
+  unchanged_safe_span_preservation_min: 0.999
+  sensitive_span_character_mask_preservation_min: 0.99
+  sensitive_span_length_preservation_or_nearest_safe_min: 0.99
+  dns_label_count_preservation_min: 0.995
+  delimiter_position_preservation_min: 0.995
+  encoding_style_preservation_min: 0.99
+  normalizer_path_preservation_min: 0.99
+  sink_family_preservation_min: 0.99
+  evidence_tier_preservation_min: 0.99
+  ccd_flag_agreement_min: 0.99
+  ccd_score_spearman_min: 0.95
+manual_review:
+  minimum_rows: 10000
+  minimum_reviewers: 2
+public_synthetic_hostname_realism:
+  avoid_obvious_intent_terms:
+    - malicious
+    - hack
+    - hacker
+    - hacked
+    - evil
+    - attack
+    - attacker
+    - exploit
+    - pwn
+    - pwned
+    - phish
+    - phishing
+    - malware
+    - virus
+    - ransom
+    - trojan
+    - botnet
+    - backdoor
+    - rootkit
+  replacement_style: realistic_operational_labels_without_malicious_intent_signaling
+public_nonlinkability_coarsening:
+  released_length_bucket_values:
+    - withheld
+  character_class_mask_style: withheld
+  public_obfuscation_family_values:
+    - none
+    - present
+  rationale: prevent_private_raw_hostname_grouping_properties_from_being_inferred_from_public_structural_fingerprints

@@ -1,0 +1,29 @@
+{
+  "paper_section": "Section 8.1 static-analysis comparison",
+  "corpus": {
+    "n_repositories": 50,
+    "repository_policy": "Source-available repositories that process host or telemetry fields.",
+    "corpus_artifact_status": "Full public corpus manifest and labeled tool outputs are external publication-stage artifacts."
+  },
+  "tools": {
+    "codeql": {
+      "version": "2.17.0",
+      "true_positive": 10,
+      "false_positive": 2,
+      "missed_delayed_path": 38,
+      "paper_wording": "A custom CodeQL 2.17.0 taint query found 10 true positives and 2 false positives but missed 38 delayed log/warehouse paths."
+    },
+    "semgrep": {
+      "version": "1.60.0",
+      "true_positive": 6,
+      "false_positive": 2,
+      "missed_delayed_path": 42,
+      "paper_wording": "Semgrep 1.60.0 taint mode found 6 true positives and 2 false positives but missed 42 cross-service telemetry flows."
+    }
+  },
+  "private_by_design": [
+    "Private review notes",
+    "Closed-source production repositories",
+    "Exact sensitive strings or response-owner records"
+  ]
+}

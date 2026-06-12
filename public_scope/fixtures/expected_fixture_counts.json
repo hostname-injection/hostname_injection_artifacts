@@ -1,0 +1,20 @@
+{
+  "paper_section": "Fixture public-scope accounting",
+  "public_reports": {
+    "total": 5,
+    "mapped_to_target_categories": 3,
+    "excluded": 2,
+    "exclusion_counts": {
+      "rebinding": 1,
+      "quic": 1
+    }
+  },
+  "public_anchors": [
+    {
+      "name": "Fixture command anchor",
+      "target_category": "command-execution",
+      "counted_in_hib_training_or_positives": false
+    }
+  ],
+  "private_by_design": []
+}

@@ -1,0 +1,8 @@
+api.canary.example.invalid
+auth.prod.example.invalid
+cdn-cache-22.edge.example.invalid
+metrics-ingest-09.service.example.invalid
+device-00999.office.example.invalid
+resolver-nxdomain.example.invalid
+host.with.many.labels.example.invalid
+batch-worker-12.internal.example.invalid

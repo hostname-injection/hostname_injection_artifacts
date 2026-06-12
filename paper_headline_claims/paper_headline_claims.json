@@ -1,0 +1,161 @@
+{
+  "source": "paper_headline_claim_inventory",
+  "paper": "IEEE_S_P_Hostnames.pdf",
+  "scope": "Release-safe audit of abstract, contribution, conclusion, and high-visibility quantitative paper claims.",
+  "headline_claims": [
+    {
+      "item_id": "abstract_replay_scale",
+      "paper_refs": ["Abstract", "Contribution 2", "Appendix B"],
+      "claim_summary": "HIB is a 200.3M-row, 835-tenant production replay.",
+      "source_paths": ["hib_profile/paper_hib_profile_counts.json"],
+      "expected": {
+        "replay_rows": 200339886,
+        "replay_rows_millions_rounded": 200.3,
+        "tenant_count": 835
+      },
+      "external_required": true,
+      "external_completion_keyword": "full HIB-Real",
+      "privacy_boundary": "Aggregate scale is public; row-level replay requires the external full HIB-Real release bundle."
+    },
+    {
+      "item_id": "abstract_fixed_fpr_recall_latency",
+      "paper_refs": ["Abstract", "Section 8.2", "Table 5", "Figure 5"],
+      "claim_summary": "CCD reaches 93.5% TPR at the 1e-4 FPR operating point while staying within the 0.60 ms full-path latency budget.",
+      "source_paths": [
+        "paper_metric_tables/paper_metric_tables.json",
+        "production_latency/paper_production_latency_counts.json"
+      ],
+      "expected": {
+        "ccd_tpr_at_1e_4": 0.935,
+        "ccd_observed_fpr": 0.000098,
+        "fpr_budget": 0.0001,
+        "fpr_within_budget": true,
+        "full_path_median_ms": 0.6
+      },
+      "external_required": true,
+      "external_completion_keyword": "production latency traces",
+      "privacy_boundary": "Aggregate accuracy and timing are public; raw replay predictions and serving traces are external."
+    },
+    {
+      "item_id": "abstract_live_added_value",
+      "paper_refs": ["Abstract", "Section 8.4", "Table 7"],
+      "claim_summary": "The live comparison found 850 CCD-only verified positives missed by deployed Regex/WAF controls.",
+      "source_paths": ["live_overlap/paper_live_overlap_counts.json"],
+      "expected": {
+        "overlap_verified_positive": 2300,
+        "ccd_only_verified_positive": 850,
+        "regex_waf_only_verified_positive": 0,
+        "ccd_total_verified_live_positives": 3150
+      },
+      "external_required": true,
+      "external_completion_keyword": "masked live-overlap",
+      "privacy_boundary": "Aggregate overlap cells are public; row-level live case chains are masked or external."
+    },
+    {
+      "item_id": "hib_label_profile",
+      "paper_refs": ["Section 8.1", "Appendix B", "Table 3"],
+      "claim_summary": "The resolved replay contains 199,889,499 benign labels, 363,401 verified positives, and 86,986 unresolved rows; positives are about 0.18% of resolved replay rows.",
+      "source_paths": ["hib_profile/paper_hib_profile_counts.json"],
+      "expected": {
+        "resolved_benign": 199889499,
+        "verified_executable_semantics": 363401,
+        "unresolved": 86986,
+        "resolved_replay_denominator": 200252900,
+        "positive_prevalence_percent_rounded": 0.18
+      },
+      "external_required": true,
+      "external_completion_keyword": "full HIB-Real",
+      "privacy_boundary": "Label totals are aggregate and release-safe; row-level labels require the external full release."
+    },
+    {
+      "item_id": "decision_stability_k6",
+      "paper_refs": ["Section 7", "Section 8.4", "Figure 7"],
+      "claim_summary": "At K=6, CCD reports stable decisions for 98% of detected positives, with SEC alone at 60% and native-feature baselines at 41-48%.",
+      "source_paths": ["stability_scope/paper_stability_scope_counts.json"],
+      "expected": {
+        "alpha": 0.0001,
+        "edit_budget_k": 6,
+        "combined_stable_detected_positive_coverage": 0.98,
+        "sec_alone_stable_detected_positive_coverage": 0.6,
+        "native_feature_baseline_min_coverage": 0.41,
+        "native_feature_baseline_max_coverage": 0.48
+      },
+      "external_required": true,
+      "external_completion_keyword": "stability",
+      "privacy_boundary": "Certificate implementation is public; paper-scale coverage counts are release-safe aggregates."
+    },
+    {
+      "item_id": "synthetic_training_gap",
+      "paper_refs": ["Section 6", "Section 8.3", "Appendix F"],
+      "claim_summary": "LLM-prior synthetic training is within 2.4 points of real-payload training at 1e-4 FPR, and tuned synthetic features reduce the gap to 1.2 points.",
+      "source_paths": ["paper_metric_tables/paper_metric_tables.json"],
+      "expected": {
+        "llm_prior_recall_at_1e_4": 0.935,
+        "real_payload_training_recall_at_1e_4": 0.959,
+        "real_training_gain_over_llm_pp": 2.4,
+        "tuned_generator_recall_at_1e_4": 0.947,
+        "real_training_gap_tuned_pp": 1.2
+      },
+      "external_required": true,
+      "external_completion_keyword": "full replay",
+      "privacy_boundary": "Aggregate generator comparison is public; full run outputs and real-payload training provenance are external."
+    },
+    {
+      "item_id": "scope_public_and_static",
+      "paper_refs": ["Contribution 5", "Section 8.1", "Section 8.4"],
+      "claim_summary": "Scope checks cover a 50-repo source corpus and map 118 of 127 post-freeze public reports to target categories.",
+      "source_paths": [
+        "source_reachability/paper_source_reachability_counts.json",
+        "public_scope/paper_public_scope_counts.json"
+      ],
+      "expected": {
+        "source_repositories": 50,
+        "codeql_true_positive": 10,
+        "codeql_false_positive": 2,
+        "codeql_missed_delayed_path": 38,
+        "semgrep_true_positive": 6,
+        "semgrep_false_positive": 2,
+        "semgrep_missed_delayed_path": 42,
+        "public_reports_total": 127,
+        "public_reports_mapped": 118,
+        "public_reports_excluded": 9
+      },
+      "external_required": true,
+      "external_completion_keyword": "full source-reachability",
+      "privacy_boundary": "Aggregate scope counts are public; full corpus labels and private review notes are external."
+    },
+    {
+      "item_id": "hostile_mimicry_range",
+      "paper_refs": ["Section 8.3", "Appendix F", "Table 12"],
+      "claim_summary": "Across hostile-mimicry suites, CCD keeps 91.5-99.2% recall at 1e-4 FPR while strongest baselines range from 45.8-85.4%.",
+      "source_paths": ["paper_metric_tables/paper_metric_tables.json"],
+      "expected": {
+        "min_ccd_recall_1e_4": 0.915,
+        "max_ccd_recall_1e_4": 0.992,
+        "min_best_baseline_recall_1e_4": 0.458,
+        "max_best_baseline_recall_1e_4": 0.854,
+        "n_hostile_mimicry_suites": 5
+      },
+      "external_required": true,
+      "external_completion_keyword": "hostile-mimicry",
+      "privacy_boundary": "Aggregate stress-suite cells are public; row-level stress cases and predictions are external."
+    },
+    {
+      "item_id": "production_throughput_tail",
+      "paper_refs": ["Section 8.2", "Figure 5", "Table 5"],
+      "claim_summary": "CCD's full production path reports 1.84/3.92/7.80 ms p95/p99/p99.9 latency and 48k host strings/s per host.",
+      "source_paths": ["production_latency/paper_production_latency_counts.json"],
+      "expected": {
+        "full_path_p95_ms": 1.84,
+        "full_path_p99_ms": 3.92,
+        "full_path_p999_ms": 7.8,
+        "single_host_throughput_per_s": 48000,
+        "scoring_kernel_p50_ms": 0.04,
+        "scoring_kernel_p99_ms": 0.11
+      },
+      "external_required": true,
+      "external_completion_keyword": "production latency traces",
+      "privacy_boundary": "Production timing aggregates are public; raw serving traces and topology are external."
+    }
+  ]
+}

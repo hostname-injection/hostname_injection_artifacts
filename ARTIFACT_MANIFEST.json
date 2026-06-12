@@ -1,0 +1,563 @@
+{
+  "artifact_name": "ccd-hostname-command-injection",
+  "paper_title": "When Hostnames Become Code: Detecting Persisted Hostname Injection at Production Scale",
+  "paper_pdf": "IEEE_S_P_Hostnames.pdf",
+  "target_badges": [
+    "Available",
+    "Functional",
+    "Reproduced"
+  ],
+  "primary_readme": "README.md",
+  "badge_readiness": "BADGE_READINESS.md",
+  "evaluation_guide": "ARTIFACT_EVALUATION.md",
+  "metadata_template": "metadata.template.toml",
+  "resource_notes": "ARTIFACT_RESOURCES.md",
+  "provenance_and_ethics": "ARTIFACT_PROVENANCE_AND_ETHICS.md",
+  "license_files": [
+    "LICENSE",
+    "LICENSE-CODE",
+    "LICENSE-ARTIFACTS"
+  ],
+  "install": {
+    "environment_file": "environment.yml",
+    "command": "conda env create -f environment.yml && conda activate ccd",
+    "python": "3.11"
+  },
+  "ieee_sp_artifact_requirements": {
+    "instruction_url": "https://sp2027.ieee-security.org/artifact_instructions.html",
+    "badge_criteria": {
+      "Available": {
+        "permanent_public_retrieval_required": true,
+        "doi_required": true,
+        "current_status": "prepared_external_publication_required",
+        "evidence": [
+          "scripts/build_artifact_archive.py",
+          "metadata.template.toml",
+          "ARTIFACT_EVALUATION.md"
+        ]
+      },
+      "Functional": {
+        "documentation": {
+          "supported": true,
+          "evidence": [
+            "README.md",
+            "ARTIFACT_EVALUATION.md",
+            "ARTIFACT_RESOURCES.md",
+            "BADGE_READINESS.md"
+          ]
+        },
+        "completeness": {
+          "supported": true,
+          "evidence": [
+            "paper_claim_coverage/paper_claim_coverage.json",
+            "paper_headline_claims/paper_headline_claims.json",
+            "method_contracts/paper_method_contracts.json",
+            "ARTIFACT_MANIFEST.json"
+          ]
+        },
+        "exercisability": {
+          "supported": true,
+          "evidence": [
+            "scripts/run_artifact_smoke.py",
+            "scripts/run_artifact_claim_checks.py",
+            "scripts/audit_artifact_readiness.py",
+            "tests"
+          ]
+        },
+        "other_machine_portability": {
+          "supported": true,
+          "evidence": [
+            "scripts/audit_artifact_readiness.py",
+            "metadata.template.toml",
+            "environment.yml"
+          ]
+        }
+      },
+      "Reproduced": {
+        "main_results_supported": true,
+        "independent_repeat_path": "ARTIFACT_EVALUATION.md#full-hib-replay-path",
+        "allowed_tolerance_documented": true,
+        "scaled_down_for_lengthy_experiments": true,
+        "external_full_data_required": true,
+        "evidence": [
+          "deidentification_release/scripts/recompute_metrics.py",
+          "paper_metric_tables/paper_metric_tables.json",
+          "ARTIFACT_EVALUATION.md"
+        ]
+      }
+    },
+    "aec_contact_required": true,
+    "aec_contact_note": "Provide at least one responsive contact author in HotCRP; no personal contact data is stored in the public repository.",
+    "public_research_infrastructure": {
+      "supported": true,
+      "notes": "Kick-the-tires, tests, release gates, and aggregate recomputation run on commodity CPU Linux/macOS hosts or public research infrastructure with Python 3.11. No SSH service, GUI, paid API, production-network access, special hardware, or GPU is required for the public artifact path.",
+      "metadata_field": "infrastructure_access"
+    },
+    "runtime": {
+      "aec_limit_hours": 24,
+      "kick_the_tires_runtime": "A few minutes on a laptop CPU after dependencies are installed.",
+      "full_tests_runtime": "Under one day on commodity CPU hardware.",
+      "scaled_down_experiments_justified": true,
+      "scaled_down_justification": "The checked-in 150-row HIB sample proves release mechanics, privacy gates, fixed-FPR replay code paths, detector mechanics, and aggregate recomputation. Paper-scale row-level replay requires staging the external 200,339,886-row HIB-Real bundle."
+    },
+    "packaging": {
+      "source_package": true,
+      "container_required": false,
+      "metadata_template": "metadata.template.toml",
+      "hotcrp_metadata_required": true,
+      "archive_builder": "scripts/build_artifact_archive.py",
+      "all_relevant_information_in_packaging": true
+    },
+    "claims": {
+      "concrete_claims_required": true,
+      "claim_map": "ARTIFACT_EVALUATION.md#paper-claim-map",
+      "machine_readable_manifest": "ARTIFACT_MANIFEST.json",
+      "paper_claim_coverage": "paper_claim_coverage/paper_claim_coverage.json",
+      "paper_headline_claims": "paper_headline_claims/paper_headline_claims.json"
+    },
+    "release_expectation": {
+      "meaningful_public_release_expected": true,
+      "private_by_design_document": "ARTIFACT_PROVENANCE_AND_ETHICS.md",
+      "full_evaluated_release_external": true,
+      "strict_final_gate": "python scripts/audit_artifact_readiness.py --strict-final"
+    },
+    "tracking": {
+      "web_tracking_embedded": false,
+      "tracking_scan_required": true,
+      "tracking_scan_paths": "tracking_scan_paths"
+    }
+  },
+  "kick_the_tires": {
+    "command": "python scripts/run_artifact_smoke.py --skip-tests",
+    "expected": "artifact smoke status: pass",
+    "runtime": "A few minutes on a laptop CPU after dependencies are installed.",
+    "network_required": false,
+    "gpu_required": false
+  },
+  "full_tests": {
+    "command": "python -m pytest -q",
+    "last_observed": "217 passed, 1 skipped"
+  },
+  "public_release_bundle": {
+    "bundle": "deidentification_release/data/release/hib_release_public_bundle.tar.gz",
+    "sha256_sidecar": "deidentification_release/data/release/hib_release_public_bundle.tar.gz.sha256",
+    "manifest": "deidentification_release/data/release/hib_release_public_bundle.tar.manifest.json",
+    "sample_release": "deidentification_release/data/release/hib_release.jsonl",
+    "audit_dir": "deidentification_release/data/audits",
+    "row_count": 150,
+    "metrics_expectations": {
+      "fixed_fpr_status": "available",
+      "threshold_source": "recomputed_from_public_grouped_calibration_scores",
+      "min_calibration_groups": 2,
+      "min_scored_benign_calibration_rows": 1,
+      "min_metric_positive_rows": 1,
+      "min_metric_negative_rows": 1,
+      "min_fixed_fpr_tp": 1,
+      "min_fixed_fpr_fp": 1,
+      "min_fixed_fpr_tn": 1,
+      "min_fixed_fpr_fn": 1
+    },
+    "validation_command": "PYTHONPATH=deidentification_release/scripts python deidentification_release/scripts/validate_release_gate.py --public-release deidentification_release/data/release/hib_release.jsonl --audit-dir deidentification_release/data/audits --bundle deidentification_release/data/release/hib_release_public_bundle.tar.gz --count-rows"
+  },
+  "components": [
+    {
+      "name": "CCD detector implementation",
+      "paths": [
+        "ccd/scoring.py",
+        "ccd/cone.py",
+        "ccd/model.py",
+        "ccd/calibration.py",
+        "ccd/certify.py",
+        "ccd/cli.py"
+      ]
+    },
+    {
+      "name": "CAHO augmentation and checkpoint",
+      "paths": [
+        "ccd/augment.py",
+        "ccd/edit_model.py",
+        "caho_model_checkpoint"
+      ]
+    },
+    {
+      "name": "Method-contract accounting",
+      "paths": [
+        "method_contracts",
+        "scripts/recompute_method_contracts.py"
+      ]
+    },
+    {
+      "name": "Paper-claim coverage accounting",
+      "paths": [
+        "paper_claim_coverage",
+        "scripts/recompute_paper_claim_coverage.py"
+      ]
+    },
+    {
+      "name": "Paper headline-claim accounting",
+      "paths": [
+        "paper_headline_claims",
+        "scripts/recompute_paper_headline_claims.py"
+      ]
+    },
+    {
+      "name": "Release-safe paper claim check runner",
+      "paths": [
+        "scripts/run_artifact_claim_checks.py"
+      ]
+    },
+    {
+      "name": "HIB de-identification release pipeline",
+      "paths": [
+        "deidentification_release/scripts",
+        "deidentification_release/data/release/hib_release_public_bundle.tar.gz",
+        "deidentification_release/data/audits"
+      ]
+    },
+    {
+      "name": "HIB dataset-profile aggregate accounting",
+      "paths": [
+        "hib_profile",
+        "scripts/recompute_hib_profile_metrics.py"
+      ]
+    },
+    {
+      "name": "Evaluation-unit and reproducibility-boundary accounting",
+      "paths": [
+        "evaluation_accounting",
+        "scripts/recompute_evaluation_accounting.py"
+      ]
+    },
+    {
+      "name": "Baselines",
+      "paths": [
+        "baselines"
+      ]
+    },
+    {
+      "name": "Source-code reachability accounting",
+      "paths": [
+        "source_reachability",
+        "scripts/recompute_source_reachability_metrics.py"
+      ]
+    },
+    {
+      "name": "Public-scope taxonomy accounting",
+      "paths": [
+        "public_scope",
+        "scripts/recompute_public_scope_metrics.py"
+      ]
+    },
+    {
+      "name": "Live-overlap aggregate accounting",
+      "paths": [
+        "live_overlap",
+        "scripts/recompute_live_overlap_metrics.py"
+      ]
+    },
+    {
+      "name": "Sink-evidence aggregate accounting",
+      "paths": [
+        "sink_evidence",
+        "scripts/recompute_sink_evidence_metrics.py"
+      ]
+    },
+    {
+      "name": "Paper metric-table aggregate accounting",
+      "paths": [
+        "paper_metric_tables",
+        "scripts/recompute_paper_metric_tables.py"
+      ]
+    },
+    {
+      "name": "Stability, drift, and scope aggregate accounting",
+      "paths": [
+        "stability_scope",
+        "scripts/recompute_stability_scope_metrics.py"
+      ]
+    },
+    {
+      "name": "Production latency aggregate accounting",
+      "paths": [
+        "production_latency",
+        "scripts/recompute_production_latency_metrics.py"
+      ]
+    },
+    {
+      "name": "Local latency smoke benchmark",
+      "paths": [
+        "scripts/benchmark_artifact_latency.py",
+        "ccd/diagnostics.py",
+        "baselines/latency.py"
+      ]
+    },
+    {
+      "name": "Evaluator smoke examples",
+      "paths": [
+        "examples"
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "claim": "CCD scoring and split-conformal thresholding are executable from the public code.",
+      "script": "python -m pytest tests/test_scoring.py tests/test_cone.py tests/test_model_pipeline.py tests/test_calibration.py",
+      "expected": "Tests pass and exercise Eq. 1 mixture cone scoring, exact full-axis scanning for the deployed top-R cone sketch that bypasses LSH by default, fixed-FPR global and grouped threshold selection, benign-reference refresh, and optional global/grouped calibrated-threshold persistence in model bundles."
+    },
+    {
+      "claim": "Finite-edit decision-stability helpers implement deterministic manifest closure.",
+      "script": "python -m pytest tests/test_certify.py",
+      "expected": "Tests pass and exercise margin-bound certificates, deterministic edit-ball enumeration, and rejection on decision flips."
+    },
+    {
+      "claim": "CAHO benchmark training supports the deployed contrastive plus binary-auxiliary training path.",
+      "script": "python -m pytest tests/test_benchmark_training.py",
+      "expected": "Tests pass and exercise BenchmarkBinaryContrastiveTrainer fit/save behavior with a two-view dataset, chunk-aware shuffled training order, and binary classifier head."
+    },
+    {
+      "claim": "Table 1 and Appendix C method contracts are executable and release-safe.",
+      "script": "python scripts/recompute_method_contracts.py --counts method_contracts/paper_method_contracts.json",
+      "expected": "The output reports status=pass, validates Table 1 contract rows, checks CCD default configuration against Appendix C, verifies E1-E11 edit-manifest coverage, deterministic finite-edit closure, calibrated-margin certificates with enumeration fallback, confirms exact full-axis scanning for the deployed top-R cone sketch that bypasses LSH by default for calibration/certification, confirms global and tenant/window grouped split-conformal threshold support, confirms benign-only P_B/threshold refresh support, confirms CAHO two-view supervised orbit contrastive plus binary-head training support with benign diversity preservation, L2-normalized binary inputs, explicit AdamW weight decay, and benchmark binary-trainer defaults matching the Appendix C deployed recipe, and confirms model bundles can persist config, axes, priors, and global/grouped calibrated thresholds."
+    },
+    {
+      "claim": "Named paper claims, figures, tables, equations, and appendices are mapped to artifact evidence and explicit external boundaries.",
+      "script": "python scripts/recompute_paper_claim_coverage.py --counts paper_claim_coverage/paper_claim_coverage.json --manifest ARTIFACT_MANIFEST.json",
+      "expected": "The output reports status=pass, validates 33 coverage items covering five contributions, Eq. 1, Proposition 5.1, Lemma C.1, Figures 1-7, Tables 1-12, and Appendices A-F, checks referenced artifact paths and manifest claim alignment, and requires full-data or production-private dependencies to remain represented as external completion items."
+    },
+    {
+      "claim": "The paper's headline numeric claims are centrally audited against release-safe aggregate artifacts.",
+      "script": "python scripts/recompute_paper_headline_claims.py --counts paper_headline_claims/paper_headline_claims.json --manifest ARTIFACT_MANIFEST.json",
+      "expected": "The output reports status=pass, validates nine abstract/contribution/conclusion headline anchors, including 200,339,886 replay rows, 835 tenants, CCD 0.935 TPR at the fixed-FPR operating point, 0.60 ms full-path latency, 850 CCD-only verified live positives, 363,401 verified positives, 98% K=6 decision-stability coverage, 50-repo source reachability, 118/127 public-scope mapping, and hostile-mimicry recall ranges."
+    },
+    {
+      "claim": "All release-safe paper-claim checks can be run from one evaluator command.",
+      "script": "python scripts/run_artifact_claim_checks.py",
+      "expected": "The output reports status=pass, runs 14 release-safe checks including the readiness audit, method contracts, paper-claim coverage, headline-claim anchors, HIB profile, evaluation accounting, source reachability, public scope, production latency, live overlap, sink evidence, metric tables, stability/scope aggregates, and public sample fixed-FPR replay metrics."
+    },
+    {
+      "claim": "The artifact can be kicked-the-tires without private data.",
+      "script": "python scripts/run_artifact_smoke.py --skip-tests",
+      "expected": "The command compiles code, validates the public bundle in-repo and after extraction, recomputes sample replay metrics, trains a tiny CCD model, calibrates fixed-FPR global and grouped thresholds into a self-contained model bundle, refreshes P_B plus global/grouped thresholds from a benign window, scores, explains, and certifies from that refreshed bundle with grouped thresholds, evaluates the CAHO checkpoint, and prints artifact smoke status: pass."
+    },
+    {
+      "claim": "A clean DOI-ready archive can be assembled from the worktree.",
+      "script": "python scripts/build_artifact_archive.py --dry-run",
+      "expected": "The command verifies required manifest paths, excludes local caches, virtualenvs, and intermediate training checkpoints, summarizes archive contents, and exits with status=pass."
+    },
+    {
+      "claim": "The checked-in public HIB sample bundle satisfies release gates and does not disclose raw-hostname recurrence facts.",
+      "script": "PYTHONPATH=deidentification_release/scripts python deidentification_release/scripts/validate_release_gate.py --public-release deidentification_release/data/release/hib_release.jsonl --audit-dir deidentification_release/data/audits --bundle deidentification_release/data/release/hib_release_public_bundle.tar.gz --count-rows",
+      "expected": "The validator exits successfully with status=pass and row_count_checked=150."
+    },
+    {
+      "claim": "Public replay metrics can be recomputed from released rows.",
+      "script": "python deidentification_release/scripts/recompute_metrics.py --public-release deidentification_release/data/release/hib_release.jsonl --alpha 1e-4 --out /tmp/recomputed_public_metrics.json",
+      "expected": "The output includes label_accounting, calibration, fixed_fpr_replay, resolved_row_replay, and detector_overlap blocks; the checked-in sample reports grouped public calibration, fixed_fpr_replay.status=available, and nonzero TP/FP/TN/FN cells."
+    },
+    {
+      "claim": "HIB dataset-profile and verified-positive profile aggregate accounting is release-safe and recomputable.",
+      "script": "python scripts/recompute_hib_profile_metrics.py --counts hib_profile/paper_hib_profile_counts.json",
+      "expected": "The output reports status=pass, validates Table 3 source/resolved/unresolved rows, Appendix B label and capture-policy counts, Table 4/Table 9 verified-positive family and obfuscation denominators, and derives replay prevalence and profile consistency checks."
+    },
+    {
+      "claim": "Evaluation units and reproducibility boundaries are release-safe and recomputable.",
+      "script": "python scripts/recompute_evaluation_accounting.py --counts evaluation_accounting/paper_evaluation_accounting.json --manifest ARTIFACT_MANIFEST.json",
+      "expected": "The output reports status=pass, validates Table 2 denominator units, validates Appendix E/Table 11 released-versus-withheld boundaries, confirms unresolved rows are excluded from resolved replay denominators, and checks that Table 11 external boundaries are represented in manifest external completion items."
+    },
+    {
+      "claim": "Static source-reachability accounting for the paper's 50-repo scope check is release-safe and recomputable.",
+      "script": "python scripts/recompute_source_reachability_metrics.py --counts source_reachability/paper_source_reachability_counts.json",
+      "expected": "The output reports status=pass with the paper's CodeQL and Semgrep true-positive, false-positive, and missed-delayed-path counts plus derived precision/recall accounting."
+    },
+    {
+      "claim": "Public-scope taxonomy accounting is release-safe and separates public anchors from HIB positives.",
+      "script": "python scripts/recompute_public_scope_metrics.py --counts public_scope/paper_public_scope_counts.json",
+      "expected": "The output reports status=pass with 118/127 post-freeze public reports mapped to target categories, allowed exclusion reasons, and public anchors marked as not counted in HIB training or production positives."
+    },
+    {
+      "claim": "The artifact exposes a local latency smoke benchmark for the encoder and CCD scoring kernel.",
+      "script": "python scripts/benchmark_artifact_latency.py --num-samples 64 --repeats 1 --warmup 0",
+      "expected": "The command reports status=pass and emits hardware-dependent encoder and ccd_scores_logpriors_topk timing fields without asserting the paper's production latency numbers on evaluator hardware."
+    },
+    {
+      "claim": "Production latency and throughput aggregates are release-safe and recomputable.",
+      "script": "python scripts/recompute_production_latency_metrics.py --counts production_latency/paper_production_latency_counts.json",
+      "expected": "The output reports status=pass, validates Figure 5 full-path latency and throughput aggregates, scoring-kernel latency ordering, Table 5 CCD p99/p99.9 alignment, and the local-smoke boundary that evaluator hardware is not expected to reproduce production latency."
+    },
+    {
+      "claim": "Live-overlap aggregate accounting is release-safe and recomputable.",
+      "script": "python scripts/recompute_live_overlap_metrics.py --counts live_overlap/paper_live_overlap_counts.json",
+      "expected": "The output reports status=pass, reconstructs Table 7 overlap cells, derives CCD-only verified live positives, lower-bound reviewed-item PPV, per-day nonverified review load, and marks controlled case-study traces as non-compromise claims."
+    },
+    {
+      "claim": "Controlled sink-evidence traces for audited metadata-to-code paths are release-safe and recomputable.",
+      "script": "python scripts/recompute_sink_evidence_metrics.py --counts sink_evidence/paper_sink_evidence_counts.json",
+      "expected": "The output reports status=pass, validates the three Table 8 controlled matching-sink replay cases, requires parser/persistence/consumer/effect/detector-boundary fields, verifies CCD fired before downstream consumption, and records the traces as evidence rather than production-compromise claims."
+    },
+    {
+      "claim": "Aggregate paper metric tables for baseline audit, ablations, hostile mimicry, and synthetic-real validity are release-safe and recomputable.",
+      "script": "python scripts/recompute_paper_metric_tables.py --counts paper_metric_tables/paper_metric_tables.json",
+      "expected": "The output reports status=pass, validates Tables 5, 6, 10, and 12 plus Appendix F aggregate metrics, and derives summary checks such as CCD's Table 5 TPR lead, largest white-box ablation drop, LLM checkpoint coverage, weakest hostile-mimicry cell, and real-training gain over LLM priors."
+    },
+    {
+      "claim": "Decision-stability, family-holdout/depth, drift-refresh, and public-real scope aggregates are release-safe and recomputable.",
+      "script": "python scripts/recompute_stability_scope_metrics.py --counts stability_scope/paper_stability_scope_counts.json",
+      "expected": "The output reports status=pass, validates Figure 7 finite-edit certificate coverage and scope limits, Section 8.2 holdout/depth ranges, Section 8.3 benign-only drift-refresh invariants, independent replay tolerance, and public-real recall ordering."
+    },
+    {
+      "claim": "Paper-scale headline metrics require the separate full HIB-Real de-identified release.",
+      "script": "See ARTIFACT_EVALUATION.md#full-hib-replay-path",
+      "expected": "After the full bundle is staged, the same validators and recompute_metrics.py command validate the 200,339,886-row replay."
+    }
+  ],
+  "required_files": [
+    "README.md",
+    "BADGE_READINESS.md",
+    "ARTIFACT_EVALUATION.md",
+    "ARTIFACT_MANIFEST.json",
+    "ARTIFACT_RESOURCES.md",
+    "ARTIFACT_PROVENANCE_AND_ETHICS.md",
+    "metadata.template.toml",
+    "IEEE_S_P_Hostnames.pdf",
+    "environment.yml",
+    "requirements.txt",
+    "pyproject.toml",
+    "Makefile",
+    "LICENSE",
+    "LICENSE-CODE",
+    "LICENSE-ARTIFACTS",
+    "scripts/run_artifact_smoke.py",
+    "scripts/run_artifact_claim_checks.py",
+    "scripts/audit_artifact_readiness.py",
+    "scripts/build_artifact_archive.py",
+    "scripts/recompute_method_contracts.py",
+    "scripts/recompute_paper_claim_coverage.py",
+    "scripts/recompute_paper_headline_claims.py",
+    "scripts/recompute_hib_profile_metrics.py",
+    "scripts/recompute_evaluation_accounting.py",
+    "scripts/recompute_source_reachability_metrics.py",
+    "scripts/recompute_public_scope_metrics.py",
+    "scripts/benchmark_artifact_latency.py",
+    "scripts/recompute_production_latency_metrics.py",
+    "scripts/recompute_live_overlap_metrics.py",
+    "scripts/recompute_sink_evidence_metrics.py",
+    "scripts/recompute_paper_metric_tables.py",
+    "scripts/recompute_stability_scope_metrics.py",
+    "ccd",
+    "baselines",
+    "baselines/requirements.txt",
+    "method_contracts",
+    "paper_claim_coverage",
+    "paper_headline_claims",
+    "hib_profile",
+    "evaluation_accounting",
+    "source_reachability",
+    "public_scope",
+    "production_latency",
+    "live_overlap",
+    "sink_evidence",
+    "paper_metric_tables",
+    "stability_scope",
+    "examples",
+    "caho_model_checkpoint",
+    "deidentification_release/data/release/hib_release_public_bundle.tar.gz",
+    "deidentification_release/data/release/hib_release_public_bundle.tar.gz.sha256",
+    "deidentification_release/data/release/hib_release_public_bundle.tar.manifest.json",
+    "deidentification_release/scripts/recompute_metrics.py",
+    "deidentification_release/scripts/validate_public_bundle.py",
+    "deidentification_release/scripts/validate_release_gate.py"
+  ],
+  "privacy_scan_paths": [
+    "README.md",
+    "BADGE_READINESS.md",
+    "ARTIFACT_EVALUATION.md",
+    "ARTIFACT_MANIFEST.json",
+    "ARTIFACT_RESOURCES.md",
+    "ARTIFACT_PROVENANCE_AND_ETHICS.md",
+    "metadata.template.toml",
+    "method_contracts",
+    "paper_claim_coverage",
+    "paper_headline_claims",
+    "evaluation_accounting",
+    "source_reachability",
+    "hib_profile",
+    "public_scope",
+    "production_latency",
+    "live_overlap",
+    "sink_evidence",
+    "paper_metric_tables",
+    "stability_scope",
+    "deidentification_release/README.md",
+    "deidentification_release/configs",
+    "deidentification_release/data/audits",
+    "deidentification_release/data/release/hib_release.jsonl",
+    "deidentification_release/data/release/hib_release.schema.json"
+  ],
+  "portability_scan_paths": [
+    "README.md",
+    "BADGE_READINESS.md",
+    "ARTIFACT_EVALUATION.md",
+    "ARTIFACT_MANIFEST.json",
+    "ARTIFACT_RESOURCES.md",
+    "ARTIFACT_PROVENANCE_AND_ETHICS.md",
+    "metadata.template.toml",
+    "Makefile",
+    "ccd",
+    "scripts",
+    "baselines",
+    "method_contracts",
+    "paper_claim_coverage",
+    "paper_headline_claims",
+    "hib_profile",
+    "evaluation_accounting",
+    "source_reachability",
+    "public_scope",
+    "production_latency",
+    "live_overlap",
+    "sink_evidence",
+    "paper_metric_tables",
+    "stability_scope",
+    "tests",
+    "deidentification_release"
+  ],
+  "tracking_scan_paths": [
+    "README.md",
+    "BADGE_READINESS.md",
+    "ARTIFACT_EVALUATION.md",
+    "ARTIFACT_MANIFEST.json",
+    "ARTIFACT_RESOURCES.md",
+    "ARTIFACT_PROVENANCE_AND_ETHICS.md",
+    "metadata.template.toml",
+    "Makefile",
+    "ccd",
+    "scripts",
+    "baselines",
+    "method_contracts",
+    "paper_claim_coverage",
+    "paper_headline_claims",
+    "hib_profile",
+    "evaluation_accounting",
+    "source_reachability",
+    "public_scope",
+    "production_latency",
+    "live_overlap",
+    "sink_evidence",
+    "paper_metric_tables",
+    "stability_scope",
+    "tests",
+    "deidentification_release"
+  ],
+  "external_completion_items": [
+    "Deposit the final artifact in a permanent public repository with a DOI.",
+    "Replace example.org placeholders in metadata.template.toml with final anonymous submission and DOI-backed URLs.",
+    "Attach or reference the full HIB-Real de-identified release bundle.",
+    "Attach the full source-reachability public corpus manifest and labeled CodeQL/Semgrep outputs if evaluators need to rerun the 50-repo static-analysis scope check end to end.",
+    "Attach public-report label exports if evaluators need to rerun public-scope taxonomy coverage from individual reports rather than release-safe aggregates.",
+    "Attach production latency traces or official timing outputs if evaluators need to audit Figure 5 from raw serving measurements rather than release-safe aggregates.",
+    "Attach masked live-overlap case-chain labels if evaluators need to rerun Table 7 accounting from row-level summaries rather than release-safe aggregates.",
+    "Attach masked sink-evidence case-chain exports if evaluators need to audit Table 8 from row-level traces rather than release-safe aggregates.",
+    "Attach full replay, ablation, LLM-baseline identifier provenance, and hostile-mimicry run outputs if evaluators need to rerun Tables 5, 6, 10, and 12 from row-level predictions/stress cases rather than release-safe aggregates.",
+    "Attach full stability, drift, family-holdout, composition-depth, and public-real outputs if evaluators need to rerun Figure 6/Figure 7 and scope checks from row-level cases rather than release-safe aggregates.",
+    "Run the full replay commands from ARTIFACT_EVALUATION.md on the full bundle and archive the resulting metrics."
+  ]
+}

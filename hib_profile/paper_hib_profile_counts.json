@@ -1,0 +1,179 @@
+{
+  "source": "published_aggregate_hib_profile",
+  "paper_sections": [
+    "Section 8.1 Table 3 HIB production-replay test-set profile",
+    "Section 8.1 Table 4 verified-positive production-replay profile",
+    "Appendix A Table 9 attack-family distribution",
+    "Appendix B dataset profile and splits"
+  ],
+  "replay": {
+    "n_rows": 200339886,
+    "n_tenants": 835,
+    "window_months": 12,
+    "window_start": "2025-02-01T00:00:00Z",
+    "window_end": "2026-02-06T23:59:59Z",
+    "source_rows": {
+      "user_login_hostnames": 112691188,
+      "dns_resolution_hostnames": 87648698
+    },
+    "reported_source_percentages": {
+      "user_login_hostnames": 56.25,
+      "dns_resolution_hostnames": 43.75
+    },
+    "resolved_rows_by_source": {
+      "user_login_hostnames": 112688728,
+      "dns_resolution_hostnames": 87564172
+    },
+    "unresolved_rows_by_source": {
+      "user_login_hostnames": 2460,
+      "dns_resolution_hostnames": 84526
+    },
+    "label_counts": {
+      "resolved_benign": 199889499,
+      "verified_executable_semantics": 363401,
+      "unresolved": 86986
+    },
+    "event_counts": {
+      "successful_logins": 109973571,
+      "failed_logins": 2717616,
+      "successful_dns_resolutions": 50904251,
+      "failed_dns_resolutions": 36744446
+    },
+    "max_event_source_residual_rows": 1,
+    "tenant_source_counts": {
+      "user_login": 552,
+      "dns": 833,
+      "both": 550
+    },
+    "capture_policy": {
+      "failed_login": "complete",
+      "failed_dns_resolution": "complete",
+      "successful_events": "bernoulli_sampled",
+      "success_sample_probability": 0.001
+    },
+    "partition_policy": {
+      "tenant_disjoint": true,
+      "time_forward": true,
+      "calibration_from_benign_only": true,
+      "test_not_used_for_threshold_selection": true
+    },
+    "quality_repairs": {
+      "rows_missing_content_or_source_time": 2,
+      "dns_rows_multiline_repaired": 2716,
+      "tenant_identifiers_repaired": 1
+    },
+    "agreement": {
+      "observed_binary_agreement_excluding_unresolved": 0.9998,
+      "cohen_kappa_overall": 0.9585,
+      "cohen_kappa_dns": 0.9546,
+      "detector_hidden_relabeling_kappa_approx": 0.97
+    }
+  },
+  "verified_positive_profile": {
+    "denominator": 363401,
+    "attack_family_distribution": [
+      {
+        "family": "JNDI lookup",
+        "count": 58047,
+        "share_percent": 16.0
+      },
+      {
+        "family": "SQL injection",
+        "count": 46623,
+        "share_percent": 12.8
+      },
+      {
+        "family": "Command injection",
+        "count": 37481,
+        "share_percent": 10.3
+      },
+      {
+        "family": "PHP OOB callback",
+        "count": 30097,
+        "share_percent": 8.3
+      },
+      {
+        "family": "Perl OOB callback",
+        "count": 25013,
+        "share_percent": 6.9
+      },
+      {
+        "family": "XSS",
+        "count": 22020,
+        "share_percent": 6.1
+      },
+      {
+        "family": "CRLF injection",
+        "count": 19991,
+        "share_percent": 5.5
+      },
+      {
+        "family": "SSRF URL",
+        "count": 19093,
+        "share_percent": 5.3
+      },
+      {
+        "family": "Code evaluation",
+        "count": 18967,
+        "share_percent": 5.2
+      },
+      {
+        "family": "SSTI",
+        "count": 17029,
+        "share_percent": 4.7
+      },
+      {
+        "family": "XXE",
+        "count": 16011,
+        "share_percent": 4.4
+      },
+      {
+        "family": "Path traversal",
+        "count": 15033,
+        "share_percent": 4.1
+      },
+      {
+        "family": "OOB DNS exfiltration",
+        "count": 14053,
+        "share_percent": 3.9
+      },
+      {
+        "family": "LDAP injection",
+        "count": 12011,
+        "share_percent": 3.3
+      },
+      {
+        "family": "NoSQL injection",
+        "count": 11920,
+        "share_percent": 3.3
+      },
+      {
+        "family": "Other",
+        "count": 12,
+        "share_percent": 0.0
+      }
+    ],
+    "obfuscation_distribution": {
+      "mixed": 121621,
+      "delimiter_rewrite": 55862,
+      "base64": 45951,
+      "percent_encoding": 33696,
+      "quote_comment": 7458,
+      "none": 98813
+    },
+    "non_none_obfuscation_count": 264588
+  },
+  "public_reproduction_boundary": {
+    "aggregate_profile_is_release_safe": true,
+    "row_level_reproduction_requires_full_hib_real_release": true,
+    "full_release_rows": 200339886
+  },
+  "private_by_design": [
+    "Tenant identities",
+    "Reversible mappings",
+    "Raw operational logs",
+    "Production weights",
+    "Exact private strings",
+    "Private sink details"
+  ]
+}

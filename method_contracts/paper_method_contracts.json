@@ -1,0 +1,132 @@
+{
+  "source": "published_method_contracts",
+  "paper_sections": [
+    "Table 1 decision and stability contract",
+    "Section 5.2 Eq. 1 CCD scoring",
+    "Section 5.3 Proposition 5.1 margin-coupled sketch",
+    "Appendix C implementation and edit model"
+  ],
+  "table1_contracts": [
+    {
+      "layer": "cone_count_model",
+      "paper_layer": "Cone-count model",
+      "contract": "likelihood_ratio_test_over_q",
+      "assumptions": [
+        "fixed_normalizer_manifest",
+        "fixed_encoder",
+        "fixed_cone_partition",
+        "fixed_effective_count"
+      ]
+    },
+    {
+      "layer": "split_calibration",
+      "paper_layer": "Split calibration",
+      "contract": "alert_fpr_budget_threshold",
+      "assumptions": [
+        "benign_calibration_window"
+      ]
+    },
+    {
+      "layer": "edit_closure",
+      "paper_layer": "Edit closure",
+      "contract": "margin_stable_decision_for_radius_k",
+      "assumptions": [
+        "frozen_edit_manifest",
+        "frozen_score_path"
+      ]
+    }
+  ],
+  "appendix_c_frozen_fields": [
+    "normalizer_manifest",
+    "taxonomy_generator_manifests",
+    "encoder_checkpoint",
+    "cone_axes",
+    "lsh_probe_seed",
+    "softmax_temperature",
+    "effective_count",
+    "epsilon_smoothing_floor",
+    "priors",
+    "mixture_weights",
+    "tenant_calibration_windows_thresholds",
+    "edit_manifest_version"
+  ],
+  "expected_ccd_defaults": {
+    "encoder_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "embedding_dim": 384,
+    "num_cones": 4096,
+    "active_cones": 8,
+    "temperature": 10.0,
+    "lsh_enabled": true,
+    "lsh_tables": 8,
+    "lsh_bits": 12,
+    "lsh_probe_radius": 1,
+    "seed": 13,
+    "prior_smoothing": 0.000001,
+    "alpha": 0.0001,
+    "effective_count_positive": true
+  },
+  "expected_edit_manifest": {
+    "version": "Eraw-public-v1",
+    "required_prefixes": [
+      "E1",
+      "E2",
+      "E3",
+      "E4",
+      "E5",
+      "E6",
+      "E7",
+      "E8",
+      "E9",
+      "E10",
+      "E11"
+    ],
+    "requires_deterministic_closure": true,
+    "randomized_sampling_only_exploratory": true
+  },
+  "expected_caho_training_support": {
+    "base_encoder_family": "all-MiniLM-L6-v2",
+    "pooled_dim": 384,
+    "requires_l2_normalized_embeddings": true,
+    "requires_two_views_per_string": true,
+    "requires_contrastive_loss": true,
+    "requires_binary_auxiliary_head": true,
+    "requires_adamw": true,
+    "default_adamw_weight_decay": 0.01,
+    "paper_deployed_recipe": {
+      "learning_rate": 0.0001,
+      "weight_decay": 0.01,
+      "batch_size": 256,
+      "max_epochs": 50
+    },
+    "benign_view_families": [
+      "case",
+      "delimiter",
+      "token_jitter"
+    ],
+    "positive_view_families": [
+      "prefix_scheme_rewrite",
+      "percent_encoding",
+      "utf8_residue",
+      "hex_encoding",
+      "base_encoding",
+      "confusable",
+      "separator_edit",
+      "comment_quote_brace_fragment",
+      "bounded_dns_label_edit"
+    ]
+  },
+  "required_bundle_contracts": [
+    "config_serialization",
+    "cone_axes_serialization",
+    "prior_serialization",
+    "optional_calibrated_threshold_serialization",
+    "optional_grouped_calibrated_threshold_serialization"
+  ],
+  "private_by_design": [
+    "Raw tenant logs",
+    "Reversible mappings",
+    "Live-control weights",
+    "Exact private strings",
+    "Tenant calibration windows"
+  ]
+}

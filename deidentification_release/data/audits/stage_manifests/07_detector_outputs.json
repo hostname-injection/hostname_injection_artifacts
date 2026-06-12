@@ -1,0 +1,16 @@
+{
+  "ccd_score_bin_policy": "not_recomputed unless reviewed public CCD scores are provided",
+  "created_at_utc": "2026-06-11T22:20:29Z",
+  "policy_version": "non-linkable-release-policy-v1.0",
+  "production_scores_released": false,
+  "public_outputs": [
+    "regex_waf_flag",
+    "ccd_score_bin",
+    "ccd_flag",
+    "ccd_score_public",
+    "public_calibration_group"
+  ],
+  "release_version": "hib-v1.0",
+  "stage": "detector_output_publication",
+  "status": "complete"
+}
