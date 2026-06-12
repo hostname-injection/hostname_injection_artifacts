@@ -191,7 +191,10 @@ match the Appendix C deployed recipe (`lr=1e-4`, weight decay `1e-2`, batch
 size `256`, up to `50` epochs). For a local parser/training-loop smoke on
 commodity hardware, use `--device cpu --max-rows ... --max-steps ...`; use
 `--require-cuda` when replaying a GPU training run and you want CPU fallback to
-fail closed.
+fail closed. This binary-head trainer intentionally rejects `--grad-cache`
+because the Appendix C objective requires supervised orbit labels inside the
+contrastive loss; GradCache remains available on the regular pairwise CAHO
+trainers.
 
 ### Replicating The Full Corpus Training Script
 

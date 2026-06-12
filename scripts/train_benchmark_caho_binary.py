@@ -73,9 +73,20 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def validate_args(args: argparse.Namespace) -> argparse.Namespace:
+    if args.grad_cache:
+        raise RuntimeError(
+            "--grad-cache is not supported by train_benchmark_caho_binary.py because "
+            "the Appendix C binary trainer requires supervised orbit labels in the "
+            "contrastive loss. Omit --grad-cache for paper-aligned binary training."
+        )
+    return args
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+    validate_args(args)
 
     device = resolve_device(args.device)
     if args.require_cuda and device != "cuda":

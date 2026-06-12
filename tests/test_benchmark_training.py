@@ -1,3 +1,4 @@
+import importlib.util
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -200,6 +201,65 @@ def test_binary_auxiliary_head_trains_on_both_views():
 
     assert summary["steps"] == 1
     assert trainer.recording_classifier.batch_sizes == [8]
+
+
+def test_binary_trainer_rejects_grad_cache_for_supervised_orbit_objective():
+    torch = pytest.importorskip("torch")
+
+    class DummySentenceModel(torch.nn.Module):
+        def __init__(self, dim=4):
+            super().__init__()
+            self.dim = dim
+            self.embed = torch.nn.Embedding(256, dim)
+            self.proj = torch.nn.Linear(dim, dim)
+
+        def tokenize(self, texts):
+            ids = [sum(text.encode("utf-8")) % 256 for text in texts]
+            return {"input_ids": torch.tensor(ids, dtype=torch.long).unsqueeze(1)}
+
+        def forward(self, tokenized):
+            emb = self.embed(tokenized["input_ids"]).mean(dim=1)
+            return {"sentence_embedding": self.proj(emb)}
+
+        def get_sentence_embedding_dimension(self):
+            return self.dim
+
+    trainer = BenchmarkBinaryContrastiveTrainer(
+        DummySentenceModel(),
+        batch_size=2,
+        temperature=0.1,
+        lr=1e-2,
+        max_grad_norm=1.0,
+        scheduler="none",
+        min_lr=0.0,
+        weight_decay=0.02,
+        use_grad_cache=True,
+        grad_cache_chunk_size=2,
+        num_workers=0,
+        loss_mode="fixed",
+        loss_max_scale=100.0,
+        loss_min_scale=1.0,
+        optimize_loss=False,
+        log_every=0,
+        binary_loss_weight=0.5,
+        contrastive_loss_weight=0.5,
+        binary_hidden_dim=4,
+    )
+
+    with pytest.raises(ValueError, match="GradCache is not supported"):
+        trainer.fit(_TinyViewDataset(), epochs=1)
+
+
+def test_benchmark_binary_script_rejects_grad_cache():
+    script = Path(__file__).resolve().parents[1] / "scripts" / "train_benchmark_caho_binary.py"
+    spec = importlib.util.spec_from_file_location("_test_train_benchmark_caho_binary", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    args = module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
+
+    with pytest.raises(RuntimeError, match="supervised orbit labels"):
+        module.validate_args(args)
 
 
 def test_chunk_shuffle_sampler_preserves_all_indices_and_chunk_locality():

@@ -216,8 +216,8 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must L2-normalize classifier inputs")
     if "torch.cat([F.normalize(e1, dim=1), F.normalize(e2, dim=1)]" not in trainer_fit:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must train the binary head on both CAHO views")
-    if "_binary_backward_microbatched(v1, v2, labels)" not in trainer_fit:
-        raise ValueError("GradCache binary auxiliary path must also train on both CAHO views")
+    if "if self.use_grad_cache" not in trainer_fit or "GradCache is not supported" not in trainer_fit:
+        raise ValueError("BenchmarkBinaryContrastiveTrainer must fail closed for GradCache supervised-orbit mismatch")
     if "binary_cross_entropy_with_logits" not in trainer_fit:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must train a binary auxiliary head")
     if "torch.optim.AdamW" not in trainer_fit:
@@ -263,6 +263,15 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         )
     if getattr(parser_defaults, "require_cuda", None) is not False:
         raise ValueError("train_benchmark_caho_binary.py must default to portable CPU/auto debug execution")
+    if not callable(getattr(train_script, "validate_args", None)):
+        raise ValueError("train_benchmark_caho_binary.py must expose validate_args")
+    try:
+        train_script.validate_args(train_script.build_parser().parse_args(["--out", "unused-output", "--grad-cache"]))
+    except RuntimeError as exc:
+        if "supervised orbit labels" not in str(exc):
+            raise ValueError("train_benchmark_caho_binary.py GradCache rejection must explain supervised orbit labels") from exc
+    else:
+        raise ValueError("train_benchmark_caho_binary.py must reject --grad-cache for paper-aligned binary training")
     return {
         "base_encoder_family": require_string(expected.get("base_encoder_family"), path="expected_caho_training_support.base_encoder_family"),
         "pooled_dim": int(require_number(expected.get("pooled_dim"), path="expected_caho_training_support.pooled_dim")),
@@ -270,6 +279,7 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         "weighted_malicious_augmentations": sorted(malicious_weights),
         "binary_auxiliary_head_supported": True,
         "binary_auxiliary_head_trains_both_views": True,
+        "binary_gradcache_fails_closed": True,
         "two_view_dataset_supported": True,
         "adamw_supported": True,
         "adamw_weight_decay_default": default_weight_decay,
