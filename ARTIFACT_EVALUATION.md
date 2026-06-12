@@ -45,13 +45,13 @@ python scripts/run_artifact_smoke.py --skip-tests
 
 The smoke command compiles the code, optionally runs tests, validates the
 checked-in HIB public sample bundle from the repository and from an extracted
-archive copy, trains a temporary CCD prior bundle from `examples/`, calibrates
-a split-conformal global and grouped threshold set into a self-contained model
-bundle, refreshes P_B/global/grouped thresholds from a clean benign window,
-scores, explains, and certifies sample hostnames from that refreshed bundle
-with grouped thresholds,
+archive copy, trains a temporary CAHO checkpoint from `examples/`, builds a CCD
+prior bundle with that checkpoint, calibrates a split-conformal global and
+grouped threshold set into a self-contained model bundle, refreshes
+P_B/global/grouped thresholds from a clean benign window, scores, explains, and
+certifies sample hostnames from that refreshed bundle with grouped thresholds,
 recomputes public replay metrics for the sample release, and encodes hostnames
-with the deterministic local smoke encoder.
+with the trained temporary CAHO checkpoint.
 
 Expected runtime on a laptop CPU is a few minutes after dependencies are
 installed. The smoke path does not require private data, network egress, or a
@@ -122,7 +122,7 @@ python3 scripts/recompute_source_reachability_metrics.py
 
 python3 scripts/recompute_public_scope_metrics.py
 
-python3 scripts/benchmark_artifact_latency.py --num-samples 64 --repeats 1 --warmup 0
+python3 scripts/benchmark_artifact_latency.py --checkpoint caho_encoder --num-samples 64 --repeats 1 --warmup 0
 
 python3 scripts/recompute_production_latency_metrics.py
 
@@ -137,7 +137,7 @@ python3 scripts/recompute_stability_scope_metrics.py
 python3 scripts/build_artifact_archive.py --dry-run
 ```
 
-Observed status: the pytest suite passed (`287 passed`), the public
+Observed status: the pytest suite passed (`290 passed`), the public
 bundle validator passed with 32 archived files, the release gate passed with 150
 public sample rows, the same gate passed from an extracted bundle copy, and the
 artifact smoke and readiness audit passed, including portability, privacy, and
@@ -181,8 +181,8 @@ paper metric-table script validated Tables 5, 6, 10, and 12 plus Appendix F
 aggregate metrics. The stability/scope script validated Figure 7 certificate
 coverage, Figure 6 family-holdout/depth ranges, drift-refresh invariants,
 independent replay tolerance, and public-real recall ordering. The archive
-builder dry-run passed with 232 files after excluding intermediate training
-checkpoints; a temporary full archive build produced 232 hashed files with a
+builder dry-run passed with 219 files after excluding intermediate training
+checkpoints; a temporary full archive build produced 219 hashed files with a
 valid SHA-256 sidecar and manifest. The full paper-scale
 metrics still require the external full HIB-Real release bundle described below.
 
@@ -269,7 +269,7 @@ and privacy-gate fixture.
 | Evaluation units and reproducibility boundary | `evaluation_accounting/`, `scripts/recompute_evaluation_accounting.py` | `python scripts/recompute_evaluation_accounting.py` |
 | Source-code reachability scope check | `source_reachability/`, `scripts/recompute_source_reachability_metrics.py` | `python scripts/recompute_source_reachability_metrics.py` |
 | Public-scope taxonomy check | `public_scope/`, `scripts/recompute_public_scope_metrics.py` | `python scripts/recompute_public_scope_metrics.py` |
-| Local latency smoke | `scripts/benchmark_artifact_latency.py`, `ccd/diagnostics.py`, `baselines/latency.py` | `python scripts/benchmark_artifact_latency.py --num-samples 64 --repeats 1 --warmup 0` |
+| Local latency smoke | `scripts/benchmark_artifact_latency.py`, `ccd/diagnostics.py`, `baselines/latency.py` | `python scripts/benchmark_artifact_latency.py --checkpoint caho_encoder --num-samples 64 --repeats 1 --warmup 0` |
 | Production-latency aggregate accounting | `production_latency/`, `scripts/recompute_production_latency_metrics.py` | `python scripts/recompute_production_latency_metrics.py` |
 | Live-overlap aggregate accounting | `live_overlap/`, `scripts/recompute_live_overlap_metrics.py` | `python scripts/recompute_live_overlap_metrics.py` |
 | Table 8 sink-evidence aggregate accounting | `sink_evidence/`, `scripts/recompute_sink_evidence_metrics.py` | `python scripts/recompute_sink_evidence_metrics.py` |

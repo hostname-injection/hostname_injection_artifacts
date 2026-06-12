@@ -136,7 +136,7 @@
   },
   "full_tests": {
     "command": "python -m pytest -q",
-    "last_observed": "287 passed"
+    "last_observed": "290 passed"
   },
   "public_release_bundle": {
     "bundle": "deidentification_release/data/release/hib_release_public_bundle.tar.gz",
@@ -340,7 +340,7 @@
     {
       "claim": "The artifact can be kicked-the-tires without private data.",
       "script": "python scripts/run_artifact_smoke.py --skip-tests",
-      "expected": "The command compiles code, validates the public bundle in-repo and after extraction, recomputes sample replay metrics, trains a tiny CCD model, calibrates fixed-FPR global and grouped thresholds into a self-contained model bundle, refreshes P_B plus global/grouped thresholds from a benign window, scores, explains, and certifies from that refreshed bundle with grouped thresholds, evaluates CAHO embeddings using the deterministic local smoke encoder, and prints artifact smoke status: pass."
+      "expected": "The command compiles code, validates the public bundle in-repo and after extraction, recomputes sample replay metrics, trains a temporary CAHO checkpoint from examples, builds a CCD prior bundle with that checkpoint, calibrates fixed-FPR global and grouped thresholds into a self-contained model bundle, refreshes P_B plus global/grouped thresholds from a benign window, scores, explains, and certifies from that refreshed bundle with grouped thresholds, evaluates CAHO embeddings using the trained temporary CAHO checkpoint, and prints artifact smoke status: pass."
     },
     {
       "claim": "A clean DOI-ready archive can be assembled from the worktree.",
@@ -379,7 +379,7 @@
     },
     {
       "claim": "The artifact exposes a local latency smoke benchmark for the encoder and CCD scoring kernel.",
-      "script": "python scripts/benchmark_artifact_latency.py --num-samples 64 --repeats 1 --warmup 0",
+      "script": "python scripts/benchmark_artifact_latency.py --checkpoint caho_encoder --num-samples 64 --repeats 1 --warmup 0",
       "expected": "The command reports status=pass and emits hardware-dependent encoder and ccd_scores_logpriors_topk timing fields without asserting the paper's production latency numbers on evaluator hardware."
     },
     {

@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from ccd.config import CCDConfig, ConeConfig
-from ccd.encoder import CahoEncoder
+from ccd.encoder import CahoEncoder, require_trained_caho_checkpoint
 from ccd.scoring import ccd_scores_logpriors_topk
 from ccd.utils import l2_normalize, stable_log
 
@@ -161,7 +161,7 @@ def benchmark_encoder(args: argparse.Namespace, hostnames: list[str]) -> dict[st
     if args.skip_encoder:
         return None
     config = CCDConfig()
-    config.encoder.model_name = args.checkpoint
+    config.encoder.model_name = str(require_trained_caho_checkpoint(args.checkpoint, purpose="benchmark_artifact_latency.py"))
     config.encoder.device = args.device
     encoder = CahoEncoder(config.encoder)
     device_type = encoder.device_type()
@@ -215,7 +215,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a local CCD latency smoke benchmark.")
-    parser.add_argument("--checkpoint", default="ccd-local-hash-encoder")
+    parser.add_argument("--checkpoint", default=None, help="Trained CAHO checkpoint directory")
     parser.add_argument("--input", default="examples/queries.txt")
     parser.add_argument("--num-samples", type=int, default=128)
     parser.add_argument("--batch-size", type=int, default=16)
@@ -230,6 +230,8 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=13)
     parser.add_argument("--out", default=None)
     args = parser.parse_args()
+    if not args.skip_encoder and not args.checkpoint:
+        raise ValueError("--checkpoint is required unless --skip-encoder is set")
 
     report = build_report(args)
     text = json.dumps(report, indent=2, sort_keys=True)

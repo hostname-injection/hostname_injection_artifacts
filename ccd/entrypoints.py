@@ -10,10 +10,6 @@ def _dispatch(module: str) -> int:
     return int(mod.main())
 
 
-def sanity_main() -> None:
-    sys.exit(_dispatch("ccd.sanity"))
-
-
 def diagnose_main() -> None:
     sys.exit(_dispatch("ccd.diagnostics"))
 

@@ -11,7 +11,6 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ENCODER = "ccd-local-hash-encoder"
 DEID_SCRIPTS = ROOT / "deidentification_release" / "scripts"
 sys.path.insert(0, str(DEID_SCRIPTS))
 
@@ -136,6 +135,7 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory(prefix="ccd-artifact-smoke-") as tmp:
         tmp_path = Path(tmp)
+        caho_encoder = tmp_path / "caho_encoder"
         model = tmp_path / "ccd_smoke_model.npz"
         calibrated_model = tmp_path / "ccd_smoke_model.calibrated.npz"
         refreshed_model = tmp_path / "ccd_smoke_model.refreshed.npz"
@@ -161,6 +161,24 @@ def main() -> int:
                 sys.executable,
                 "-m",
                 "ccd.cli",
+                "train-caho",
+                "--benign",
+                "examples/benign.txt",
+                "--malicious",
+                "examples/malicious.csv",
+                "--out",
+                str(caho_encoder),
+                "--batch-size",
+                "8",
+                "--device",
+                "cpu",
+            ]
+        )
+        run(
+            [
+                sys.executable,
+                "-m",
+                "ccd.cli",
                 "train-priors",
                 "--benign",
                 "examples/benign.txt",
@@ -169,7 +187,7 @@ def main() -> int:
                 "--config",
                 "examples/ccd_smoke_config.json",
                 "--encoder",
-                DEFAULT_ENCODER,
+                str(caho_encoder),
                 "--output",
                 str(model),
                 "--batch-size",
@@ -316,7 +334,7 @@ def main() -> int:
                 "ccd.cli",
                 "eval-caho",
                 "--model",
-                DEFAULT_ENCODER,
+                str(caho_encoder),
                 "--input",
                 "examples/queries.txt",
                 "--output",

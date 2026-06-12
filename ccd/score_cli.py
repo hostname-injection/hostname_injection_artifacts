@@ -10,6 +10,7 @@ import numpy as np
 
 from .calibration import coerce_finite_threshold, threshold_for_group
 from .csv_io import write_score_csv
+from .encoder import require_model_uses_trained_caho_checkpoint
 from .io import load_model
 from .line_io import read_nonempty_lines, read_parallel_lines
 from .preprocess import normalize_hostname
@@ -44,6 +45,7 @@ def main() -> int:
     args = parser.parse_args()
 
     model = load_model(args.model)
+    require_model_uses_trained_caho_checkpoint(model, purpose="ccd-score")
     hostnames = read_lines(args.input)
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]

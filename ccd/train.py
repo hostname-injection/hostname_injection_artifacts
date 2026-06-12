@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import random
+import sys
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -15,6 +17,95 @@ CAHO_94GB_GRAD_CACHE_CHUNK_SIZE = 8_192
 CAHO_DEFAULT_EPOCHS = 20
 CAHO_DEFAULT_LR = 1e-4
 CAHO_DEFAULT_WEIGHT_DECAY = 1e-2
+CAHO_TRAINING_SETTING_FIELDS = (
+    "model",
+    "epochs",
+    "batch_size",
+    "lr",
+    "weight_decay",
+    "temperature",
+    "loss",
+    "augmenter",
+    "weighted_num_augs",
+    "weighted_max_attempts",
+    "weighted_no_retry",
+    "max_grad_norm",
+    "scheduler",
+    "min_lr",
+    "grad_cache",
+    "grad_cache_chunk_size",
+    "contrastive_loss",
+    "contrastive_max_scale",
+    "contrastive_min_scale",
+    "optimize_contrastive_scale",
+    "num_workers",
+    "empty_cache",
+    "device",
+    "resume",
+    "save_best",
+    "no_save_final",
+    "no_normalize",
+    "seed",
+)
+CAHO_DEFAULT_DEVIATION_WARNING = (
+    "WARNING: {label} settings differ from the shipped defaults: {changes}. "
+    "Results should be expected to differ from the CAHO/CCD results reported in the paper."
+)
+
+
+def training_default_values(parser, fields: Sequence[str]) -> Dict[str, Any]:
+    """Collect parser defaults for result-affecting CAHO training settings."""
+    return {field: parser.get_default(field) for field in fields}
+
+
+def _display_value(value: Any) -> str:
+    if isinstance(value, Path):
+        return str(value)
+    return repr(value)
+
+
+def _same_training_value(value: Any, default: Any) -> bool:
+    if isinstance(value, Path) or isinstance(default, Path):
+        return str(value) == str(default)
+    return value == default
+
+
+def caho_training_default_deviations(
+    args: Any,
+    defaults: Mapping[str, Any],
+    fields: Sequence[str],
+) -> List[str]:
+    deviations: List[str] = []
+    for field in fields:
+        if not hasattr(args, field) or field not in defaults:
+            continue
+        value = getattr(args, field)
+        default = defaults[field]
+        if _same_training_value(value, default):
+            continue
+        flag = "--" + field.replace("_", "-")
+        deviations.append(f"{flag}={_display_value(value)} (default {_display_value(default)})")
+    return deviations
+
+
+def warn_if_caho_training_defaults_changed(
+    args: Any,
+    *,
+    defaults: Mapping[str, Any],
+    fields: Sequence[str] = CAHO_TRAINING_SETTING_FIELDS,
+    label: str = "CAHO training",
+) -> List[str]:
+    """Warn when training settings move away from the artifact defaults."""
+    deviations = caho_training_default_deviations(args, defaults, fields)
+    if deviations:
+        print(
+            CAHO_DEFAULT_DEVIATION_WARNING.format(
+                label=label,
+                changes="; ".join(deviations),
+            ),
+            file=sys.stderr,
+        )
+    return deviations
 
 
 def resolve_caho_batch_size(batch_size: Optional[int], *, use_grad_cache: bool) -> int:

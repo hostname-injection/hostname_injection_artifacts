@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List
 
 from .calibration import SPLIT_CONFORMAL_DECISION_RULE, coerce_finite_threshold
+from .encoder import require_model_uses_trained_caho_checkpoint
 from .io import load_model
 from .line_io import read_nonempty_lines, read_parallel_lines
 from .preprocess import normalize_hostname
@@ -43,6 +44,7 @@ def main() -> int:
     args = parser.parse_args()
 
     model = load_model(args.model)
+    require_model_uses_trained_caho_checkpoint(model, purpose="ccd-explain")
     hostnames = read_lines(args.input)
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]

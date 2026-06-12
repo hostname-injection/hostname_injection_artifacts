@@ -40,7 +40,7 @@ def test_artifact_manifest_has_claim_scripts_and_required_files() -> None:
     assert requirements["packaging"]["container_required"] is False
     assert requirements["tracking"]["web_tracking_embedded"] is False
     assert manifest["full_tests"]["command"] == "python -m pytest -q"
-    assert manifest["full_tests"]["last_observed"] == "287 passed"
+    assert manifest["full_tests"]["last_observed"] == "290 passed"
     assert (ROOT / manifest["badge_readiness"]).exists()
     assert manifest["claims"]
     claim_text = " ".join(claim["claim"] for claim in manifest["claims"])
@@ -151,6 +151,11 @@ def test_dependency_files_cover_artifact_smoke_and_claim_map() -> None:
         assert package in environment
     assert "GradCache @ git+https://github.com/luyug/GradCache.git" in environment
 
+    scripts = pyproject["project"]["scripts"]
+    assert "ccd-sanity" not in scripts
+    assert not (ROOT / "scripts/train_user_logins.py").exists()
+    assert not (ROOT / "ccd/sanity.py").exists()
+
     install_script = (ROOT / "scripts/install_conda.sh").read_text(encoding="utf-8")
     assert "GradCache @ git+https://github.com/luyug/GradCache.git" in install_script
     assert "INSTALL_GRADCACHE" not in install_script
@@ -160,6 +165,16 @@ def test_dependency_files_cover_artifact_smoke_and_claim_map() -> None:
     assert "Train / fine‑tune CAHO encoder (optional)" not in readme
     assert "Optional: GradCache" not in readme
     assert "GradCache is optional" not in readme
+    assert "python -m pip install 'GradCache" not in readme
+    assert "https://github.com/luyug/GradCache" in readme
+    assert "data shift compared to\nthe original evaluation set" in readme
+    assert "ccd train-priors" in readme
+    assert "--encoder caho_encoder" in readme
+    assert "train-user-logins" not in readme
+    assert "ccd-sanity" not in readme
+    assert "reviewer-facing CCD training and scoring commands require a trained CAHO checkpoint path" in " ".join(
+        readme.split()
+    )
     assert re.search(r"(?is)(GradCache.{0,120}optional|optional.{0,120}GradCache)", readme) is None
 
 

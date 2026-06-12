@@ -10,6 +10,9 @@ from ccd.train import (
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_WEIGHT_DECAY,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+    CAHO_TRAINING_SETTING_FIELDS,
+    training_default_values,
+    warn_if_caho_training_defaults_changed,
 )
 
 
@@ -135,6 +138,11 @@ def main() -> int:
     parser.add_argument("--no-normalize", action="store_true")
     parser.add_argument("--seed", type=int, default=13)
     args = parser.parse_args()
+    warn_if_caho_training_defaults_changed(
+        args,
+        defaults=training_default_values(parser, CAHO_TRAINING_SETTING_FIELDS),
+        label="scripts/train_caho_corpus.py",
+    )
 
     cmd = _build_command(args)
     return subprocess.call(cmd)

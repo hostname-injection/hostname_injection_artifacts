@@ -32,9 +32,9 @@ FORBIDDEN_PUBLIC_PATTERNS = tuple(
 FORBIDDEN_PORTABILITY_PATTERNS = tuple(
     "".join(parts)
     for parts in (
-        ("/media", "/sameer/"),
-        ("/Users", "/sameer"),
-        ("/home", "/sameer"),
+        ("/media", "/"),
+        ("/Users", "/"),
+        ("/home", "/"),
     )
 )
 FORBIDDEN_TRACKING_PATTERNS = tuple(

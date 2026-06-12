@@ -16,11 +16,14 @@ from ccd.train import (
     CAHO_DEFAULT_WEIGHT_DECAY,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+    CAHO_TRAINING_SETTING_FIELDS,
     CAHODataset,
     CAHOTrainer,
     ContrastiveTrainer,
     Sample,
     resolve_caho_batch_size,
+    training_default_values,
+    warn_if_caho_training_defaults_changed,
 )
 
 
@@ -87,6 +90,11 @@ def main() -> None:
     parser.add_argument("--no-normalize", action="store_true", help="Skip hostname normalization")
     parser.add_argument("--seed", type=int, default=13, help="Deterministic seed for augmentation and training order")
     args = parser.parse_args()
+    warn_if_caho_training_defaults_changed(
+        args,
+        defaults=training_default_values(parser, CAHO_TRAINING_SETTING_FIELDS),
+        label="scripts/train_caho.py",
+    )
     args.batch_size = resolve_caho_batch_size(args.batch_size, use_grad_cache=args.grad_cache)
 
     benign_hosts = read_lines(args.benign)

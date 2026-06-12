@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import random
 
 import pytest
@@ -8,12 +10,15 @@ from ccd.train import (
     CAHOTrainer,
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_WEIGHT_DECAY,
+    CAHO_TRAINING_SETTING_FIELDS,
     ContrastiveTrainer,
     Sample,
+    caho_training_default_deviations,
     pairwise_contrastive_loss,
     split_input_fn,
     supcon_loss,
     supervised_orbit_contrastive_loss,
+    warn_if_caho_training_defaults_changed,
 )
 
 
@@ -95,6 +100,34 @@ def test_caho_trainers_reject_invalid_optimizer_hyperparameters():
         ContrastiveTrainer(object(), lr=float("nan"))
     with pytest.raises(ValueError, match="weight_decay"):
         ContrastiveTrainer(object(), weight_decay=-0.01)
+
+
+def test_caho_training_default_deviation_warning(capsys):
+    args = SimpleNamespace(lr=2e-4, epochs=20)
+    defaults = {"lr": CAHO_DEFAULT_LR, "epochs": 20}
+
+    deviations = warn_if_caho_training_defaults_changed(
+        args,
+        defaults=defaults,
+        fields=("lr", "epochs"),
+        label="unit-test CAHO",
+    )
+
+    captured = capsys.readouterr()
+    assert deviations == ["--lr=0.0002 (default 0.0001)"]
+    assert "WARNING: unit-test CAHO settings differ" in captured.err
+    assert "Results should be expected to differ" in captured.err
+
+
+def test_caho_training_default_deviation_fields_cover_core_training_args():
+    assert {"epochs", "batch_size", "lr", "weight_decay", "seed"}.issubset(
+        set(CAHO_TRAINING_SETTING_FIELDS)
+    )
+    assert caho_training_default_deviations(
+        SimpleNamespace(epochs=20, lr=CAHO_DEFAULT_LR),
+        {"epochs": 20, "lr": CAHO_DEFAULT_LR},
+        ("epochs", "lr"),
+    ) == []
 
 
 def test_pairwise_contrastive_loss_aligned():

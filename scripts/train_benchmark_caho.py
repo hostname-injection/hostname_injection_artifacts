@@ -19,6 +19,39 @@ from ccd.benchmark_training import (
     resolve_caho_batch_size,
     resolve_device,
     save_encoder_only,
+    training_default_values,
+    warn_if_caho_training_defaults_changed,
+)
+
+
+BENCHMARK_CAHO_TRAINING_SETTING_FIELDS = (
+    "model",
+    "epochs",
+    "batch_size",
+    "lr",
+    "weight_decay",
+    "temperature",
+    "max_grad_norm",
+    "scheduler",
+    "min_lr",
+    "grad_cache",
+    "grad_cache_chunk_size",
+    "num_workers",
+    "device",
+    "augmenter",
+    "weighted_num_augs",
+    "weighted_max_attempts",
+    "weighted_no_retry",
+    "contrastive_loss",
+    "contrastive_max_scale",
+    "contrastive_min_scale",
+    "optimize_contrastive_scale",
+    "normalize_text",
+    "resume",
+    "log_every",
+    "seed",
+    "max_rows",
+    "max_steps",
 )
 
 
@@ -68,6 +101,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+    warn_if_caho_training_defaults_changed(
+        args,
+        defaults=training_default_values(parser, BENCHMARK_CAHO_TRAINING_SETTING_FIELDS),
+        fields=BENCHMARK_CAHO_TRAINING_SETTING_FIELDS,
+        label="scripts/train_benchmark_caho.py",
+    )
     args.batch_size = resolve_caho_batch_size(args.batch_size, use_grad_cache=args.grad_cache)
 
     device = resolve_device(args.device)

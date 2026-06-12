@@ -11,7 +11,7 @@ import numpy as np
 from ccd.config import CCDConfig
 from ccd.cone import ConePartition
 from ccd.csv_io import read_malicious_csv_map
-from ccd.encoder import CahoEncoder
+from ccd.encoder import CahoEncoder, require_trained_caho_checkpoint
 from ccd.io import ModelBundle, save_model
 from ccd.priors import build_benign_prior, build_malicious_priors
 from ccd.preprocess import normalize_hostname
@@ -35,7 +35,7 @@ def main() -> None:
     parser.add_argument("--malicious", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--config", type=Path, default=None)
-    parser.add_argument("--encoder", type=str, default=None, help="Override encoder model path/name")
+    parser.add_argument("--encoder", type=str, required=True, help="Trained CAHO checkpoint directory")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--no-normalize", action="store_true", help="Skip hostname normalization")
     args = parser.parse_args()
@@ -45,8 +45,8 @@ def main() -> None:
         config_dict = json.loads(args.config.read_text())
         config = CCDConfig.from_dict(config_dict)
 
-    if args.encoder:
-        config.encoder.model_name = args.encoder
+    checkpoint = require_trained_caho_checkpoint(args.encoder, purpose="scripts/train_priors.py")
+    config.encoder.model_name = str(checkpoint)
 
     encoder = CahoEncoder(config.encoder)
     benign = read_lines(args.benign)

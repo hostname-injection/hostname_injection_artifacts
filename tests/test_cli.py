@@ -40,29 +40,10 @@ def test_train_caho_parser_smoke():
     assert args.seed == 13
 
 
-def test_train_user_logins_parser_smoke():
+def test_train_user_logins_command_is_not_available():
     parser = build_parser()
-    args = parser.parse_args(
-        [
-            "train-user-logins",
-            "--train-caho",
-            "--output",
-            "model.npz",
-            "--caho-loss",
-            "contrastive",
-            "--caho-augmenter",
-            "weighted",
-            "--caho-grad-cache",
-        ]
-    )
-    assert args.command == "train-user-logins"
-    assert args.train_caho is True
-    assert args.caho_loss == "contrastive"
-    assert args.caho_augmenter == "weighted"
-    assert args.caho_grad_cache is True
-    assert args.caho_epochs == CAHO_DEFAULT_EPOCHS
-    assert args.caho_lr == CAHO_DEFAULT_LR
-    assert args.caho_weight_decay == CAHO_DEFAULT_WEIGHT_DECAY
+    with pytest.raises(SystemExit):
+        parser.parse_args(["train-user-logins"])
 
 
 def test_train_priors_parser_smoke():
@@ -74,11 +55,29 @@ def test_train_priors_parser_smoke():
             "benign.txt",
             "--malicious",
             "malicious.csv",
+            "--encoder",
+            "caho_encoder",
             "--output",
             "ccd_model.npz",
         ]
     )
     assert args.command == "train-priors"
+
+
+def test_train_priors_parser_requires_caho_checkpoint_arg():
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "train-priors",
+                "--benign",
+                "benign.txt",
+                "--malicious",
+                "malicious.csv",
+                "--output",
+                "ccd_model.npz",
+            ]
+        )
 
 
 def test_train_caho_corpus_parser_smoke():
@@ -168,8 +167,12 @@ def test_calibrate_can_embed_threshold_in_model_bundle(tmp_path, monkeypatch):
     groups.write_text("tenant-a\ntenant-b\n")
     calibration = tmp_path / "calibration.json"
     calibrated_model = tmp_path / "calibrated_model.npz"
+    checkpoint = tmp_path / "caho_encoder"
+    checkpoint.mkdir()
+    (checkpoint / "modules.json").write_text("[]", encoding="utf-8")
 
     config = CCDConfig()
+    config.encoder.model_name = str(checkpoint)
     config.cone = ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False)
     dummy_model = SimpleNamespace(
         config=config,
@@ -422,6 +425,9 @@ def test_refresh_benign_saves_updated_model_bundle(tmp_path, monkeypatch):
     groups.write_text("tenant-a\ntenant-b\ntenant-b\n", encoding="utf-8")
     report_path = tmp_path / "refresh.json"
     refreshed_model = tmp_path / "refreshed.npz"
+    checkpoint = tmp_path / "caho_encoder"
+    checkpoint.mkdir()
+    (checkpoint / "modules.json").write_text("[]", encoding="utf-8")
 
     class DummyEncoder:
         def encode(self, hostnames, batch_size=64, normalize=True):
@@ -431,6 +437,7 @@ def test_refresh_benign_saves_updated_model_bundle(tmp_path, monkeypatch):
             return np.array(rows, dtype=np.float32)
 
     config = CCDConfig()
+    config.encoder.model_name = str(checkpoint)
     config.cone = ConeConfig(dim=2, num_cones=2, active_cones=1, temperature=1.0, use_lsh=False)
     axes = np.eye(2, dtype=np.float32)
     from ccd.cone import ConePartition
@@ -626,6 +633,8 @@ def test_eval_caho_parser_smoke():
     args = parser.parse_args(
         [
             "eval-caho",
+            "--model",
+            "caho_encoder",
             "--input",
             "queries.txt",
             "--output",
@@ -633,3 +642,17 @@ def test_eval_caho_parser_smoke():
         ]
     )
     assert args.command == "eval-caho"
+
+
+def test_eval_caho_parser_requires_caho_checkpoint_arg():
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "eval-caho",
+                "--input",
+                "queries.txt",
+                "--output",
+                "embeddings.npz",
+            ]
+        )

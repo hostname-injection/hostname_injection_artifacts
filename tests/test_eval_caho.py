@@ -23,6 +23,7 @@ def test_eval_caho_checkpoint_npz(tmp_path: Path):
             "device": "cpu",
             "normalize": False,
             "embed_normalize": True,
+            "_allow_test_encoder": True,
         },
     )()
 

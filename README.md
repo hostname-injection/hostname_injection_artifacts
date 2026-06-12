@@ -40,6 +40,12 @@ For evaluator-facing setup, badge scope, and paper-claim mapping, start with
 A reviewer-viewable dataslice is available at
 https://drive.google.com/drive/folders/1KeKZyIXIqZvEJ4tZAWxE9h4gPoinZCWt?usp=drive_link.
 
+Data-shift note: the reviewer dataslice and released HIB sample are
+de-identified. They preserve the public replay accounting and safety checks,
+but they are not the original private evaluation rows, so CAHO and CCD runs on
+the de-identified data should be expected to have some data shift compared to
+the original evaluation set used for the paper's reported results.
+
 `ARTIFACT_MANIFEST.json` is the machine-readable map from paper claims to files,
 commands, expected outcomes, release gates, and remaining external publication
 items. Check it with:
@@ -82,11 +88,12 @@ For a faster detector and bundle gate check without running `pytest`:
 python scripts/run_artifact_smoke.py --skip-tests
 ```
 
-The smoke path trains a temporary CCD prior bundle from `examples/`, calibrates
-global and grouped thresholds into a self-contained model bundle, refreshes
-`P_B` plus global/grouped thresholds from a clean benign window, scores and
-certifies sample hostnames from that refreshed bundle with grouped thresholds,
-emits explanations, encodes hostnames with the deterministic local smoke encoder, and validates the
+The smoke path first trains a temporary CAHO encoder from `examples/`, then
+trains a CCD prior bundle with that checkpoint, calibrates global and grouped
+thresholds into a self-contained model bundle, refreshes `P_B` plus
+global/grouped thresholds from a clean benign window, scores and certifies
+sample hostnames from that refreshed bundle with grouped thresholds, emits
+explanations, encodes hostnames with the trained temporary CAHO checkpoint, and validates the
 checked-in de-identified HIB sample bundle from both the repository and an
 extracted archive copy. It also recomputes public replay metrics for the sample
 release. The sample bundle is deliberately small; the paper-scale 200.3M-row
@@ -113,9 +120,8 @@ Use the provided install script to set up a fresh environment:
 bash scripts/install_conda.sh
 ```
 
-This creates a `ccd` conda environment, installs dependencies with conda,
-installs GradCache from GitHub, then installs the local package in editable
-mode.
+This creates a `ccd` conda environment, installs dependencies, then installs
+the local package in editable mode.
 
 You can also use the provided `environment.yml`:
 
@@ -127,18 +133,9 @@ conda activate ccd
 ### GradCache
 
 GradCache is required for replay-scale pairwise CAHO training. It is not on
-conda or PyPI, so install it directly from GitHub when you are not using the
-provided setup script or `environment.yml`:
-
-```bash
-python -m pip install 'GradCache @ git+https://github.com/luyug/GradCache.git'
-```
-
-Verify the install:
-
-```bash
-python -c "import grad_cache; print(grad_cache.__version__)"
-```
+conda or PyPI; when you are not using the provided setup script or
+`environment.yml`, follow the upstream installation guidance in the GradCache
+repository: https://github.com/luyug/GradCache.
 
 If you prefer manual steps:
 
@@ -147,7 +144,6 @@ conda create -y -n ccd python=3.11
 conda activate ccd
 conda install -y -c conda-forge -c pytorch \
   numpy scipy pytorch sentence-transformers idna pytest sentencepiece scikit-learn
-python -m pip install 'GradCache @ git+https://github.com/luyug/GradCache.git'
 python -m pip install -e .
 ```
 
@@ -225,9 +221,8 @@ source (`binary_auxiliary_head_sigmoid`), and score view
 `--restore-best-validation` is set, the trainer restores the encoder and
 binary head from the best validation epoch before saving.
 
-All CAHO training entry points accept `--seed` (or `--caho-seed` for
-`train-user-logins`) and default to `13`; benchmark training reports record the
-seed so augmentation/order replay is explicit.
+All CAHO training entry points accept `--seed` and default to `13`; benchmark
+training reports record the seed so augmentation/order replay is explicit.
 
 ### Replicating The Full Corpus Training Script
 
@@ -285,35 +280,13 @@ python scripts/train_caho_corpus.py \
 ccd train-priors \
   --benign data/benign.txt \
   --malicious data/malicious.csv \
+  --encoder caho_encoder \
   --output ccd_model.npz
 ```
 
-### Train Directly From `user_logins` CSVs
-
-If you have the benchmark CSVs under `hostname_injection_benchmark/user_logins`, you can build
-the full CCD priors in one command:
-
-```bash
-ccd train-user-logins \
-  --output ccd_user_logins.npz
-```
-
-By default, `train-user-logins` applies labels to the `USERNAME` column. If your CSV uses
-`HOSTNAME` instead, override with `--hostname-col HOSTNAME`. For other datasets, `HOSTNAME`
-remains the typical default.
-
-Label policies control how GPT 5.5 / Claude Opus 4.8 labels are combined
-(e.g., `both-m`, `either-m`, `agreement`, `gpt-5.5-only`, `opus-4.8-only`,
-`non-u`, `prefer-m`, `prefer-b`). Deprecated `sonnet-only` and `opus-only`
-aliases remain for compatibility. The default is `both-m`, which treats a
-hostname as malicious only when both models label it `M` and drops rows where
-labels are `U`.
-
-You can also:
-- Run a dry run to see label counts: `--dry-run`
-- Filter low-confidence labels: `--min-confidence 0.9` (or per-model `--min-sonnet-confidence`,
-  `--min-opus-confidence`)
-- Fine-tune CAHO first with bounded local sampling: `--train-caho --caho-sample 100000`
+For reviewer-facing runs, CAHO and CCD should be trained from the full available
+benign and malicious training splits. The artifact does not provide a
+user-logins-only CAHO or CCD training command.
 
 ### 3) Score hostnames
 
@@ -542,21 +515,19 @@ This repo includes a `Makefile` plus a few CLI entry points to make demos and re
 ### Make targets
 
 ```bash
-make sanity
 make diagnose
 make explain MODEL=ccd_model.npz INPUT=data/queries.txt
 make score MODEL=ccd_model.npz INPUT=data/queries.txt OUTPUT=out/scores.csv
 ```
 
-Variables you can override: `MODEL`, `INPUT`, `OUTPUT`, `CHECKPOINT`, `PER_CLASS`, `BATCH`.
+Variables you can override: `MODEL`, `INPUT`, `OUTPUT`, `CHECKPOINT`, `BATCH`.
 
 ### Entry points
 
 These are installed with the package:
 
 ```bash
-ccd-sanity --per-class 50
-ccd-diagnose --checkpoint ccd-local-hash-encoder --batch-size 256
+ccd-diagnose --checkpoint caho_encoder --batch-size 256
 ccd-explain --model ccd_model.npz --input data/queries.txt --top-k 3
 ccd-score --model ccd_model.npz --input data/queries.txt --output out/scores.csv
 ```
@@ -567,14 +538,14 @@ Use diagnostics to confirm which device is being used (GPU, MPS, CPU) and to mea
 encoder throughput:
 
 ```bash
-ccd-diagnose --checkpoint ccd-local-hash-encoder --batch-size 256 --num-samples 2048
+ccd-diagnose --checkpoint caho_encoder --batch-size 256 --num-samples 2048
 ```
 
 For an evaluator-facing latency smoke over the configured CAHO encoder and the
 CCD cone-scoring kernel:
 
 ```bash
-python scripts/benchmark_artifact_latency.py --num-samples 64 --repeats 1 --warmup 0
+python scripts/benchmark_artifact_latency.py --checkpoint caho_encoder --num-samples 64 --repeats 1 --warmup 0
 ```
 
 This is hardware-dependent. It exercises the artifact paths but does not assert
@@ -607,19 +578,20 @@ ccd score \
 
 ### Evaluate / Encode With CAHO Encoder
 
-To encode hostnames using the deterministic local smoke encoder:
+To encode hostnames using the trained CAHO checkpoint:
 
 ```bash
 ccd eval-caho \
+  --model caho_encoder \
   --input data/queries.txt \
   --output embeddings.npz
 ```
 
-You can also specify a custom trained CAHO encoder path:
+You can also write CSV embeddings:
 
 ```bash
 ccd eval-caho \
-  --model /path/to/caho_encoder \
+  --model caho_encoder \
   --input data/queries.txt \
   --output embeddings.csv \
   --format csv
@@ -727,7 +699,7 @@ The CCD configuration is a JSON file that maps to `CCDConfig`:
 
 ```json
 {
-  "encoder": {"model_name": "sentence-transformers/all-MiniLM-L6-v2", "device": "cpu"},
+  "encoder": {"model_name": "caho_encoder", "device": "cpu"},
   "cone": {"dim": 384, "num_cones": 4096, "active_cones": 8, "temperature": 10.0},
   "prior": {"smoothing": 1e-6},
   "calibration": {"alpha": 1e-4},
@@ -735,8 +707,10 @@ The CCD configuration is a JSON file that maps to `CCDConfig`:
 }
 ```
 
-Pass this file via `--config` to `train-priors`.
-If you fine‑tuned a CAHO encoder, you can override it with `--encoder`.
+Pass this file via `--config` to `train-priors` and still provide the trained
+CAHO checkpoint with `--encoder`; reviewer-facing CCD training and scoring
+commands require a trained CAHO checkpoint path rather than an implicit base
+encoder.
 
 ## Library Usage
 

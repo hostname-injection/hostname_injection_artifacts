@@ -310,7 +310,11 @@ def test_explain_cli_rejects_non_finite_calibration_threshold_before_explaining(
         explain.main()
 
 
-def test_diagnostics_cli_runs(monkeypatch):
+def test_diagnostics_cli_runs(tmp_path, monkeypatch):
+    checkpoint = tmp_path / "caho_encoder"
+    checkpoint.mkdir()
+    (checkpoint / "modules.json").write_text("[]", encoding="utf-8")
+
     class DummyEncoder:
         def __init__(self, config):
             self.config = config
@@ -327,6 +331,8 @@ def test_diagnostics_cli_runs(monkeypatch):
         "argv",
         [
             "ccd-diagnose",
+            "--checkpoint",
+            str(checkpoint),
             "--num-samples",
             "10",
             "--batch-size",

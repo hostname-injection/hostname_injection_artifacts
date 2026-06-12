@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 from typing import Iterable, List, Optional
 
 import numpy as np
@@ -9,6 +10,46 @@ from .config import EncoderConfig
 from .utils import l2_normalize
 
 LOCAL_HASH_ENCODER = "ccd-local-hash-encoder"
+SENTENCE_TRANSFORMER_MODULES_FILE = "modules.json"
+
+
+def require_trained_caho_checkpoint(model_name: str, *, purpose: str = "this command") -> Path:
+    """Require an explicit filesystem CAHO checkpoint for reviewer-facing runs.
+
+    Unit tests may still construct in-memory models directly, but command-line
+    CCD training/scoring must not silently fall back to a base SentenceTransformer
+    model or the deterministic local hash encoder.
+    """
+    value = str(model_name or "").strip()
+    if not value:
+        raise ValueError(f"{purpose} requires --encoder pointing to a trained CAHO checkpoint directory")
+    if value == LOCAL_HASH_ENCODER:
+        raise ValueError(
+            f"{purpose} requires a trained CAHO checkpoint; {LOCAL_HASH_ENCODER!r} is reserved for unit tests."
+        )
+    path = Path(value).expanduser()
+    if not path.exists():
+        raise ValueError(
+            f"{purpose} requires an existing trained CAHO checkpoint directory; got {value!r}"
+        )
+    if not path.is_dir():
+        raise ValueError(f"{purpose} requires a trained CAHO checkpoint directory; got file {value!r}")
+    modules_path = path / SENTENCE_TRANSFORMER_MODULES_FILE
+    if not modules_path.exists():
+        raise ValueError(
+            f"{purpose} requires a SentenceTransformer CAHO checkpoint directory containing "
+            f"{SENTENCE_TRANSFORMER_MODULES_FILE!r}; got {value!r}"
+        )
+    return path
+
+
+def require_model_uses_trained_caho_checkpoint(model, *, purpose: str = "this command") -> None:
+    config = getattr(model, "config", None)
+    encoder_config = getattr(config, "encoder", None)
+    model_name = getattr(encoder_config, "model_name", None)
+    if model_name is None:
+        return
+    require_trained_caho_checkpoint(model_name, purpose=purpose)
 
 
 class _HashingSentenceModel:

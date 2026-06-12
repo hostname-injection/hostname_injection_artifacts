@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import List
 
 from .config import CCDConfig
-from .encoder import CahoEncoder
+from .encoder import CahoEncoder, require_trained_caho_checkpoint
 
 
 def _make_inputs(n: int) -> List[str]:
@@ -37,8 +37,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="CCD device/throughput diagnostics.")
     parser.add_argument(
         "--checkpoint",
-        default="ccd-local-hash-encoder",
-        help="CAHO encoder path or SentenceTransformer name.",
+        required=True,
+        help="Trained CAHO checkpoint directory.",
     )
     parser.add_argument(
         "--device",
@@ -59,7 +59,7 @@ def main() -> int:
         raise ValueError("--num-samples must be positive")
 
     config = CCDConfig()
-    config.encoder.model_name = args.checkpoint
+    config.encoder.model_name = str(require_trained_caho_checkpoint(args.checkpoint, purpose="ccd-diagnose"))
     config.encoder.device = args.device
 
     encoder = CahoEncoder(config.encoder)

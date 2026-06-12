@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from ccd.calibration import calibrate_thresholds_by_group, split_conformal_threshold_metadata
+from ccd.encoder import require_model_uses_trained_caho_checkpoint
 from ccd.io import ModelBundle, load_model, save_model
 from ccd.line_io import read_nonempty_lines, read_parallel_lines
 from ccd.preprocess import normalize_hostname
@@ -33,6 +34,7 @@ def main() -> None:
     args = parser.parse_args()
 
     model = load_model(args.model)
+    require_model_uses_trained_caho_checkpoint(model, purpose="scripts/calibrate.py")
     hostnames = read_lines(args.benign)
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]

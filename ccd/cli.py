@@ -19,7 +19,7 @@ from .csv_io import iter_malicious_csv_rows, read_malicious_csv_map, write_score
 from .io import load_model, ModelBundle, save_model
 from .line_io import read_nonempty_lines, read_parallel_lines
 from .cone import ConePartition
-from .encoder import CahoEncoder, LOCAL_HASH_ENCODER
+from .encoder import CahoEncoder, require_model_uses_trained_caho_checkpoint, require_trained_caho_checkpoint
 from .augment import CAHOAugmenter, AugmentConfig, WeightedAugmentConfig
 from .edit_model import EditModel
 from .preprocess import normalize_hostname, normalization_trace
@@ -33,9 +33,12 @@ from .train import (
     CAHOTrainer,
     CAHO_DEFAULT_LR,
     CAHO_DEFAULT_WEIGHT_DECAY,
+    CAHO_TRAINING_SETTING_FIELDS,
     ContrastiveTrainer,
     Sample,
     resolve_caho_batch_size,
+    training_default_values,
+    warn_if_caho_training_defaults_changed,
 )
 import numpy as np
 from .calibration import (
@@ -43,19 +46,6 @@ from .calibration import (
     coerce_finite_threshold,
     split_conformal_threshold_metadata,
     threshold_for_group,
-)
-from .user_logins import (
-    DEFAULT_HOSTNAME_COLUMN,
-    DEFAULT_USER_LOGINS_COLUMN,
-    DEFAULT_OPUS_COLUMN,
-    DEFAULT_SONNET_COLUMN,
-    DEFAULT_OPUS_CONF_COLUMN,
-    DEFAULT_SONNET_CONF_COLUMN,
-    LABEL_POLICY_DESCRIPTIONS,
-    LabelPolicy,
-    build_priors_from_user_logins,
-    collect_caho_samples_from_user_logins,
-    collect_label_stats_from_user_logins,
 )
 
 
@@ -90,11 +80,20 @@ def _resolve_device(name: str) -> str:
     return name
 
 
-def _default_caho_checkpoint() -> str:
-    return LOCAL_HASH_ENCODER
+def _require_model_bundle_caho_checkpoint(model, *, purpose: str) -> None:
+    require_model_uses_trained_caho_checkpoint(model, purpose=purpose)
 
 
 def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_path: Path) -> None:
+    defaults = getattr(args, "_caho_training_defaults", None)
+    if defaults:
+        warn_if_caho_training_defaults_changed(
+            args,
+            defaults=defaults,
+            fields=getattr(args, "_caho_training_warning_fields", CAHO_TRAINING_SETTING_FIELDS),
+            label=getattr(args, "_caho_training_warning_label", "CAHO training"),
+        )
+
     model_path = args.model
     if args.resume and out_path.exists():
         model_path = str(out_path)
@@ -217,6 +216,8 @@ def cmd_train_caho_corpus(args: argparse.Namespace) -> None:
 
 
 def cmd_eval_caho(args: argparse.Namespace) -> None:
+    if not getattr(args, "_allow_test_encoder", False):
+        require_trained_caho_checkpoint(args.model, purpose="ccd eval-caho")
     hostnames = _read_lines(args.input)
     if args.normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]
@@ -252,8 +253,8 @@ def cmd_train_priors(args: argparse.Namespace) -> None:
     if args.config and args.config.exists():
         config = CCDConfig.from_dict(json.loads(args.config.read_text()))
 
-    if args.encoder:
-        config.encoder.model_name = args.encoder
+    checkpoint = require_trained_caho_checkpoint(args.encoder, purpose="ccd train-priors")
+    config.encoder.model_name = str(checkpoint)
 
     encoder = CahoEncoder(config.encoder)
     benign = _read_lines(args.benign)
@@ -282,6 +283,7 @@ def cmd_train_priors(args: argparse.Namespace) -> None:
 
 def cmd_score(args: argparse.Namespace) -> None:
     model = load_model(args.model)
+    _require_model_bundle_caho_checkpoint(model, purpose="ccd score")
     hostnames = _read_lines(args.input)
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]
@@ -332,6 +334,7 @@ def cmd_score(args: argparse.Namespace) -> None:
 
 def cmd_calibrate(args: argparse.Namespace) -> None:
     model = load_model(args.model)
+    _require_model_bundle_caho_checkpoint(model, purpose="ccd calibrate")
     hostnames = _read_lines(args.benign)
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]
@@ -381,6 +384,7 @@ def cmd_calibrate(args: argparse.Namespace) -> None:
 
 def cmd_refresh_benign(args: argparse.Namespace) -> None:
     model = load_model(args.model)
+    _require_model_bundle_caho_checkpoint(model, purpose="ccd refresh-benign")
     hostnames = _read_lines(args.benign)
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]
@@ -422,6 +426,7 @@ def cmd_refresh_benign(args: argparse.Namespace) -> None:
 
 def cmd_certify(args: argparse.Namespace) -> None:
     model = load_model(args.model)
+    _require_model_bundle_caho_checkpoint(model, purpose="ccd certify")
     hostnames = _read_lines(args.input)
     threshold = coerce_finite_threshold(
         args.threshold if args.threshold is not None else (model.threshold if model.threshold is not None else 0.0)
@@ -551,192 +556,6 @@ def cmd_certify(args: argparse.Namespace) -> None:
     print(f"Wrote certificates to {args.output}")
 
 
-def _label_policy_help() -> str:
-    details = " ".join(f"{name}: {desc}" for name, desc in LABEL_POLICY_DESCRIPTIONS.items())
-    return f"How to combine GPT 5.5 / Claude Opus 4.8 labels. {details}"
-
-
-def cmd_train_user_logins(args: argparse.Namespace) -> None:
-    config = CCDConfig()
-    if args.config and args.config.exists():
-        config = CCDConfig.from_dict(json.loads(args.config.read_text()))
-
-    if args.train_caho and args.encoder:
-        raise ValueError("Use either --train-caho or --encoder, not both.")
-
-    if args.encoder:
-        config.encoder.model_name = args.encoder
-
-    label_policy = LabelPolicy(args.label_policy)
-    min_sonnet_conf = args.min_sonnet_confidence
-    min_opus_conf = args.min_opus_confidence
-    if args.min_confidence is not None:
-        if min_sonnet_conf is None:
-            min_sonnet_conf = args.min_confidence
-        if min_opus_conf is None:
-            min_opus_conf = args.min_confidence
-
-    if args.dry_run:
-        stats = collect_label_stats_from_user_logins(
-            args.user_logins_dir,
-            label_policy=label_policy,
-            min_sonnet_confidence=min_sonnet_conf,
-            min_opus_confidence=min_opus_conf,
-            normalize=not args.no_normalize,
-            hostname_col=args.hostname_col,
-            sonnet_col=args.sonnet_col,
-            opus_col=args.opus_col,
-            sonnet_conf_col=args.sonnet_conf_col,
-            opus_conf_col=args.opus_conf_col,
-        )
-        print(
-            "Rows: "
-            f"total={stats.total_rows}, "
-            f"benign={stats.used_benign}, "
-            f"malicious={stats.used_malicious}, "
-            f"dropped={stats.dropped_rows}"
-        )
-        combos = ", ".join(f"{k}:{v}" for k, v in sorted(stats.combo_counts.items()))
-        if combos:
-            print(f"Label combos (sonnet/opus): {combos}")
-        return
-
-    if args.output is None:
-        raise ValueError("--output is required unless --dry-run is set.")
-
-    if args.train_caho:
-        caho_out = args.caho_out or Path("caho_encoder_user_logins")
-        base_model = args.caho_model or config.encoder.model_name
-        if args.caho_resume and caho_out.exists():
-            base_model = str(caho_out)
-        samples, sample_stats = collect_caho_samples_from_user_logins(
-            args.user_logins_dir,
-            label_policy=label_policy,
-            min_sonnet_confidence=min_sonnet_conf,
-            min_opus_confidence=min_opus_conf,
-            normalize=not args.no_normalize,
-            malicious_family=args.malicious_family,
-            hostname_col=args.hostname_col,
-            sonnet_col=args.sonnet_col,
-            opus_col=args.opus_col,
-            sonnet_conf_col=args.sonnet_conf_col,
-            opus_conf_col=args.opus_conf_col,
-            sample_per_class=args.caho_sample,
-            seed=args.caho_seed,
-        )
-        if not samples:
-            raise ValueError("No samples available for CAHO training after filtering.")
-
-        model = SentenceTransformer(base_model)
-        device = _resolve_device(args.caho_device)
-        if device:
-            try:
-                model = model.to(device)
-            except Exception:
-                pass
-
-        normalize_in_aug = not args.no_normalize
-        if args.caho_augmenter in {"weighted", "hybrid"}:
-            normalize_in_aug = False
-        weighted_config = WeightedAugmentConfig(
-            num_augs=args.caho_weighted_num_augs,
-            retry_on_no_change=not args.caho_weighted_no_retry,
-            max_attempts=args.caho_weighted_max_attempts,
-        )
-        aug_config = AugmentConfig(
-            normalize_input=normalize_in_aug,
-            use_edit_model=args.caho_augmenter in {"edit", "hybrid"},
-            use_weighted_augs=args.caho_augmenter in {"weighted", "hybrid"},
-            weighted=weighted_config,
-        )
-        dataset = CAHODataset(
-            samples,
-            augmenter=CAHOAugmenter(config=aug_config),
-            include_original=args.caho_loss == "contrastive",
-            seed=args.caho_seed,
-        )
-        caho_batch_size = resolve_caho_batch_size(
-            args.caho_batch_size,
-            use_grad_cache=args.caho_grad_cache,
-        )
-
-        if args.caho_loss == "contrastive":
-            trainer = ContrastiveTrainer(
-                model,
-                batch_size=caho_batch_size,
-                temperature=args.caho_temperature,
-                lr=args.caho_lr,
-                weight_decay=args.caho_weight_decay,
-                max_grad_norm=args.caho_max_grad_norm,
-                scheduler=args.caho_scheduler,
-                min_lr=args.caho_min_lr,
-                use_grad_cache=args.caho_grad_cache,
-                grad_cache_chunk_size=args.caho_grad_cache_chunk_size,
-                num_workers=args.caho_num_workers,
-                empty_cache=args.caho_empty_cache,
-                loss_mode=args.caho_contrastive_loss,
-                loss_max_scale=args.caho_contrastive_max_scale,
-                loss_min_scale=args.caho_contrastive_min_scale,
-                optimize_loss=args.caho_optimize_contrastive_scale,
-                save_best=args.caho_save_best,
-                save_best_path=str(caho_out) if args.caho_save_best else None,
-                seed=args.caho_seed,
-            )
-        else:
-            trainer = CAHOTrainer(
-                model,
-                batch_size=caho_batch_size,
-                temperature=args.caho_temperature,
-                lr=args.caho_lr,
-                weight_decay=args.caho_weight_decay,
-                seed=args.caho_seed,
-            )
-        trainer.fit(dataset, epochs=args.caho_epochs)
-        if not args.caho_no_save_final:
-            model.save(str(caho_out))
-        print(
-            "CAHO samples: "
-            f"benign={sample_stats.used_benign}, "
-            f"malicious={sample_stats.used_malicious}, "
-            f"dropped={sample_stats.dropped_rows}"
-        )
-        print(f"Saved CAHO encoder to {caho_out}")
-        config.encoder.model_name = str(caho_out)
-
-    encoder = CahoEncoder(config.encoder)
-
-    bundle, stats = build_priors_from_user_logins(
-        args.user_logins_dir,
-        config,
-        encoder=encoder,
-        label_policy=label_policy,
-        min_sonnet_confidence=min_sonnet_conf,
-        min_opus_confidence=min_opus_conf,
-        batch_size=args.batch_size,
-        buffer_size=args.buffer_size,
-        normalize=not args.no_normalize,
-        malicious_family=args.malicious_family,
-        hostname_col=args.hostname_col,
-        sonnet_col=args.sonnet_col,
-        opus_col=args.opus_col,
-        sonnet_conf_col=args.sonnet_conf_col,
-        opus_conf_col=args.opus_conf_col,
-    )
-
-    save_model(args.output, bundle)
-    print(f"Saved model to {args.output}")
-    print(
-        "Rows: "
-        f"total={stats.total_rows}, "
-        f"benign={stats.used_benign}, "
-        f"malicious={stats.used_malicious}, "
-        f"dropped={stats.dropped_rows}"
-    )
-    combos = ", ".join(f"{k}:{v}" for k, v in sorted(stats.combo_counts.items()))
-    if combos:
-        print(f"Label combos (sonnet/opus): {combos}")
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ccd")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -782,7 +601,12 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho.add_argument("--no-save-final", action="store_true")
     train_caho.add_argument("--no-normalize", action="store_true")
     train_caho.add_argument("--seed", type=int, default=13)
-    train_caho.set_defaults(func=cmd_train_caho)
+    train_caho.set_defaults(
+        func=cmd_train_caho,
+        _caho_training_defaults=training_default_values(train_caho, CAHO_TRAINING_SETTING_FIELDS),
+        _caho_training_warning_fields=CAHO_TRAINING_SETTING_FIELDS,
+        _caho_training_warning_label="ccd train-caho",
+    )
 
     train_caho_corpus = sub.add_parser(
         "train-caho-corpus",
@@ -834,10 +658,15 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--no-save-final", action="store_true")
     train_caho_corpus.add_argument("--no-normalize", action="store_true")
     train_caho_corpus.add_argument("--seed", type=int, default=13)
-    train_caho_corpus.set_defaults(func=cmd_train_caho_corpus)
+    train_caho_corpus.set_defaults(
+        func=cmd_train_caho_corpus,
+        _caho_training_defaults=training_default_values(train_caho_corpus, CAHO_TRAINING_SETTING_FIELDS),
+        _caho_training_warning_fields=CAHO_TRAINING_SETTING_FIELDS,
+        _caho_training_warning_label="ccd train-caho-corpus",
+    )
 
     eval_caho = sub.add_parser("eval-caho", help="Encode hostnames with a CAHO encoder")
-    eval_caho.add_argument("--model", default=_default_caho_checkpoint())
+    eval_caho.add_argument("--model", required=True, help="Trained CAHO checkpoint directory")
     eval_caho.add_argument("--input", required=True, type=Path)
     eval_caho.add_argument("--output", required=True, type=Path)
     eval_caho.add_argument("--format", choices=["npz", "csv"], default=None)
@@ -852,7 +681,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_priors.add_argument("--malicious", required=True, type=Path)
     train_priors.add_argument("--output", required=True, type=Path)
     train_priors.add_argument("--config", type=Path, default=None)
-    train_priors.add_argument("--encoder", type=str, default=None, help="Override encoder model path/name")
+    train_priors.add_argument("--encoder", type=str, required=True, help="Trained CAHO checkpoint directory")
     train_priors.add_argument("--batch-size", type=int, default=64)
     train_priors.add_argument("--no-normalize", action="store_true")
     train_priors.set_defaults(func=cmd_train_priors)
@@ -972,102 +801,6 @@ def build_parser() -> argparse.ArgumentParser:
     certify.add_argument("--cert-eps", type=float, default=1e-12)
     certify.add_argument("--no-normalize", action="store_true")
     certify.set_defaults(func=cmd_certify)
-
-    train_user_logins = sub.add_parser(
-        "train-user-logins",
-        help="Build CCD priors directly from user_logins CSVs",
-    )
-    train_user_logins.add_argument(
-        "--user-logins-dir",
-        type=Path,
-        default=Path("hostname_injection_benchmark/user_logins"),
-    )
-    train_user_logins.add_argument("--output", type=Path)
-    train_user_logins.add_argument(
-        "--label-policy",
-        choices=[policy.value for policy in LabelPolicy],
-        default=LabelPolicy.BOTH_M.value,
-        help=_label_policy_help(),
-    )
-    train_user_logins.add_argument("--malicious-family", default="dns_cmd_injection")
-    train_user_logins.add_argument("--config", type=Path, default=None)
-    train_user_logins.add_argument(
-        "--encoder",
-        type=str,
-        default=None,
-        help="Override encoder model path/name",
-    )
-    train_user_logins.add_argument("--batch-size", type=int, default=64)
-    train_user_logins.add_argument(
-        "--buffer-size",
-        type=int,
-        default=2048,
-        help="Hostnames to buffer per class before encoding",
-    )
-    train_user_logins.add_argument("--no-normalize", action="store_true")
-    train_user_logins.add_argument("--hostname-col", default=DEFAULT_USER_LOGINS_COLUMN)
-    train_user_logins.add_argument("--sonnet-col", default=DEFAULT_SONNET_COLUMN)
-    train_user_logins.add_argument("--opus-col", default=DEFAULT_OPUS_COLUMN)
-    train_user_logins.add_argument("--sonnet-conf-col", default=DEFAULT_SONNET_CONF_COLUMN)
-    train_user_logins.add_argument("--opus-conf-col", default=DEFAULT_OPUS_CONF_COLUMN)
-    train_user_logins.add_argument("--min-confidence", type=float, default=None)
-    train_user_logins.add_argument("--min-sonnet-confidence", type=float, default=None)
-    train_user_logins.add_argument("--min-opus-confidence", type=float, default=None)
-    train_user_logins.add_argument("--dry-run", action="store_true", help="Only report label counts")
-    train_user_logins.add_argument("--train-caho", action="store_true", help="Fine-tune CAHO encoder first")
-    train_user_logins.add_argument("--caho-out", type=Path, default=None)
-    train_user_logins.add_argument(
-        "--caho-model",
-        type=str,
-        default=None,
-        help="Base SentenceTransformer model for CAHO fine-tuning",
-    )
-    train_user_logins.add_argument("--caho-epochs", type=int, default=CAHO_DEFAULT_EPOCHS)
-    train_user_logins.add_argument(
-        "--caho-batch-size",
-        type=int,
-        default=None,
-        help=(
-            "Effective CAHO batch size. Defaults to "
-            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with --caho-grad-cache and "
-            f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
-        ),
-    )
-    train_user_logins.add_argument("--caho-lr", type=float, default=CAHO_DEFAULT_LR)
-    train_user_logins.add_argument("--caho-weight-decay", type=float, default=CAHO_DEFAULT_WEIGHT_DECAY)
-    train_user_logins.add_argument("--caho-temperature", type=float, default=0.07)
-    train_user_logins.add_argument("--caho-loss", choices=["supcon", "contrastive"], default="supcon")
-    train_user_logins.add_argument("--caho-augmenter", choices=["edit", "weighted", "hybrid"], default="edit")
-    train_user_logins.add_argument("--caho-weighted-num-augs", type=int, default=2)
-    train_user_logins.add_argument("--caho-weighted-max-attempts", type=int, default=3)
-    train_user_logins.add_argument("--caho-weighted-no-retry", action="store_true")
-    train_user_logins.add_argument("--caho-max-grad-norm", type=float, default=1.0)
-    train_user_logins.add_argument("--caho-scheduler", choices=["cosine", "none"], default="cosine")
-    train_user_logins.add_argument("--caho-min-lr", type=float, default=1e-5)
-    train_user_logins.add_argument(
-        "--caho-grad-cache",
-        action="store_true",
-        help="Use GradCache for replay-scale pairwise CAHO training",
-    )
-    train_user_logins.add_argument("--caho-grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
-    train_user_logins.add_argument("--caho-contrastive-loss", choices=["fixed", "learnable"], default="fixed")
-    train_user_logins.add_argument("--caho-contrastive-max-scale", type=float, default=100.0)
-    train_user_logins.add_argument("--caho-contrastive-min-scale", type=float, default=1.0)
-    train_user_logins.add_argument("--caho-optimize-contrastive-scale", action="store_true")
-    train_user_logins.add_argument("--caho-num-workers", type=int, default=0)
-    train_user_logins.add_argument("--caho-empty-cache", action="store_true")
-    train_user_logins.add_argument("--caho-device", default="auto", help="Training device: auto|cpu|cuda")
-    train_user_logins.add_argument("--caho-resume", action="store_true")
-    train_user_logins.add_argument("--caho-save-best", action="store_true")
-    train_user_logins.add_argument("--caho-no-save-final", action="store_true")
-    train_user_logins.add_argument(
-        "--caho-sample",
-        type=int,
-        default=None,
-        help="Reservoir sample size per class for CAHO training",
-    )
-    train_user_logins.add_argument("--caho-seed", type=int, default=13)
-    train_user_logins.set_defaults(func=cmd_train_user_logins)
 
     return parser
 
