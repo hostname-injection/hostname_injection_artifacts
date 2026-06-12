@@ -62,9 +62,12 @@ Current evidence:
   and CCD scoring kernel.
 - Exercisability: `scripts/run_artifact_smoke.py --skip-tests` compiles code,
   validates the public bundle in-place and after extraction, recomputes sample
-  metrics, trains a tiny CCD model, calibrates a fixed-FPR threshold into a
-  self-contained model bundle, scores from that bundle, writes explanations and
-  certificate records, and evaluates CAHO embeddings with the deterministic local smoke encoder.
+  metrics, trains a temporary CAHO checkpoint from `examples/`, builds a CCD
+  prior bundle with that checkpoint, calibrates a fixed-FPR threshold into a
+  self-contained model bundle, refreshes `P_B` plus global/grouped thresholds,
+  scores from that refreshed bundle, writes explanations and certificate
+  records, and evaluates CAHO embeddings with the trained temporary CAHO
+  checkpoint.
 - Release-safe claim checks: `scripts/run_artifact_claim_checks.py` runs the
   readiness audit, aggregate recomputation scripts, headline-claim audit, and
   checked-in public sample fixed-FPR replay metrics from one evaluator command.

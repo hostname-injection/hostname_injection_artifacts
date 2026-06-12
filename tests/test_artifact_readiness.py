@@ -175,6 +175,10 @@ def test_dependency_files_cover_artifact_smoke_and_claim_map() -> None:
     assert "reviewer-facing CCD training and scoring commands require a trained CAHO checkpoint path" in " ".join(
         readme.split()
     )
+    for rel in ("BADGE_READINESS.md", "ARTIFACT_RESOURCES.md", "metadata.template.toml"):
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        assert "trains a tiny CCD model" not in text
+        assert "deterministic local smoke encoder" not in text
     assert re.search(r"(?is)(GradCache.{0,120}optional|optional.{0,120}GradCache)", readme) is None
 
 

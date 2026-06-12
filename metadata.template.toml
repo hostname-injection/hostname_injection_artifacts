@@ -31,7 +31,7 @@ expected1 = "The focused tests for scoring, cone partitioning, model pipeline, c
 
 claim2 = "The artifact can be kicked-the-tires without private data."
 script2 = "https://example.org/REPLACE_WITH_FINAL_ARTIFACT_URL/blob/main/scripts/run_artifact_smoke.py"
-expected2 = "The smoke command compiles code, validates the public bundle in-repo and after extraction, recomputes sample replay metrics, trains a tiny CCD model, calibrates a fixed-FPR threshold into a self-contained model bundle, refreshes P_B plus global/grouped thresholds from a clean benign window, scores, explains, and certifies from that refreshed bundle with grouped thresholds, evaluates CAHO embeddings with the deterministic local smoke encoder, and prints artifact smoke status: pass."
+expected2 = "The smoke command compiles code, validates the public bundle in-repo and after extraction, recomputes sample replay metrics, trains a temporary CAHO checkpoint from examples, builds a CCD prior bundle with that checkpoint, calibrates a fixed-FPR threshold into a self-contained model bundle, refreshes P_B plus global/grouped thresholds from a clean benign window, scores, explains, and certifies from that refreshed bundle with grouped thresholds, evaluates CAHO embeddings with the trained temporary CAHO checkpoint, and prints artifact smoke status: pass."
 
 claim3 = "The checked-in public HIB sample bundle satisfies release gates and does not disclose raw-hostname recurrence facts."
 script3 = "https://example.org/REPLACE_WITH_FINAL_ARTIFACT_URL/blob/main/deidentification_release/scripts/validate_release_gate.py"

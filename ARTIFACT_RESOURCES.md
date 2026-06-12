@@ -28,11 +28,12 @@ infrastructure. It does not require SSH access to author-controlled hosts,
 production-network access, special hardware, or private services.
 
 The smoke path compiles code, validates the public sample HIB bundle in-place
-and after extraction, recomputes public sample metrics, trains a tiny CCD model
-from `examples/`, calibrates a fixed-FPR threshold into a self-contained model
-bundle, refreshes `P_B` plus global/grouped thresholds from a clean benign
-window, scores, explains, and certifies from that refreshed bundle with grouped
-thresholds, and evaluates the deterministic local smoke encoder.
+and after extraction, recomputes public sample metrics, trains a temporary CAHO
+checkpoint from `examples/`, builds a CCD prior bundle with that checkpoint,
+calibrates a fixed-FPR threshold into a self-contained model bundle, refreshes
+`P_B` plus global/grouped thresholds from a clean benign window, scores,
+explains, and certifies from that refreshed bundle with grouped thresholds, and
+evaluates CAHO embeddings with the trained temporary CAHO checkpoint.
 
 ## Release-Safe Paper Claim Check Runner
 
