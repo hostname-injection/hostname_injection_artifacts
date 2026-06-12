@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 from dataclasses import asdict, dataclass
 from collections import deque
+from numbers import Integral
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
@@ -22,6 +24,7 @@ from .train import (
     CAHO_94GB_ACTUAL_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+    CAHO_DEFAULT_EPOCHS,
     ContrastiveLoss,
     pairwise_contrastive_loss,
     resolve_caho_batch_size,
@@ -205,6 +208,32 @@ def resolve_device(device: str) -> str:
     return "cpu"
 
 
+def _require_positive_int(value: int, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, Integral) or int(value) <= 0:
+        raise ValueError(f"{name} must be a positive integer")
+    return int(value)
+
+
+def _require_nonnegative_int(value: int, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, Integral) or int(value) < 0:
+        raise ValueError(f"{name} must be a non-negative integer")
+    return int(value)
+
+
+def _require_finite_positive(value: float, name: str) -> float:
+    value = float(value)
+    if not math.isfinite(value) or value <= 0.0:
+        raise ValueError(f"{name} must be finite and positive")
+    return value
+
+
+def _require_finite_nonnegative(value: float, name: str) -> float:
+    value = float(value)
+    if not math.isfinite(value) or value < 0.0:
+        raise ValueError(f"{name} must be finite and non-negative")
+    return value
+
+
 def build_augmenter(
     *,
     mode: str,
@@ -256,22 +285,28 @@ class BenchmarkContrastiveTrainer:
         seed: Optional[int] = None,
     ) -> None:
         self.model = model
-        self.batch_size = batch_size
-        self.temperature = temperature
-        self.lr = lr
-        self.max_grad_norm = max_grad_norm
+        self.batch_size = _require_positive_int(batch_size, "batch_size")
+        self.temperature = _require_finite_positive(temperature, "temperature")
+        self.lr = _require_finite_positive(lr, "lr")
+        self.max_grad_norm = _require_finite_nonnegative(max_grad_norm, "max_grad_norm")
         self.scheduler = scheduler
-        self.min_lr = min_lr
-        self.weight_decay = float(weight_decay)
+        if self.scheduler not in {"cosine", "none"}:
+            raise ValueError("scheduler must be 'cosine' or 'none'")
+        self.min_lr = _require_finite_nonnegative(min_lr, "min_lr")
+        self.weight_decay = _require_finite_nonnegative(weight_decay, "weight_decay")
         self.use_grad_cache = use_grad_cache
-        self.grad_cache_chunk_size = grad_cache_chunk_size
-        self.num_workers = num_workers
+        self.grad_cache_chunk_size = _require_positive_int(grad_cache_chunk_size, "grad_cache_chunk_size")
+        self.num_workers = _require_nonnegative_int(num_workers, "num_workers")
         self.loss_mode = loss_mode
-        self.loss_max_scale = loss_max_scale
-        self.loss_min_scale = loss_min_scale
+        if self.loss_mode not in {"fixed", "learnable"}:
+            raise ValueError("loss_mode must be 'fixed' or 'learnable'")
+        self.loss_max_scale = _require_finite_positive(loss_max_scale, "loss_max_scale")
+        self.loss_min_scale = _require_finite_positive(loss_min_scale, "loss_min_scale")
+        if self.loss_max_scale < self.loss_min_scale:
+            raise ValueError("loss_max_scale must be greater than or equal to loss_min_scale")
         self.optimize_loss = optimize_loss
-        self.log_every = max(0, int(log_every))
-        self.max_steps = max_steps
+        self.log_every = _require_nonnegative_int(log_every, "log_every")
+        self.max_steps = None if max_steps is None else _require_positive_int(max_steps, "max_steps")
         self.seed = seed
         self._loss_module = None
 
@@ -281,7 +316,7 @@ class BenchmarkContrastiveTrainer:
         tokenized = {k: v.to(device) for k, v in tokenized.items()}
         return self.model(tokenized)["sentence_embedding"]
 
-    def fit(self, dataset: BenchmarkCAHOViewDataset, *, epochs: int = 1) -> Dict[str, Any]:
+    def fit(self, dataset: BenchmarkCAHOViewDataset, *, epochs: int = CAHO_DEFAULT_EPOCHS) -> Dict[str, Any]:
         import torch
         from torch.optim.lr_scheduler import CosineAnnealingLR
         from torch.utils.data import DataLoader
@@ -397,11 +432,14 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.binary_loss_weight = binary_loss_weight
-        self.contrastive_loss_weight = contrastive_loss_weight
-        self.binary_hidden_dim = int(binary_hidden_dim)
+        self.binary_loss_weight = _require_finite_positive(binary_loss_weight, "binary_loss_weight")
+        self.contrastive_loss_weight = _require_finite_positive(
+            contrastive_loss_weight,
+            "contrastive_loss_weight",
+        )
+        self.binary_hidden_dim = _require_positive_int(binary_hidden_dim, "binary_hidden_dim")
         self.binary_classifier_path = Path(binary_classifier_path) if binary_classifier_path is not None else None
-        self.checkpoint_every_steps = max(0, int(checkpoint_every_steps))
+        self.checkpoint_every_steps = _require_nonnegative_int(checkpoint_every_steps, "checkpoint_every_steps")
         self.checkpoint_dir = Path(checkpoint_dir) if checkpoint_dir is not None else None
         self.checkpoint_config = checkpoint_config
         self.best_checkpoint_avg_loss: Optional[float] = None
@@ -421,7 +459,7 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
         self,
         dataset: BenchmarkCAHOViewDataset,
         *,
-        epochs: int = 1,
+        epochs: int = CAHO_DEFAULT_EPOCHS,
         validation_dataset: Optional[BenchmarkCAHOViewDataset] = None,
         validation_target_fpr: float = 1e-4,
         restore_best_validation: bool = False,

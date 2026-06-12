@@ -1,5 +1,4 @@
 import numpy as np
-from pathlib import Path
 
 from ccd.config import EncoderConfig
 from ccd.encoder import CahoEncoder
@@ -11,12 +10,36 @@ def test_encode_torch_matches_numpy():
     except Exception:
         return
 
-    checkpoint = Path("caho_model_checkpoint")
-    if not checkpoint.exists():
-        return
+    class DummyModel:
+        def eval(self):
+            return None
 
-    config = EncoderConfig(model_name=str(checkpoint), device="cpu", fp16=False)
+        def encode(
+            self,
+            hostnames,
+            *,
+            batch_size,
+            convert_to_numpy=False,
+            convert_to_tensor=False,
+            normalize_embeddings=False,
+            show_progress_bar=False,
+        ):
+            del batch_size, show_progress_bar
+            embeddings = np.asarray(
+                [[float(index + 1), float(len(hostname)), 0.25] for index, hostname in enumerate(hostnames)],
+                dtype=np.float32,
+            )
+            if normalize_embeddings:
+                embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+            if convert_to_tensor:
+                return torch.as_tensor(embeddings)
+            if convert_to_numpy:
+                return embeddings
+            return embeddings
+
+    config = EncoderConfig(model_name="dummy-caho", device="cpu", fp16=False)
     encoder = CahoEncoder(config)
+    encoder._model = DummyModel()
 
     hostnames = ["example.com", "login.microsoftonline.com"]
     emb_np = encoder.encode(hostnames, batch_size=2, normalize=True)

@@ -26,6 +26,7 @@ from .preprocess import normalize_hostname, normalization_trace
 from .priors import build_benign_prior, build_malicious_priors
 from .train import (
     CAHO_94GB_ACTUAL_BATCH_SIZE,
+    CAHO_DEFAULT_EPOCHS,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     CAHODataset,
@@ -88,9 +89,6 @@ def _resolve_device(name: str) -> str:
 
 
 def _default_caho_checkpoint() -> str:
-    checkpoint = Path("caho_model_checkpoint")
-    if checkpoint.exists():
-        return str(checkpoint)
     return "sentence-transformers/all-MiniLM-L6-v2"
 
 
@@ -770,7 +768,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho.add_argument("--malicious", required=True, type=Path)
     train_caho.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     train_caho.add_argument("--out", required=True, type=Path)
-    train_caho.add_argument("--epochs", type=int, default=1)
+    train_caho.add_argument("--epochs", type=int, default=CAHO_DEFAULT_EPOCHS)
     train_caho.add_argument(
         "--batch-size",
         type=int,
@@ -821,7 +819,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--malicious-family", default="corpus")
     train_caho_corpus.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     train_caho_corpus.add_argument("--out", required=True, type=Path)
-    train_caho_corpus.add_argument("--epochs", type=int, default=1)
+    train_caho_corpus.add_argument("--epochs", type=int, default=CAHO_DEFAULT_EPOCHS)
     train_caho_corpus.add_argument(
         "--batch-size",
         type=int,
@@ -1044,7 +1042,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Base SentenceTransformer model for CAHO fine-tuning",
     )
-    train_user_logins.add_argument("--caho-epochs", type=int, default=1)
+    train_user_logins.add_argument("--caho-epochs", type=int, default=CAHO_DEFAULT_EPOCHS)
     train_user_logins.add_argument(
         "--caho-batch-size",
         type=int,

@@ -1,5 +1,0 @@
-{"report_id": "fixture-1", "status": "target", "target_category": "command-execution"}
-{"report_id": "fixture-2", "status": "mapped", "target_category": "template-execution"}
-{"report_id": "fixture-3", "status": "covered", "target_category": "query-execution"}
-{"report_id": "fixture-4", "status": "excluded", "exclusion_reason": "rebinding"}
-{"report_id": "fixture-5", "status": "boundary", "exclusion_reason": "quic"}

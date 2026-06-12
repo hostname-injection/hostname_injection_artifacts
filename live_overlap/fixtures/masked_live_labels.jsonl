@@ -1,6 +1,0 @@
-{"case_id": "fixture-1", "ccd_flag": true, "regex_waf_flag": true, "label": "verified_positive"}
-{"case_id": "fixture-2", "ccd_flag": true, "regex_waf_flag": true, "label": "uncertain"}
-{"case_id": "fixture-3", "ccd_flag": true, "regex_waf_flag": true, "label": "verified_benign"}
-{"case_id": "fixture-4", "ccd_flag": true, "regex_waf_flag": false, "label": "positive"}
-{"case_id": "fixture-5", "ccd_flag": false, "regex_waf_flag": true, "label": "unresolved"}
-{"case_id": "fixture-6", "ccd_flag": false, "regex_waf_flag": true, "label": "benign"}

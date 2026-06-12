@@ -7,10 +7,12 @@ import pytest
 
 from ccd.benchmark_training import (
     CAHO_94GB_ACTUAL_BATCH_SIZE,
+    CAHO_DEFAULT_EPOCHS,
     CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     BenchmarkBinaryContrastiveTrainer,
     BenchmarkChunkShuffleSampler,
+    BenchmarkContrastiveTrainer,
     BenchmarkTrainingConfig,
     _orbit_labels,
     resolve_caho_batch_size,
@@ -145,6 +147,65 @@ def test_benchmark_binary_contrastive_trainer_fit_and_save(tmp_path):
     assert report["contrastive_objective"]["binary_auxiliary_head_views"] == "both_l2_normalized_views"
     assert report["contrastive_objective"]["deterministic_seed"] == 17
     assert report["train_summary"]["steps"] == 2
+
+
+def _valid_benchmark_trainer_kwargs():
+    return {
+        "batch_size": 2,
+        "temperature": 0.1,
+        "lr": 1e-2,
+        "max_grad_norm": 1.0,
+        "scheduler": "none",
+        "min_lr": 0.0,
+        "weight_decay": 0.02,
+        "use_grad_cache": False,
+        "grad_cache_chunk_size": 2,
+        "num_workers": 0,
+        "loss_mode": "fixed",
+        "loss_max_scale": 100.0,
+        "loss_min_scale": 1.0,
+        "optimize_loss": False,
+        "log_every": 0,
+        "max_steps": None,
+    }
+
+
+def test_benchmark_trainers_reject_invalid_hyperparameters():
+    invalid_contrastive_overrides = [
+        {"batch_size": 0},
+        {"temperature": 0.0},
+        {"lr": float("nan")},
+        {"max_grad_norm": -1.0},
+        {"scheduler": "linear"},
+        {"min_lr": -1e-5},
+        {"weight_decay": -0.01},
+        {"grad_cache_chunk_size": 0},
+        {"num_workers": -1},
+        {"loss_mode": "bad"},
+        {"loss_max_scale": 0.0},
+        {"loss_min_scale": float("inf")},
+        {"loss_max_scale": 1.0, "loss_min_scale": 2.0},
+        {"log_every": -1},
+        {"max_steps": 0},
+    ]
+
+    for override in invalid_contrastive_overrides:
+        kwargs = _valid_benchmark_trainer_kwargs()
+        kwargs.update(override)
+        with pytest.raises(ValueError):
+            BenchmarkContrastiveTrainer(object(), **kwargs)
+
+    invalid_binary_overrides = [
+        {"binary_loss_weight": 0.0},
+        {"contrastive_loss_weight": float("nan")},
+        {"binary_hidden_dim": 0},
+        {"checkpoint_every_steps": -1},
+    ]
+    for override in invalid_binary_overrides:
+        kwargs = _valid_benchmark_trainer_kwargs()
+        kwargs.update(override)
+        with pytest.raises(ValueError):
+            BenchmarkBinaryContrastiveTrainer(object(), **kwargs)
 
 
 def test_binary_trainer_records_validation_fixed_fpr_selection():
@@ -451,6 +512,7 @@ def test_benchmark_caho_94gb_batch_defaults():
     binary_module = importlib.util.module_from_spec(binary_spec)
     binary_spec.loader.exec_module(binary_module)
     binary_args = binary_module.build_parser().parse_args(["--out", "unused-output"])
+    assert binary_args.epochs == CAHO_DEFAULT_EPOCHS
     assert binary_args.batch_size == CAHO_94GB_ACTUAL_BATCH_SIZE
     assert binary_args.grad_cache_chunk_size == CAHO_94GB_GRAD_CACHE_CHUNK_SIZE
 
@@ -461,6 +523,7 @@ def test_benchmark_caho_94gb_batch_defaults():
     regular_spec.loader.exec_module(regular_module)
     regular_args = regular_module.build_parser().parse_args(["--out", "unused-output"])
     gradcache_args = regular_module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
+    assert regular_args.epochs == CAHO_DEFAULT_EPOCHS
     assert resolve_caho_batch_size(regular_args.batch_size, use_grad_cache=False) == CAHO_94GB_ACTUAL_BATCH_SIZE
     assert resolve_caho_batch_size(gradcache_args.batch_size, use_grad_cache=True) == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
     assert regular_args.grad_cache_chunk_size == CAHO_94GB_GRAD_CACHE_CHUNK_SIZE

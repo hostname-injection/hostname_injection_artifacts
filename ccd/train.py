@@ -12,6 +12,7 @@ from .augment import CAHOAugmenter
 CAHO_94GB_ACTUAL_BATCH_SIZE = 16_384
 CAHO_94GB_GRAD_CACHE_BATCH_SIZE = 49_152
 CAHO_94GB_GRAD_CACHE_CHUNK_SIZE = 8_192
+CAHO_DEFAULT_EPOCHS = 20
 
 
 def resolve_caho_batch_size(batch_size: Optional[int], *, use_grad_cache: bool) -> int:
@@ -283,7 +284,7 @@ class CAHOTrainer:
         self.lr = lr
         self.seed = seed
 
-    def fit(self, dataset: CAHODataset, epochs: int = 1) -> None:
+    def fit(self, dataset: CAHODataset, epochs: int = CAHO_DEFAULT_EPOCHS) -> None:
         import torch
         from torch.utils.data import DataLoader
 
@@ -393,7 +394,7 @@ class ContrastiveTrainer:
         model_output = self.model(tokenized)
         return model_output["sentence_embedding"]
 
-    def fit(self, dataset: CAHODataset, epochs: int = 1) -> None:
+    def fit(self, dataset: CAHODataset, epochs: int = CAHO_DEFAULT_EPOCHS) -> None:
         import torch
         from torch.utils.data import DataLoader
         from torch.optim.lr_scheduler import CosineAnnealingLR

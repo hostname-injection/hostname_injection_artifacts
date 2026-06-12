@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
 
 from ccd.benchmark_training import (
     CAHO_94GB_ACTUAL_BATCH_SIZE,
+    CAHO_DEFAULT_EPOCHS,
     CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     BenchmarkBinaryContrastiveTrainer,
     BenchmarkCAHOViewDataset,
@@ -24,9 +25,9 @@ from ccd.benchmark_training import (
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train CAHO plus a binary classification head over the full benchmark Dataset.")
     parser.add_argument("--root", type=Path, default=Path(os.environ.get("HIB_BENCHMARK_ROOT", "HostnameCommandInjectionBenchmark")))
-    parser.add_argument("--model", default="caho_model_checkpoint")
+    parser.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--epochs", type=int, default=CAHO_DEFAULT_EPOCHS)
     parser.add_argument(
         "--batch-size",
         type=int,

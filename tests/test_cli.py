@@ -9,6 +9,7 @@ import ccd.cli as cli_module
 from ccd.certify import DecisionCertificate
 from ccd.config import CCDConfig, ConeConfig
 from ccd.cli import build_parser
+from ccd.train import CAHO_DEFAULT_EPOCHS
 
 
 def test_train_caho_parser_smoke():
@@ -33,6 +34,7 @@ def test_train_caho_parser_smoke():
     assert args.loss == "contrastive"
     assert args.augmenter == "weighted"
     assert args.grad_cache is True
+    assert args.epochs == CAHO_DEFAULT_EPOCHS
     assert args.seed == 13
 
 
@@ -56,6 +58,7 @@ def test_train_user_logins_parser_smoke():
     assert args.caho_loss == "contrastive"
     assert args.caho_augmenter == "weighted"
     assert args.caho_grad_cache is True
+    assert args.caho_epochs == CAHO_DEFAULT_EPOCHS
 
 
 def test_train_priors_parser_smoke():
@@ -101,6 +104,7 @@ def test_train_caho_corpus_parser_smoke():
     assert args.command == "train-caho-corpus"
     assert args.loss == "contrastive"
     assert args.grad_cache is True
+    assert args.epochs == CAHO_DEFAULT_EPOCHS
 
 
 def test_score_parser_smoke():

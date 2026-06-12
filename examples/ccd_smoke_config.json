@@ -1,6 +1,6 @@
 {
   "encoder": {
-    "model_name": "caho_model_checkpoint",
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
     "device": "cpu",
     "max_length": 253,
     "fp16": false
