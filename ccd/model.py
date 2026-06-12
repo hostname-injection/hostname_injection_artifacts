@@ -424,6 +424,8 @@ class CCDModel:
                 "benign_embeddings dimension does not match cone axes: "
                 f"{benign_embeddings.shape[1]} != {self.cones.axes.shape[1]}"
             )
+        if not np.isfinite(benign_embeddings).all():
+            raise ValueError("benign_embeddings must contain only finite values")
         return benign_embeddings
 
     def refresh_benign_reference(

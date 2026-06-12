@@ -430,6 +430,58 @@ def test_update_benign_prior_rejects_empty_embeddings():
     assert False, "Expected ValueError for an empty benign refresh window"
 
 
+def test_update_benign_prior_rejects_non_finite_embeddings_before_mutating():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.5, 0.5], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+    )
+    old_prior = model.benign_prior.copy()
+
+    try:
+        model.update_benign_prior(np.array([[1.0, 0.0], [float("nan"), 1.0]], dtype=np.float32))
+    except ValueError as exc:
+        assert "finite" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for non-finite benign refresh embeddings")
+
+    assert np.allclose(model.benign_prior, old_prior)
+
+
+def test_refresh_benign_reference_rejects_non_finite_embeddings_before_mutating():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.95, 0.05], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=9.0,
+        grouped_thresholds={"tenant-a": {"threshold": 9.0}},
+    )
+    old_prior = model.benign_prior.copy()
+    old_threshold = model.threshold
+    old_grouped = model.grouped_thresholds
+
+    try:
+        model.refresh_benign_reference(
+            np.array([[1.0, 0.0], [float("inf"), 1.0]], dtype=np.float32),
+            alpha=0.5,
+            calibration_groups=["tenant-a", "tenant-a"],
+        )
+    except ValueError as exc:
+        assert "finite" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for non-finite benign refresh embeddings")
+
+    assert np.allclose(model.benign_prior, old_prior)
+    assert model.threshold == old_threshold
+    assert model.grouped_thresholds is old_grouped
+
+
 def test_model_score_normalization():
     class DummyEncoder:
         def __init__(self):

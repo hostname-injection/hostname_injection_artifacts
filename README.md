@@ -745,7 +745,9 @@ scores = model.score(["example.com"], normalize=True)
   Certificate output includes a per-row normalization trace for URL-like
   scheme/userinfo/port/path/query/fragment segmentation and decode changes.
 - Benign drift refresh is implemented as a narrow `(P_B, tau_alpha)` update;
-  `P_M`, cone axes, encoder config, and scoring config remain fixed.
+  `P_M`, cone axes, encoder config, and scoring config remain fixed. Refresh
+  windows must contain finite embeddings before `P_B` or thresholds are
+  updated.
 - CCD model bundles fail closed on non-finite or shape-incompatible cone axes
   and malformed prior arrays before scoring or certification.
 - The edit model E1–E12 is implemented in `ccd/edit_model.py`; emitted

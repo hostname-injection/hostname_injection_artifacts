@@ -615,6 +615,26 @@ def validate_code_path_evidence() -> dict[str, bool]:
     old_grouped = refresh_model.grouped_thresholds
     try:
         refresh_model.refresh_benign_reference(
+            np.array([[0.0, 1.0], [float("nan"), 0.0]], dtype=np.float32),
+            alpha=0.5,
+            calibration_groups=["tenant-a", "tenant-a"],
+        )
+    except ValueError as exc:
+        if "finite" not in str(exc):
+            raise
+    else:
+        raise ValueError("benign refresh must reject non-finite embeddings")
+    if (
+        not np.allclose(refresh_model.benign_prior, old_prior)
+        or refresh_model.threshold != old_threshold
+        or refresh_model.grouped_thresholds is not old_grouped
+    ):
+        raise ValueError("failed non-finite benign refresh must leave P_B and thresholds unchanged")
+    old_prior = refresh_model.benign_prior.copy()
+    old_threshold = refresh_model.threshold
+    old_grouped = refresh_model.grouped_thresholds
+    try:
+        refresh_model.refresh_benign_reference(
             np.array([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32),
             alpha=0.5,
             calibration_groups=["tenant-a"],
@@ -723,6 +743,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "grouped_threshold_refresh_available": True,
         "grouped_refresh_requires_groups_or_explicit_drop": True,
         "grouped_refresh_rolls_back_on_calibration_failure": True,
+        "benign_refresh_rejects_non_finite_embeddings": True,
         "refresh_updates_pb_and_threshold_only": True,
     }
 

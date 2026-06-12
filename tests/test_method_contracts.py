@@ -50,6 +50,7 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["code_path_evidence"]["grouped_threshold_refresh_available"] is True
     assert report["derived"]["code_path_evidence"]["grouped_refresh_requires_groups_or_explicit_drop"] is True
     assert report["derived"]["code_path_evidence"]["grouped_refresh_rolls_back_on_calibration_failure"] is True
+    assert report["derived"]["code_path_evidence"]["benign_refresh_rejects_non_finite_embeddings"] is True
     assert report["derived"]["code_path_evidence"]["refresh_updates_pb_and_threshold_only"] is True
     assert report["derived"]["edit_manifest"]["deterministic_closure_available"] is True
     assert report["derived"]["edit_manifest"]["utf8_percent_run_closure"] is True
