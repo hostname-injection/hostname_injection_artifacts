@@ -112,6 +112,22 @@ def test_train_caho_corpus_parser_smoke():
     assert args.weight_decay == CAHO_DEFAULT_WEIGHT_DECAY
 
 
+def test_train_caho_corpus_parser_requires_all_corpus_sources():
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "train-caho-corpus",
+                "--benign-dir",
+                "benign_dir",
+                "--malicious-jsonl-dir",
+                "jsonl_dir",
+                "--out",
+                "caho_encoder",
+            ]
+        )
+
+
 def test_score_parser_smoke():
     parser = build_parser()
     args = parser.parse_args(

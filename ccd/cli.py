@@ -184,24 +184,36 @@ def cmd_train_caho(args: argparse.Namespace) -> None:
 
 
 def cmd_train_caho_corpus(args: argparse.Namespace) -> None:
+    if not args.benign_dir.is_dir():
+        raise ValueError(f"--benign-dir must be an existing directory: {args.benign_dir}")
+    if not args.malicious_jsonl_dir.is_dir():
+        raise ValueError(f"--malicious-jsonl-dir must be an existing directory: {args.malicious_jsonl_dir}")
+    if not args.malicious_txt_dir.is_dir():
+        raise ValueError(f"--malicious-txt-dir must be an existing directory: {args.malicious_txt_dir}")
+
     benign_hosts = read_hostnames_from_benign_dir(args.benign_dir)
     benign_hosts = filter_hostnames(benign_hosts, min_length=args.min_length, dedup=not args.no_dedup)
 
-    malicious_hosts: List[str] = []
-    if args.malicious_jsonl_dir and args.malicious_jsonl_dir.is_dir():
-        malicious_hosts.extend(read_hostnames_from_jsonl_dir(args.malicious_jsonl_dir, key=args.jsonl_key))
-    if args.malicious_txt_dir and args.malicious_txt_dir.is_dir():
-        malicious_hosts.extend(
-            read_hostnames_from_txt_dir(
-                args.malicious_txt_dir,
-                include_csv=True,
-                csv_column=args.csv_hostname_col,
-            )
-        )
-    malicious_hosts = filter_hostnames(malicious_hosts, min_length=args.min_length, dedup=not args.no_dedup)
+    malicious_jsonl_hosts = read_hostnames_from_jsonl_dir(args.malicious_jsonl_dir, key=args.jsonl_key)
+    malicious_txt_hosts = read_hostnames_from_txt_dir(
+        args.malicious_txt_dir,
+        include_csv=True,
+        csv_column=args.csv_hostname_col,
+    )
+    malicious_hosts = filter_hostnames(
+        malicious_jsonl_hosts + malicious_txt_hosts,
+        min_length=args.min_length,
+        dedup=not args.no_dedup,
+    )
 
-    if not benign_hosts and not malicious_hosts:
-        raise ValueError("No hostnames loaded. Check input paths.")
+    if not benign_hosts:
+        raise ValueError("No benign hostnames loaded. Check --benign-dir.")
+    if not filter_hostnames(malicious_jsonl_hosts, min_length=args.min_length, dedup=not args.no_dedup):
+        raise ValueError("No JSONL malicious hostnames loaded. Check --malicious-jsonl-dir and --jsonl-key.")
+    if not filter_hostnames(malicious_txt_hosts, min_length=args.min_length, dedup=not args.no_dedup):
+        raise ValueError(
+            "No TXT/CSV malicious hostnames loaded. Check --malicious-txt-dir and --csv-hostname-col."
+        )
 
     benign_samples = [Sample(h, is_malicious=False, family=None) for h in benign_hosts]
     malicious_samples = [
@@ -613,8 +625,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fine-tune CAHO encoder from corpus directories",
     )
     train_caho_corpus.add_argument("--benign-dir", required=True, type=Path)
-    train_caho_corpus.add_argument("--malicious-jsonl-dir", type=Path, default=None)
-    train_caho_corpus.add_argument("--malicious-txt-dir", type=Path, default=None)
+    train_caho_corpus.add_argument("--malicious-jsonl-dir", required=True, type=Path)
+    train_caho_corpus.add_argument("--malicious-txt-dir", required=True, type=Path)
     train_caho_corpus.add_argument("--jsonl-key", default="hostname")
     train_caho_corpus.add_argument("--csv-hostname-col", default="Hostname")
     train_caho_corpus.add_argument("--min-length", type=int, default=5)

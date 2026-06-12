@@ -228,6 +228,9 @@ training reports record the seed so augmentation/order replay is explicit.
 
 If you have the JSONL/TXT corpora used in the updated script, you can replicate it via:
 
+Both malicious corpus sources are required for the full-corpus path; omitting
+either source is treated as partial-data training and fails closed.
+
 ```bash
 ccd train-caho-corpus \
   --benign-dir ../txt_corpus/benign \

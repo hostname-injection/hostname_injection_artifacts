@@ -40,7 +40,7 @@ def test_artifact_manifest_has_claim_scripts_and_required_files() -> None:
     assert requirements["packaging"]["container_required"] is False
     assert requirements["tracking"]["web_tracking_embedded"] is False
     assert manifest["full_tests"]["command"] == "python -m pytest -q"
-    assert manifest["full_tests"]["last_observed"] == "290 passed"
+    assert manifest["full_tests"]["last_observed"] == "291 passed"
     assert (ROOT / manifest["badge_readiness"]).exists()
     assert manifest["claims"]
     claim_text = " ".join(claim["claim"] for claim in manifest["claims"])

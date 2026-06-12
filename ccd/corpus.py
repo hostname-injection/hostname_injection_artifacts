@@ -9,7 +9,9 @@ from typing import Iterable, List, Optional
 
 def list_file_paths(folder_path: Path) -> List[Path]:
     file_paths: List[Path] = []
-    for dirpath, _, filenames in os.walk(folder_path):
+    for dirpath, dirnames, filenames in os.walk(folder_path):
+        dirnames.sort()
+        filenames.sort()
         for filename in filenames:
             file_paths.append(Path(dirpath) / filename)
     return file_paths
@@ -65,7 +67,7 @@ def read_hostnames_from_benign_dir(path: Path) -> List[str]:
     hostnames: List[str] = []
     if not path.is_dir():
         return hostnames
-    for file_path in path.iterdir():
+    for file_path in list_file_paths(path):
         if not file_path.is_file() or file_path.suffix.lower() != ".txt":
             continue
         try:
@@ -83,5 +85,5 @@ def filter_hostnames(hostnames: Iterable[str], *, min_length: int = 5, dedup: bo
         if isinstance(h, str) and len(h) > min_length
     ]
     if dedup:
-        return list(set(filtered))
+        return list(dict.fromkeys(filtered))
     return filtered

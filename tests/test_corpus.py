@@ -10,11 +10,10 @@ from ccd.corpus import (
 
 
 def test_filter_hostnames_dedup_and_length():
-    hosts = ["a.com", "longhost.com", "longhost.com", "short"]
+    hosts = ["a.com", "longhost.com", "otherlong.com", "longhost.com", "short"]
     out = filter_hostnames(hosts, min_length=5, dedup=True)
-    assert "longhost.com" in out
+    assert out == ["longhost.com", "otherlong.com"]
     assert "short" not in out
-    assert len(out) == 1
 
 
 def test_read_hostnames_from_jsonl_dir(tmp_path: Path):
@@ -43,5 +42,8 @@ def test_read_hostnames_from_benign_dir(tmp_path: Path):
     benign_dir.mkdir()
     (benign_dir / "a.txt").write_text("good.com\n")
     (benign_dir / "b.txt").write_text("ok.com\n")
+    nested = benign_dir / "nested"
+    nested.mkdir()
+    (nested / "c.txt").write_text("nested.com\n")
     out = read_hostnames_from_benign_dir(benign_dir)
-    assert set(out) == {"good.com", "ok.com"}
+    assert out == ["good.com", "ok.com", "nested.com"]

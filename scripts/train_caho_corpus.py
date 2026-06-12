@@ -101,8 +101,8 @@ def _build_command(args) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--benign-dir", required=True)
-    parser.add_argument("--malicious-jsonl-dir", default=None)
-    parser.add_argument("--malicious-txt-dir", default=None)
+    parser.add_argument("--malicious-jsonl-dir", required=True)
+    parser.add_argument("--malicious-txt-dir", required=True)
     parser.add_argument("--jsonl-key", default="hostname")
     parser.add_argument("--csv-hostname-col", default="Hostname")
     parser.add_argument("--min-length", type=int, default=5)
