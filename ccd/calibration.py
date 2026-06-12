@@ -65,6 +65,8 @@ def threshold_for_group(
     if missing not in {"default", "error"}:
         raise ValueError("missing must be 'default' or 'error'")
     group_name = str(group).strip()
+    if not group_name:
+        raise ValueError("groups cannot contain empty values")
     if grouped_thresholds and group_name in grouped_thresholds:
         value = grouped_thresholds[group_name]
         if isinstance(value, Mapping):

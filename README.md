@@ -619,7 +619,9 @@ threshold in `calibration.json` or the saved model bundle. The same `--groups`
 file can be supplied to `ccd-explain` so explanation rows use and record the
 same tenant/window threshold as scoring. The Python `CCDModel.predict(...)`
 API accepts the same `calibration_groups` and `missing_group_threshold`
-arguments for model-level tenant/window decisions.
+arguments for model-level tenant/window decisions. Group files must contain one
+non-empty group id per non-empty hostname row; empty group ids are rejected
+instead of falling back to the global threshold.
 
 If you intend to use `--approximate` at inference time, calibrate with it as well:
 

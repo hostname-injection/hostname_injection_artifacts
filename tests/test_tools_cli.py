@@ -2,6 +2,7 @@ import json
 import sys
 
 import numpy as np
+import pytest
 
 import ccd.diagnostics as diagnostics
 import ccd.explain as explain
@@ -89,6 +90,38 @@ def test_score_cli_applies_grouped_thresholds(tmp_path, monkeypatch):
     assert lines[0] == "hostname,calibration_group,threshold,score,prediction"
     assert lines[1].endswith("tenant-a,0.700000,0.600000,0")
     assert lines[2].endswith("tenant-b,0.400000,0.600000,1")
+
+
+def test_score_cli_rejects_empty_group_ids(tmp_path, monkeypatch):
+    input_path = tmp_path / "input.txt"
+    groups_path = tmp_path / "groups.txt"
+    output_path = tmp_path / "out.csv"
+    input_path.write_text("alpha.example\nbeta.example\n", encoding="utf-8")
+    groups_path.write_text("tenant-a\n\n tenant-b\n", encoding="utf-8")
+
+    class DummyModel:
+        threshold = 0.5
+        grouped_thresholds = None
+
+    monkeypatch.setattr(score_cli, "load_model", lambda _: DummyModel())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ccd-score",
+            "--model",
+            "model.npz",
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--groups",
+            str(groups_path),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="groups file contains empty values"):
+        score_cli.main()
 
 
 def test_explain_cli_outputs_json(tmp_path, monkeypatch):

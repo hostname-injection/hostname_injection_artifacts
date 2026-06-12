@@ -16,6 +16,7 @@ from .corpus import (
     read_hostnames_from_txt_dir,
 )
 from .io import load_model, ModelBundle, save_model
+from .line_io import read_nonempty_lines, read_parallel_lines
 from .cone import ConePartition
 from .encoder import CahoEncoder
 from .augment import CAHOAugmenter, AugmentConfig, WeightedAugmentConfig
@@ -41,14 +42,11 @@ from .user_logins import (
 
 
 def _read_lines(path: Path) -> List[str]:
-    return [line.strip() for line in path.read_text(errors="ignore").splitlines() if line.strip()]
+    return read_nonempty_lines(path)
 
 
 def _read_parallel_lines(path: Path, expected_len: int, *, field_name: str) -> List[str]:
-    values = _read_lines(path)
-    if len(values) != expected_len:
-        raise ValueError(f"{field_name} file has {len(values)} rows; expected {expected_len}")
-    return values
+    return read_parallel_lines(path, expected_len, field_name)
 
 
 def _read_malicious_csv(path: Path) -> Dict[str, List[str]]:

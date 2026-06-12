@@ -7,18 +7,12 @@ from pathlib import Path
 
 from ccd.calibration import calibrate_threshold, calibrate_thresholds_by_group
 from ccd.io import ModelBundle, load_model, save_model
+from ccd.line_io import read_nonempty_lines, read_parallel_lines
 from ccd.preprocess import normalize_hostname
 
 
 def read_lines(path: Path):
-    return [line.strip() for line in path.read_text(errors="ignore").splitlines() if line.strip()]
-
-
-def read_parallel_lines(path: Path, expected_len: int, *, field_name: str):
-    values = read_lines(path)
-    if len(values) != expected_len:
-        raise ValueError(f"{field_name} file has {len(values)} rows; expected {expected_len}")
-    return values
+    return read_nonempty_lines(path)
 
 
 def main() -> None:

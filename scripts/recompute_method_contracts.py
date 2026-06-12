@@ -7,6 +7,7 @@ import inspect
 import json
 import math
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -22,6 +23,7 @@ from ccd.cone import ConePartition
 from ccd.config import CCDConfig
 from ccd.edit_model import DEFAULT_EDITS, EDIT_MANIFEST_VERSION, EditModel
 from ccd.io import MODEL_FORMAT_VERSION, ModelBundle
+from ccd.line_io import read_parallel_lines
 from ccd.model import CCDModel
 from ccd.scoring import ccd_score_logpriors, mixture_log_weights
 from ccd.train import supervised_orbit_contrastive_loss
@@ -375,6 +377,23 @@ def validate_code_path_evidence() -> dict[str, bool]:
         raise ValueError("grouped threshold lookup did not use the tenant/window threshold")
     if abs(threshold_for_group("tenant-c", 0.5, grouped_thresholds) - 0.5) > 1e-12:
         raise ValueError("grouped threshold lookup did not fall back to the global threshold")
+    try:
+        threshold_for_group(" ", 0.5, grouped_thresholds)
+    except ValueError as exc:
+        if "groups cannot contain empty values" not in str(exc):
+            raise
+    else:
+        raise ValueError("grouped threshold lookup must reject empty group ids")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        group_path = Path(tmpdir) / "groups.txt"
+        group_path.write_text("tenant-a\n\n tenant-b\n", encoding="utf-8")
+        try:
+            read_parallel_lines(group_path, 2, "groups")
+        except ValueError as exc:
+            if "groups file contains empty values" not in str(exc):
+                raise
+        else:
+            raise ValueError("group metadata files must reject empty group ids")
     certify_signature = inspect.signature(CCDModel.certify)
     for param in ("method", "sketch_lipschitz", "embedding_rotation_bound"):
         if param not in certify_signature.parameters:
@@ -416,6 +435,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "split_conformal_calibration_available": True,
         "grouped_split_conformal_calibration_available": True,
         "tenant_window_threshold_resolution_available": True,
+        "group_metadata_rejects_empty_values": True,
         "model_predict_grouped_thresholds_available": True,
         "grouped_decision_explanations_available": True,
         "explanations_use_normalized_cone_evidence": True,

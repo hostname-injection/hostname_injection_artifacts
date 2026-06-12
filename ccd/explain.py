@@ -8,18 +8,12 @@ from pathlib import Path
 from typing import List
 
 from .io import load_model
+from .line_io import read_nonempty_lines, read_parallel_lines
 from .preprocess import normalize_hostname
 
 
 def read_lines(path: Path) -> List[str]:
-    return [line.strip() for line in path.read_text(errors="ignore").splitlines() if line.strip()]
-
-
-def read_parallel_lines(path: Path, expected_len: int, field_name: str) -> List[str]:
-    values = read_lines(path)
-    if len(values) != expected_len:
-        raise ValueError(f"{field_name} file has {len(values)} rows; expected {expected_len}")
-    return values
+    return read_nonempty_lines(path)
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -2,6 +2,7 @@ import json
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 import ccd.cli as cli_module
 from ccd.certify import DecisionCertificate
@@ -290,6 +291,14 @@ def test_score_uses_grouped_thresholds_from_model_bundle(tmp_path, monkeypatch):
     lines = output.read_text(encoding="utf-8").splitlines()
     assert lines[1].endswith("tenant-a,0.700000,0.600000,0")
     assert lines[2].endswith("tenant-b,0.400000,0.600000,1")
+
+
+def test_group_files_reject_empty_group_ids(tmp_path):
+    groups = tmp_path / "groups.txt"
+    groups.write_text("tenant-a\n\n tenant-b\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="groups file contains empty values"):
+        cli_module._read_parallel_lines(groups, 2, field_name="groups")
 
 
 def test_refresh_benign_parser_smoke():
