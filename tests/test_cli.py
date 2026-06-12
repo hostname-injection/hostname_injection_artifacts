@@ -202,11 +202,15 @@ def test_calibrate_can_embed_threshold_in_model_bundle(tmp_path, monkeypatch):
     assert saved["bundle"].grouped_thresholds is not None
     assert abs(saved["bundle"].grouped_thresholds["tenant-b"]["threshold"] - 0.4) < 1e-6
     assert saved["bundle"].config.to_dict() == config.to_dict()
-    payload = calibration.read_text()
-    assert '"threshold": 0.4000000059604645' in payload
-    assert '"tenant-a"' in payload
-    assert '"n_calibration_groups": 2' in payload
-    assert '"normalized_inputs": false' in payload
+    payload = json.loads(calibration.read_text(encoding="utf-8"))
+    assert payload["threshold"] == 0.4000000059604645
+    assert payload["order_statistic_rank"] == 2
+    assert payload["decision_rule"] == "score > threshold"
+    assert payload["calibration_scores"] == "benign_only"
+    assert "tenant-a" in payload["grouped_thresholds"]
+    assert payload["grouped_thresholds"]["tenant-b"]["decision_rule"] == "score > threshold"
+    assert payload["n_calibration_groups"] == 2
+    assert payload["score_path"]["normalized_inputs"] is False
 
 
 def test_score_applies_grouped_thresholds(tmp_path, monkeypatch):
@@ -433,6 +437,9 @@ def test_refresh_benign_saves_updated_model_bundle(tmp_path, monkeypatch):
     assert report["refresh_scope"]["malicious_priors_fixed"] is True
     assert report["refresh_scope"]["grouped_thresholds_updated"] is True
     assert report["threshold_source"] == "grouped_benign_refresh_scores"
+    assert report["order_statistic_rank"] == 2
+    assert report["decision_rule"] == "score > threshold"
+    assert report["calibration_scores"] == "benign_only"
     assert report["n_calibration_groups"] == 2
     assert report["refresh_scope"]["encoder_config_fixed"] is True
     assert report["score_path"]["normalized_inputs"] is False

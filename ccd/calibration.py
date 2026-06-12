@@ -6,20 +6,60 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 
-def calibrate_threshold(benign_scores: np.ndarray, alpha: float) -> float:
+SPLIT_CONFORMAL_ORDER_STATISTIC_FORMULA = "ceil((1-alpha)*(n+1)) clipped to [1,n]"
+SPLIT_CONFORMAL_SCORE_ORDER = "ascending"
+SPLIT_CONFORMAL_DECISION_RULE = "score > threshold"
+SPLIT_CONFORMAL_CALIBRATION_SCORES = "benign_only"
+
+
+def _coerce_score_vector(benign_scores: Sequence[float] | np.ndarray) -> np.ndarray:
+    scores = np.asarray(benign_scores, dtype=np.float64)
+    if scores.ndim != 1:
+        raise ValueError("benign_scores must be a 1D array")
+    if len(scores) == 0:
+        raise ValueError("benign_scores cannot be empty")
+    return scores
+
+
+def calibration_order_statistic_rank(n: int, alpha: float) -> int:
+    if n <= 0:
+        raise ValueError("n must be positive")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in (0, 1)")
+    k = math.ceil((1.0 - alpha) * (n + 1))
+    return max(1, min(k, n))
+
+
+def calibrate_threshold(benign_scores: Sequence[float] | np.ndarray, alpha: float) -> float:
     """Split-conformal threshold for fixed FPR control.
 
     t_alpha is the ceil((1-alpha)(n+1))-th order statistic.
     """
-    if len(benign_scores) == 0:
-        raise ValueError("benign_scores cannot be empty")
     if not 0.0 < alpha < 1.0:
         raise ValueError("alpha must be in (0, 1)")
-    scores = np.sort(benign_scores)
+    scores = np.sort(_coerce_score_vector(benign_scores))
     n = len(scores)
-    k = math.ceil((1.0 - alpha) * (n + 1))
-    k = max(1, min(k, n))
+    k = calibration_order_statistic_rank(n, alpha)
     return float(scores[k - 1])
+
+
+def split_conformal_threshold_metadata(
+    benign_scores: Sequence[float] | np.ndarray,
+    alpha: float,
+) -> dict[str, Any]:
+    """Return the calibrated threshold plus auditable decision-rule metadata."""
+    scores = _coerce_score_vector(benign_scores)
+    threshold = calibrate_threshold(scores, alpha)
+    return {
+        "alpha": float(alpha),
+        "threshold": float(threshold),
+        "num_samples": int(len(scores)),
+        "order_statistic_rank": calibration_order_statistic_rank(len(scores), alpha),
+        "order_statistic_formula": SPLIT_CONFORMAL_ORDER_STATISTIC_FORMULA,
+        "score_order": SPLIT_CONFORMAL_SCORE_ORDER,
+        "decision_rule": SPLIT_CONFORMAL_DECISION_RULE,
+        "calibration_scores": SPLIT_CONFORMAL_CALIBRATION_SCORES,
+    }
 
 
 def calibrate_thresholds_by_group(
@@ -49,7 +89,11 @@ def calibrate_thresholds_by_group(
         out[group_name] = {
             "threshold": threshold,
             "num_samples": len(group_scores),
-            "order_statistic_rank": _order_statistic_rank(len(group_scores), alpha),
+            "order_statistic_rank": calibration_order_statistic_rank(len(group_scores), alpha),
+            "order_statistic_formula": SPLIT_CONFORMAL_ORDER_STATISTIC_FORMULA,
+            "score_order": SPLIT_CONFORMAL_SCORE_ORDER,
+            "decision_rule": SPLIT_CONFORMAL_DECISION_RULE,
+            "calibration_scores": SPLIT_CONFORMAL_CALIBRATION_SCORES,
         }
     return out
 
@@ -88,12 +132,7 @@ def threshold_for_group(
 
 
 def _order_statistic_rank(n: int, alpha: float) -> int:
-    if n <= 0:
-        raise ValueError("n must be positive")
-    if not 0.0 < alpha < 1.0:
-        raise ValueError("alpha must be in (0, 1)")
-    k = math.ceil((1.0 - alpha) * (n + 1))
-    return max(1, min(k, n))
+    return calibration_order_statistic_rank(n, alpha)
 
 
 def conformal_p_value(score: float, benign_scores: np.ndarray) -> float:

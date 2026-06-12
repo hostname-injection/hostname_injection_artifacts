@@ -5,7 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
-from ccd.calibration import calibrate_threshold, calibrate_thresholds_by_group
+from ccd.calibration import calibrate_thresholds_by_group, split_conformal_threshold_metadata
 from ccd.io import ModelBundle, load_model, save_model
 from ccd.line_io import read_nonempty_lines, read_parallel_lines
 from ccd.preprocess import normalize_hostname
@@ -40,16 +40,15 @@ def main() -> None:
 
     scores = model.score(hostnames, batch_size=args.batch_size, normalize=False)
     alpha = args.alpha if args.alpha is not None else model.config.calibration.alpha
-    threshold = calibrate_threshold(scores, alpha)
+    calibration_metadata = split_conformal_threshold_metadata(scores, alpha)
+    threshold = calibration_metadata["threshold"]
     grouped_thresholds = calibrate_thresholds_by_group(scores, groups, alpha) if groups is not None else {}
     model.threshold = threshold
     if hasattr(model, "grouped_thresholds"):
         model.grouped_thresholds = grouped_thresholds or None
 
     output = {
-        "alpha": alpha,
-        "threshold": threshold,
-        "num_samples": len(scores),
+        **calibration_metadata,
         "threshold_source": "grouped_benign_calibration_scores" if groups is not None else "benign_calibration_scores",
         "grouped_thresholds": grouped_thresholds,
         "n_calibration_groups": len(grouped_thresholds),

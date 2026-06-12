@@ -611,10 +611,11 @@ ccd calibrate \
   --alpha 1e-4
 ```
 
-`calibration.json` records the calibrated threshold and score path. The optional
-`--save-model` output embeds global or grouped thresholds in a model bundle, so
-later `score` and `certify` commands can use the frozen threshold without a
-separate calibration file.
+`calibration.json` records the calibrated threshold, the clipped split-conformal
+order-statistic rank, the strict `score > threshold` decision rule, and the score
+path. The optional `--save-model` output embeds global or grouped thresholds in a
+model bundle, so later `score` and `certify` commands can use the frozen
+threshold without a separate calibration file.
 
 To calibrate per tenant/window while preserving a global fallback threshold,
 pass one group id per benign calibration row:

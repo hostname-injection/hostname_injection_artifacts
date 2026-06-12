@@ -20,7 +20,11 @@ if str(ROOT) not in sys.path:
 
 from ccd.augment import DEFAULT_WEIGHTED_BENIGN_WEIGHTS, DEFAULT_WEIGHTED_MALICIOUS_WEIGHTS
 from ccd.benchmark_training import BenchmarkBinaryContrastiveTrainer, BenchmarkCAHOViewDataset, BenchmarkContrastiveTrainer
-from ccd.calibration import calibrate_thresholds_by_group, threshold_for_group
+from ccd.calibration import (
+    calibrate_thresholds_by_group,
+    split_conformal_threshold_metadata,
+    threshold_for_group,
+)
 from ccd.certify import deterministic_single_edit_neighbors, enumerate_edit_ball, randomized_smoothing_certificate
 from ccd.cone import ConePartition
 from ccd.config import CCDConfig, ConeConfig, EncoderConfig
@@ -446,6 +450,14 @@ def validate_code_path_evidence() -> dict[str, bool]:
         raise ValueError("calibrate_thresholds_by_group must be callable for tenant/window calibration")
     if not callable(threshold_for_group):
         raise ValueError("threshold_for_group must be callable for grouped threshold lookup")
+    threshold_metadata = split_conformal_threshold_metadata([0.1, 0.2, 0.3, 0.4, 0.5], alpha=0.2)
+    if (
+        abs(threshold_metadata["threshold"] - 0.5) > 1e-12
+        or threshold_metadata["order_statistic_rank"] != 5
+        or threshold_metadata["decision_rule"] != "score > threshold"
+        or threshold_metadata["calibration_scores"] != "benign_only"
+    ):
+        raise ValueError("split-conformal threshold metadata must record rank and strict decision rule")
     grouped_thresholds = calibrate_thresholds_by_group(
         [0.1, 0.4, 0.2, 0.8],
         ["tenant-a", "tenant-a", "tenant-b", "tenant-b"],
@@ -555,6 +567,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "score_paths_normalize_unit_embeddings": True,
         "mixture_weights_normalized": True,
         "split_conformal_calibration_available": True,
+        "split_conformal_order_statistic_reported": True,
         "grouped_split_conformal_calibration_available": True,
         "tenant_window_threshold_resolution_available": True,
         "group_metadata_rejects_empty_values": True,

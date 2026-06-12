@@ -9,6 +9,7 @@ from .calibration import (
     calibrate_threshold,
     calibrate_thresholds_by_group,
     conformal_p_value,
+    split_conformal_threshold_metadata,
     threshold_for_group,
 )
 from .cone import ConePartition
@@ -436,7 +437,8 @@ class CCDModel:
                 approximate=approximate,
                 approximate_k=approximate_k,
             )
-            threshold = calibrate_threshold(scores, alpha_value)
+            calibration_metadata = split_conformal_threshold_metadata(scores, alpha_value)
+            threshold = calibration_metadata["threshold"]
             grouped_thresholds = (
                 calibrate_thresholds_by_group(scores, calibration_groups, alpha_value)
                 if calibration_groups is not None
@@ -453,11 +455,9 @@ class CCDModel:
         grouped_thresholds_dropped = old_grouped_thresholds is not None and calibration_groups is None
         self.grouped_thresholds = grouped_thresholds
         return {
-            "alpha": alpha_value,
-            "num_samples": int(len(scores)),
+            **calibration_metadata,
             "old_threshold": None if old_threshold is None else float(old_threshold),
             "old_n_calibration_groups": 0 if old_grouped_thresholds is None else len(old_grouped_thresholds),
-            "threshold": float(threshold),
             "threshold_source": (
                 "grouped_benign_refresh_scores" if grouped_thresholds is not None else "benign_refresh_scores"
             ),

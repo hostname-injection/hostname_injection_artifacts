@@ -26,7 +26,11 @@ from .preprocess import normalize_hostname, normalization_trace
 from .priors import build_benign_prior, build_malicious_priors
 from .train import CAHODataset, CAHOTrainer, ContrastiveTrainer, Sample
 import numpy as np
-from .calibration import calibrate_threshold, calibrate_thresholds_by_group, threshold_for_group
+from .calibration import (
+    calibrate_thresholds_by_group,
+    split_conformal_threshold_metadata,
+    threshold_for_group,
+)
 from .user_logins import (
     DEFAULT_HOSTNAME_COLUMN,
     DEFAULT_USER_LOGINS_COLUMN,
@@ -354,16 +358,15 @@ def cmd_calibrate(args: argparse.Namespace) -> None:
         approximate_k=args.approximate_k,
     )
     alpha = args.alpha if args.alpha is not None else model.config.calibration.alpha
-    threshold = calibrate_threshold(scores, alpha)
+    calibration_metadata = split_conformal_threshold_metadata(scores, alpha)
+    threshold = calibration_metadata["threshold"]
     grouped_thresholds = calibrate_thresholds_by_group(scores, groups, alpha) if groups is not None else {}
     model.threshold = threshold
     if hasattr(model, "grouped_thresholds"):
         model.grouped_thresholds = grouped_thresholds or None
 
     output = {
-        "alpha": alpha,
-        "threshold": threshold,
-        "num_samples": len(scores),
+        **calibration_metadata,
         "threshold_source": "grouped_benign_calibration_scores" if groups is not None else "benign_calibration_scores",
         "grouped_thresholds": grouped_thresholds,
         "n_calibration_groups": len(grouped_thresholds),

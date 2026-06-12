@@ -29,6 +29,7 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["code_path_evidence"]["raw_artifact_csv_roundtrip_available"] is True
     assert report["derived"]["code_path_evidence"]["score_paths_normalize_unit_embeddings"] is True
     assert report["derived"]["code_path_evidence"]["exact_score_bypasses_lsh_by_default"] is True
+    assert report["derived"]["code_path_evidence"]["split_conformal_order_statistic_reported"] is True
     assert report["derived"]["code_path_evidence"]["grouped_split_conformal_calibration_available"] is True
     assert report["derived"]["code_path_evidence"]["tenant_window_threshold_resolution_available"] is True
     assert report["derived"]["code_path_evidence"]["group_metadata_rejects_empty_values"] is True
