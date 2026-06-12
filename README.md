@@ -310,6 +310,11 @@ ccd score \
   --output scores.csv
 ```
 
+`scores.csv` records the threshold used for each row, the CCD score, and the
+strict-threshold prediction. With `--groups`, the row threshold is the resolved
+tenant/window threshold; otherwise it is the global model, calibration-file, or
+CLI threshold.
+
 For maximum throughput, you can use fast approximate scoring (hard-cone). This may reduce
 accuracy; use only when you need the extra throughput:
 

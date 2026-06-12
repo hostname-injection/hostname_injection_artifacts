@@ -295,7 +295,7 @@ def test_score_csv_preserves_raw_artifact_commas(tmp_path, monkeypatch):
 
     with output.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.reader(handle))
-    assert rows == [["hostname", "score", "prediction"], ["alpha,one.example", "0.600000", "1"]]
+    assert rows == [["hostname", "threshold", "score", "prediction"], ["alpha,one.example", "0.500000", "0.600000", "1"]]
 
 
 def test_score_uses_grouped_thresholds_from_model_bundle(tmp_path, monkeypatch):

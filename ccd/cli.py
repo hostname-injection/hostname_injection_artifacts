@@ -338,7 +338,7 @@ def cmd_score(args: argparse.Namespace) -> None:
         scores,
         preds,
         groups=groups,
-        thresholds=row_thresholds if groups is not None else None,
+        thresholds=row_thresholds,
     )
     print(f"Wrote scores to {args.output}")
 

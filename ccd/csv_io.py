@@ -41,9 +41,14 @@ def write_score_csv(
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle, lineterminator="\n")
         if groups is None:
-            writer.writerow(["hostname", "score", "prediction"])
-            for hostname, score, prediction in zip(hostnames, scores, predictions):
-                writer.writerow([hostname, f"{float(score):.6f}", int(prediction)])
+            if thresholds is None:
+                writer.writerow(["hostname", "score", "prediction"])
+                for hostname, score, prediction in zip(hostnames, scores, predictions):
+                    writer.writerow([hostname, f"{float(score):.6f}", int(prediction)])
+            else:
+                writer.writerow(["hostname", "threshold", "score", "prediction"])
+                for hostname, threshold, score, prediction in zip(hostnames, thresholds, scores, predictions):
+                    writer.writerow([hostname, f"{float(threshold):.6f}", f"{float(score):.6f}", int(prediction)])
             return
 
         if thresholds is None:

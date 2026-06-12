@@ -85,7 +85,7 @@ def main() -> int:
         scores,
         preds,
         groups=groups,
-        thresholds=row_thresholds if groups is not None else None,
+        thresholds=row_thresholds,
     )
     print(f"Wrote scores to {args.output}")
     return 0

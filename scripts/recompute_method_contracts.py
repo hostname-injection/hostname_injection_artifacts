@@ -451,6 +451,11 @@ def validate_code_path_evidence() -> dict[str, bool]:
             rows = list(csv.reader(handle))
         if rows != [["hostname", "score", "prediction"], ["alpha,one.example", "0.600000", "1"]]:
             raise ValueError("score CSV writer must quote raw hostname fields when needed")
+        write_score_csv(scores_csv, ["alpha,one.example"], [0.6], [True], thresholds=[0.5])
+        with scores_csv.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.reader(handle))
+        if rows != [["hostname", "threshold", "score", "prediction"], ["alpha,one.example", "0.500000", "0.600000", "1"]]:
+            raise ValueError("score CSV writer must record global thresholds when provided")
     refresh_signature = inspect.signature(CCDModel.refresh_benign_reference)
     if "calibration_groups" not in refresh_signature.parameters:
         raise ValueError("CCDModel.refresh_benign_reference must support tenant/window threshold refresh")
@@ -613,6 +618,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "normalizer_decodes_utf8_percent_runs": True,
         "normalizer_trace_records_url_segments": True,
         "raw_artifact_csv_roundtrip_available": True,
+        "global_score_csv_thresholds_available": True,
         "score_paths_normalize_unit_embeddings": True,
         "mixture_weights_normalized": True,
         "split_conformal_calibration_available": True,
