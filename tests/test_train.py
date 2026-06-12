@@ -48,6 +48,23 @@ def test_caho_dataset_include_original():
     assert label is None
 
 
+def test_caho_dataset_seed_replays_augmented_views():
+    class RandomSuffixAugmenter:
+        def augment(self, hostname, is_malicious=False, rng=None):
+            return f"{hostname}:{rng.random():.8f}"
+
+    samples = [
+        Sample("example.com", is_malicious=False),
+        Sample("evil.example", is_malicious=True, family="cmd"),
+    ]
+    first = CAHODataset(samples, augmenter=RandomSuffixAugmenter(), include_original=False, seed=7)
+    second = CAHODataset(samples, augmenter=RandomSuffixAugmenter(), include_original=False, seed=7)
+
+    assert [first[i] for i in range(len(first))] == [second[i] for i in range(len(second))]
+    first.set_epoch(1)
+    assert first[0] != second[0]
+
+
 def test_pairwise_contrastive_loss_aligned():
     torch = pytest.importorskip("torch")
     embeddings = torch.eye(2)

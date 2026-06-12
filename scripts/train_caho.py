@@ -68,6 +68,7 @@ def main() -> None:
     parser.add_argument("--save-best", action="store_true")
     parser.add_argument("--no-save-final", action="store_true")
     parser.add_argument("--no-normalize", action="store_true", help="Skip hostname normalization")
+    parser.add_argument("--seed", type=int, default=13, help="Deterministic seed for augmentation and training order")
     args = parser.parse_args()
 
     benign_hosts = read_lines(args.benign)
@@ -117,6 +118,7 @@ def main() -> None:
         samples,
         augmenter=CAHOAugmenter(config=aug_config),
         include_original=args.loss == "contrastive",
+        seed=args.seed,
     )
     if args.loss == "contrastive":
         trainer = ContrastiveTrainer(
@@ -137,9 +139,10 @@ def main() -> None:
             optimize_loss=args.optimize_contrastive_scale,
             save_best=args.save_best,
             save_best_path=str(args.out) if args.save_best else None,
+            seed=args.seed,
         )
     else:
-        trainer = CAHOTrainer(model, batch_size=args.batch_size, temperature=args.temperature, lr=args.lr)
+        trainer = CAHOTrainer(model, batch_size=args.batch_size, temperature=args.temperature, lr=args.lr, seed=args.seed)
     trainer.fit(dataset, epochs=args.epochs)
 
     if not args.no_save_final:

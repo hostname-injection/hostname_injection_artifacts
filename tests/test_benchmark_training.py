@@ -62,6 +62,7 @@ def _training_config(out: Path) -> BenchmarkTrainingConfig:
         max_steps=None,
         checkpoint_every_steps=0,
         checkpoint_dir=None,
+        seed=17,
     )
 
 
@@ -113,6 +114,7 @@ def test_benchmark_binary_contrastive_trainer_fit_and_save(tmp_path):
         binary_loss_weight=0.5,
         contrastive_loss_weight=0.5,
         binary_hidden_dim=4,
+        seed=17,
     )
 
     summary = trainer.fit(_TinyViewDataset(), epochs=1)
@@ -134,8 +136,10 @@ def test_benchmark_binary_contrastive_trainer_fit_and_save(tmp_path):
     report = json.loads((out / "benchmark_training_report.json").read_text(encoding="utf-8"))
     assert report["config"]["binary_loss_weight"] == 0.5
     assert report["config"]["weight_decay"] == 0.02
+    assert report["config"]["seed"] == 17
     assert report["contrastive_objective"]["name"] == "supervised_orbit_contrastive_loss"
     assert report["contrastive_objective"]["binary_auxiliary_head_views"] == "both_l2_normalized_views"
+    assert report["contrastive_objective"]["deterministic_seed"] == 17
     assert report["train_summary"]["steps"] == 2
 
 

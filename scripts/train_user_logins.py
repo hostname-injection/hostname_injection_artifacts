@@ -214,6 +214,7 @@ def main() -> None:
             samples,
             augmenter=CAHOAugmenter(config=aug_config),
             include_original=args.caho_loss == "contrastive",
+            seed=args.caho_seed,
         )
         if args.caho_loss == "contrastive":
             trainer = ContrastiveTrainer(
@@ -234,6 +235,7 @@ def main() -> None:
                 optimize_loss=args.caho_optimize_contrastive_scale,
                 save_best=args.caho_save_best,
                 save_best_path=str(caho_out) if args.caho_save_best else None,
+                seed=args.caho_seed,
             )
         else:
             trainer = CAHOTrainer(
@@ -241,6 +243,7 @@ def main() -> None:
                 batch_size=args.caho_batch_size,
                 temperature=args.caho_temperature,
                 lr=args.caho_lr,
+                seed=args.caho_seed,
             )
         trainer.fit(dataset, epochs=args.caho_epochs)
         if not args.caho_no_save_final:

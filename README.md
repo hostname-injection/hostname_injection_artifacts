@@ -195,6 +195,9 @@ fail closed. This binary-head trainer intentionally rejects `--grad-cache`
 because the Appendix C objective requires supervised orbit labels inside the
 contrastive loss; GradCache remains available on the regular pairwise CAHO
 trainers.
+All CAHO training entry points accept `--seed` (or `--caho-seed` for
+`train-user-logins`) and default to `13`; benchmark training reports record the
+seed so augmentation/order replay is explicit.
 
 ### Replicating The Full Corpus Training Script
 

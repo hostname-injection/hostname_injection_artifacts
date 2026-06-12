@@ -199,8 +199,10 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError(f"malicious CAHO weighted augmentations missing {sorted(required_malicious - malicious_weights)}")
 
     dataset_getitem = inspect.getsource(BenchmarkCAHOViewDataset.__getitem__)
+    dataset_init_signature = inspect.signature(BenchmarkCAHOViewDataset)
     trainer_init_signature = inspect.signature(BenchmarkContrastiveTrainer)
     trainer_fit = inspect.getsource(BenchmarkBinaryContrastiveTrainer.fit)
+    report_source = inspect.getsource(BenchmarkBinaryContrastiveTrainer.save.__globals__["_write_report"])
     trainer_loss = inspect.getsource(BenchmarkContrastiveTrainer._contrastive_loss)
     trainer_save = inspect.getsource(BenchmarkBinaryContrastiveTrainer.save)
     train_script = load_python_module(
@@ -211,6 +213,8 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("train_benchmark_caho_binary.py must expose build_parser for contract checks")
     if "view1" not in dataset_getitem or "view2" not in dataset_getitem:
         raise ValueError("BenchmarkCAHOViewDataset must emit two views per string")
+    if "seed" not in dataset_init_signature.parameters or "_rng_for_index" not in dataset_getitem:
+        raise ValueError("BenchmarkCAHOViewDataset must support deterministic seeded augmentation")
     if "_contrastive_loss" not in trainer_fit or "contrastive_loss" not in trainer_fit:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must train the contrastive objective")
     if not callable(supervised_orbit_contrastive_loss):
@@ -231,6 +235,8 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must pass explicit AdamW weight decay")
     if "binary_classifier.pt" not in trainer_save:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must save binary_classifier.pt")
+    if "seed_training(self.seed)" not in trainer_fit or "deterministic_seed" not in report_source:
+        raise ValueError("benchmark CAHO training must seed training order and record the seed")
 
     recipe = require_mapping(expected.get("paper_deployed_recipe"), path="expected_caho_training_support.paper_deployed_recipe")
     default_weight_decay = require_number(
@@ -253,6 +259,7 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         "batch_size": int(require_number(recipe.get("batch_size"), path="paper_deployed_recipe.batch_size")),
         "epochs": int(require_number(recipe.get("max_epochs"), path="paper_deployed_recipe.max_epochs")),
         "device": "auto",
+        "seed": 13,
     }
     observed_script_defaults = {
         "lr": float(parser_defaults.lr),
@@ -260,6 +267,7 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         "batch_size": int(parser_defaults.batch_size),
         "epochs": int(parser_defaults.epochs),
         "device": str(parser_defaults.device),
+        "seed": int(parser_defaults.seed),
     }
     if observed_script_defaults != expected_script_defaults:
         raise ValueError(
@@ -292,6 +300,7 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         "contrastive_loss_supported": True,
         "supervised_orbit_contrastive_supported": True,
         "benign_orbit_labels_preserve_diversity": True,
+        "deterministic_training_seed_supported": True,
         "benchmark_binary_training_script_defaults": observed_script_defaults,
         "benchmark_binary_training_script_has_cuda_gate": True,
         "paper_deployed_recipe": {

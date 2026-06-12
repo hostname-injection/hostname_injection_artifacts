@@ -45,6 +45,7 @@ def main() -> None:
     parser.add_argument("--normalize-text", action="store_true")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--log-every", type=int, default=100)
+    parser.add_argument("--seed", type=int, default=13, help="Deterministic seed for augmentation and training order.")
     parser.add_argument("--max-rows", type=int, default=None, help="Debug only: limit rows loaded by the benchmark Dataset.")
     parser.add_argument("--max-steps", type=int, default=None, help="Debug only: stop after this many optimizer steps.")
     args = parser.parse_args()
@@ -68,6 +69,7 @@ def main() -> None:
         augmenter=augmenter,
         include_original=True,
         max_rows=args.max_rows,
+        seed=args.seed,
     )
     config = BenchmarkTrainingConfig(
         root=str(args.root),
@@ -96,6 +98,7 @@ def main() -> None:
         optimize_contrastive_scale=args.optimize_contrastive_scale,
         log_every=args.log_every,
         max_steps=args.max_steps,
+        seed=args.seed,
     )
     trainer = BenchmarkContrastiveTrainer(
         model,
@@ -115,6 +118,7 @@ def main() -> None:
         optimize_loss=args.optimize_contrastive_scale,
         log_every=args.log_every,
         max_steps=args.max_steps,
+        seed=args.seed,
     )
     summary = trainer.fit(dataset, epochs=args.epochs)
     save_encoder_only(model, args.out, config, summary)

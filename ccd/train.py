@@ -24,17 +24,29 @@ class CAHODataset:
         samples: Sequence[Sample],
         augmenter: Optional[CAHOAugmenter] = None,
         include_original: bool = False,
+        seed: Optional[int] = None,
     ) -> None:
         self.samples = list(samples)
         self.augmenter = augmenter or CAHOAugmenter()
         self.include_original = include_original
+        self.seed = seed
+        self.epoch = 0
 
     def __len__(self) -> int:
         return len(self.samples)
 
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = int(epoch)
+
+    def _rng_for_index(self, idx: int) -> random.Random:
+        if self.seed is None:
+            return random.Random()
+        epoch_stride = max(1, len(self.samples))
+        return random.Random(int(self.seed) + self.epoch * epoch_stride + int(idx))
+
     def __getitem__(self, idx: int) -> Tuple[str, str, Optional[str]]:
         sample = self.samples[idx]
-        rng = random.Random()
+        rng = self._rng_for_index(idx)
         if self.include_original:
             view1 = sample.hostname
             view2 = self.augmenter.augment(sample.hostname, is_malicious=sample.is_malicious, rng=rng)
@@ -199,10 +211,42 @@ def split_input_fn(model_input: List[str], chunk_size: int) -> List[Dict[str, Li
     return [{"view": model_input[i:i + chunk_size]} for i in range(0, len(model_input), chunk_size)]
 
 
+def seed_training(seed: Optional[int]) -> None:
+    if seed is None:
+        return
+    random.seed(int(seed))
+    np.random.seed(int(seed) % (2**32 - 1))
+    try:
+        import torch
+
+        torch.manual_seed(int(seed))
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(int(seed))
+    except Exception:
+        pass
+
+
+def torch_generator(seed: Optional[int]):
+    if seed is None:
+        return None
+    import torch
+
+    generator = torch.Generator()
+    generator.manual_seed(int(seed))
+    return generator
+
+
 class CAHOTrainer:
     """Trainer for CAHO using a SentenceTransformers model."""
 
-    def __init__(self, model, batch_size: int = 64, temperature: float = 0.07, lr: float = 2e-5) -> None:
+    def __init__(
+        self,
+        model,
+        batch_size: int = 64,
+        temperature: float = 0.07,
+        lr: float = 2e-5,
+        seed: Optional[int] = None,
+    ) -> None:
         """Initialize trainer.
 
         Args:
@@ -210,16 +254,19 @@ class CAHOTrainer:
             batch_size: Batch size per step.
             temperature: SupCon temperature.
             lr: AdamW learning rate.
+            seed: Optional deterministic seed for training order and augmentations.
         """
         self.model = model
         self.batch_size = batch_size
         self.temperature = temperature
         self.lr = lr
+        self.seed = seed
 
     def fit(self, dataset: CAHODataset, epochs: int = 1) -> None:
         import torch
         from torch.utils.data import DataLoader
 
+        seed_training(self.seed)
         optim = torch.optim.AdamW(self.model.parameters(), lr=self.lr)
         self.model.train()
 
@@ -229,8 +276,16 @@ class CAHOTrainer:
             labels = [b[2] for b in batch]
             return v1, v2, labels
 
-        loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True, collate_fn=collate)
+        loader = DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            collate_fn=collate,
+            generator=torch_generator(self.seed),
+        )
         for _epoch in range(epochs):
+            if hasattr(dataset, "set_epoch"):
+                dataset.set_epoch(_epoch)
             for v1, v2, labels in loader:
                 label_ids: List[int] = []
                 family_map: Dict[str, int] = {}
@@ -296,6 +351,7 @@ class ContrastiveTrainer:
         optimize_loss: bool = False,
         save_best: bool = False,
         save_best_path: Optional[str] = None,
+        seed: Optional[int] = None,
     ) -> None:
         self.model = model
         self.batch_size = batch_size
@@ -314,6 +370,7 @@ class ContrastiveTrainer:
         self.optimize_loss = optimize_loss
         self.save_best = save_best
         self.save_best_path = save_best_path
+        self.seed = seed
         self._loss_module = None
 
     def _embed_view(self, view):
@@ -336,6 +393,7 @@ class ContrastiveTrainer:
         from torch.utils.data import DataLoader
         from torch.optim.lr_scheduler import CosineAnnealingLR
 
+        seed_training(self.seed)
         loss_params = []
         if self.loss_mode == "learnable":
             self._loss_module = ContrastiveLoss(
@@ -360,6 +418,7 @@ class ContrastiveTrainer:
             shuffle=True,
             collate_fn=collate,
             num_workers=self.num_workers,
+            generator=torch_generator(self.seed),
         )
         total_steps = len(loader) * max(1, epochs)
         lr_sched = None
@@ -397,6 +456,8 @@ class ContrastiveTrainer:
 
         best_loss = float("inf")
         for _epoch in range(epochs):
+            if hasattr(dataset, "set_epoch"):
+                dataset.set_epoch(_epoch)
             total_loss = 0.0
             steps = 0
             for v1, v2 in loader:

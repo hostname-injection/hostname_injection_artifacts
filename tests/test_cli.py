@@ -32,6 +32,7 @@ def test_train_caho_parser_smoke():
     assert args.loss == "contrastive"
     assert args.augmenter == "weighted"
     assert args.grad_cache is True
+    assert args.seed == 13
 
 
 def test_train_user_logins_parser_smoke():

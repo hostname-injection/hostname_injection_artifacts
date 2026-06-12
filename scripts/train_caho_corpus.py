@@ -81,6 +81,8 @@ def _build_command(args) -> list[str]:
         cmd += ["--no-save-final"]
     if args.no_normalize:
         cmd += ["--no-normalize"]
+    if args.seed is not None:
+        cmd += ["--seed", str(args.seed)]
     return cmd
 
 
@@ -121,6 +123,7 @@ def main() -> int:
     parser.add_argument("--save-best", action="store_true")
     parser.add_argument("--no-save-final", action="store_true")
     parser.add_argument("--no-normalize", action="store_true")
+    parser.add_argument("--seed", type=int, default=13)
     args = parser.parse_args()
 
     cmd = _build_command(args)

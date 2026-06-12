@@ -49,12 +49,14 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["caho_training_support"]["supervised_orbit_contrastive_supported"] is True
     assert report["derived"]["caho_training_support"]["benign_orbit_labels_preserve_diversity"] is True
     assert report["derived"]["caho_training_support"]["l2_normalized_binary_inputs"] is True
+    assert report["derived"]["caho_training_support"]["deterministic_training_seed_supported"] is True
     assert report["derived"]["caho_training_support"]["adamw_weight_decay_default"] == 0.01
     assert report["derived"]["caho_training_support"]["benchmark_binary_training_script_defaults"] == {
         "batch_size": 256,
         "device": "auto",
         "epochs": 50,
         "lr": 0.0001,
+        "seed": 13,
         "weight_decay": 0.01,
     }
     assert report["derived"]["caho_training_support"]["benchmark_binary_training_script_has_cuda_gate"] is True

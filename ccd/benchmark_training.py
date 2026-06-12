@@ -15,7 +15,14 @@ from .benchmark_dataset import (
     HostnameCommandInjectionBenchmarkDataset,
 )
 from .preprocess import normalize_hostname
-from .train import ContrastiveLoss, pairwise_contrastive_loss, split_input_fn, supervised_orbit_contrastive_loss
+from .train import (
+    ContrastiveLoss,
+    pairwise_contrastive_loss,
+    seed_training,
+    split_input_fn,
+    supervised_orbit_contrastive_loss,
+    torch_generator,
+)
 
 
 @dataclass(frozen=True)
@@ -51,6 +58,7 @@ class BenchmarkTrainingConfig:
     max_steps: Optional[int] = None
     checkpoint_every_steps: int = 5000
     checkpoint_dir: Optional[str] = None
+    seed: Optional[int] = 13
 
 
 class BenchmarkCAHOViewDataset:
@@ -69,6 +77,7 @@ class BenchmarkCAHOViewDataset:
         augmenter: Optional[CAHOAugmenter] = None,
         include_original: bool = True,
         max_rows: Optional[int] = None,
+        seed: Optional[int] = None,
     ) -> None:
         self.base = HostnameCommandInjectionBenchmarkDataset(
             root,
@@ -85,6 +94,8 @@ class BenchmarkCAHOViewDataset:
         )
         self.augmenter = augmenter or CAHOAugmenter()
         self.include_original = include_original
+        self.seed = seed
+        self.epoch = 0
 
     def __len__(self) -> int:
         return len(self.base)
@@ -93,12 +104,21 @@ class BenchmarkCAHOViewDataset:
     def stats(self):
         return self.base.stats
 
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = int(epoch)
+
+    def _rng_for_index(self, idx: int) -> random.Random:
+        if self.seed is None:
+            return random.Random()
+        epoch_stride = max(1, len(self))
+        return random.Random(int(self.seed) + self.epoch * epoch_stride + int(idx))
+
     def __getitem__(self, idx: int) -> Tuple[str, str, int]:
         item = self.base[idx]
         text = str(item["text"])
         label = int(item["label"])
         is_malicious = label == 1
-        rng = random.Random()
+        rng = self._rng_for_index(idx)
         if self.include_original:
             view1 = text
             view2 = self.augmenter.augment(text, is_malicious=is_malicious, rng=rng)
@@ -223,6 +243,7 @@ class BenchmarkContrastiveTrainer:
         optimize_loss: bool,
         log_every: int = 100,
         max_steps: Optional[int] = None,
+        seed: Optional[int] = None,
     ) -> None:
         self.model = model
         self.batch_size = batch_size
@@ -241,6 +262,7 @@ class BenchmarkContrastiveTrainer:
         self.optimize_loss = optimize_loss
         self.log_every = max(0, int(log_every))
         self.max_steps = max_steps
+        self.seed = seed
         self._loss_module = None
 
     def _embed_view(self, view: List[str]):
@@ -254,6 +276,7 @@ class BenchmarkContrastiveTrainer:
         from torch.optim.lr_scheduler import CosineAnnealingLR
         from torch.utils.data import DataLoader
 
+        seed_training(self.seed)
         loss_params = []
         if self.loss_mode == "learnable":
             self._loss_module = ContrastiveLoss(
@@ -266,7 +289,7 @@ class BenchmarkContrastiveTrainer:
                 loss_params = list(self._loss_module.parameters())
 
         optim = torch.optim.AdamW(list(self.model.parameters()) + loss_params, lr=self.lr, weight_decay=self.weight_decay)
-        sampler = BenchmarkChunkShuffleSampler(dataset) if isinstance(dataset, BenchmarkCAHOViewDataset) else None
+        sampler = BenchmarkChunkShuffleSampler(dataset, seed=self.seed) if isinstance(dataset, BenchmarkCAHOViewDataset) else None
         loader = DataLoader(
             dataset,
             batch_size=self.batch_size,
@@ -275,6 +298,7 @@ class BenchmarkContrastiveTrainer:
             collate_fn=_collate_views,
             num_workers=self.num_workers,
             pin_memory=next(self.model.parameters()).device.type == "cuda",
+            generator=torch_generator(self.seed) if sampler is None else None,
         )
         total_steps = len(loader) * max(1, epochs)
         if self.max_steps is not None:
@@ -286,6 +310,8 @@ class BenchmarkContrastiveTrainer:
         steps = 0
         total_loss = 0.0
         for _epoch in range(epochs):
+            if hasattr(dataset, "set_epoch"):
+                dataset.set_epoch(_epoch)
             for v1, v2, labels in loader:
                 optim.zero_grad()
                 if gc_module is not None:
@@ -387,6 +413,7 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
         from torch.optim.lr_scheduler import CosineAnnealingLR
         from torch.utils.data import DataLoader
 
+        seed_training(self.seed)
         if self.use_grad_cache:
             raise ValueError(
                 "GradCache is not supported for BenchmarkBinaryContrastiveTrainer because "
@@ -415,7 +442,7 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
             lr=self.lr,
             weight_decay=self.weight_decay,
         )
-        sampler = BenchmarkChunkShuffleSampler(dataset) if isinstance(dataset, BenchmarkCAHOViewDataset) else None
+        sampler = BenchmarkChunkShuffleSampler(dataset, seed=self.seed) if isinstance(dataset, BenchmarkCAHOViewDataset) else None
         loader = DataLoader(
             dataset,
             batch_size=self.batch_size,
@@ -424,6 +451,7 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
             collate_fn=_collate_views,
             num_workers=self.num_workers,
             pin_memory=next(self.model.parameters()).device.type == "cuda",
+            generator=torch_generator(self.seed) if sampler is None else None,
         )
         total_steps = len(loader) * max(1, epochs)
         if self.max_steps is not None:
@@ -438,6 +466,8 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
         total_binary = 0.0
         recent_losses = deque(maxlen=self.checkpoint_every_steps or 1)
         for _epoch in range(epochs):
+            if hasattr(dataset, "set_epoch"):
+                dataset.set_epoch(_epoch)
             for v1, v2, labels in loader:
                 optim.zero_grad()
                 e1 = self._embed_view(v1)
@@ -609,6 +639,7 @@ def _write_report(out: Path, config: BenchmarkTrainingConfig, train_summary: Map
             "positive_orbits": "shared_positive_label_when_family_labels_are_unavailable",
             "binary_auxiliary_head_views": "both_l2_normalized_views",
             "grad_cache_boundary": "BenchmarkBinaryContrastiveTrainer fails closed for GradCache because supervised orbit labels must reach the contrastive objective.",
+            "deterministic_seed": config.seed,
         },
         "train_summary": dict(train_summary),
     }

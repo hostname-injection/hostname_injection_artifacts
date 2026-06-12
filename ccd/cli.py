@@ -117,7 +117,12 @@ def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_pat
         weighted=weighted_config,
     )
     augmenter = CAHOAugmenter(config=aug_config)
-    dataset = CAHODataset(samples, augmenter=augmenter, include_original=args.loss == "contrastive")
+    dataset = CAHODataset(
+        samples,
+        augmenter=augmenter,
+        include_original=args.loss == "contrastive",
+        seed=args.seed,
+    )
 
     if args.loss == "contrastive":
         trainer = ContrastiveTrainer(
@@ -138,10 +143,17 @@ def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_pat
             optimize_loss=args.optimize_contrastive_scale,
             save_best=args.save_best,
             save_best_path=str(out_path) if args.save_best else None,
+            seed=args.seed,
         )
         trainer.fit(dataset, epochs=args.epochs)
     else:
-        trainer = CAHOTrainer(model, batch_size=args.batch_size, temperature=args.temperature, lr=args.lr)
+        trainer = CAHOTrainer(
+            model,
+            batch_size=args.batch_size,
+            temperature=args.temperature,
+            lr=args.lr,
+            seed=args.seed,
+        )
         trainer.fit(dataset, epochs=args.epochs)
 
     if not args.no_save_final:
@@ -643,6 +655,7 @@ def cmd_train_user_logins(args: argparse.Namespace) -> None:
             samples,
             augmenter=CAHOAugmenter(config=aug_config),
             include_original=args.caho_loss == "contrastive",
+            seed=args.caho_seed,
         )
 
         if args.caho_loss == "contrastive":
@@ -664,6 +677,7 @@ def cmd_train_user_logins(args: argparse.Namespace) -> None:
                 optimize_loss=args.caho_optimize_contrastive_scale,
                 save_best=args.caho_save_best,
                 save_best_path=str(caho_out) if args.caho_save_best else None,
+                seed=args.caho_seed,
             )
         else:
             trainer = CAHOTrainer(
@@ -671,6 +685,7 @@ def cmd_train_user_logins(args: argparse.Namespace) -> None:
                 batch_size=args.caho_batch_size,
                 temperature=args.caho_temperature,
                 lr=args.caho_lr,
+                seed=args.caho_seed,
             )
         trainer.fit(dataset, epochs=args.caho_epochs)
         if not args.caho_no_save_final:
@@ -752,6 +767,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho.add_argument("--save-best", action="store_true")
     train_caho.add_argument("--no-save-final", action="store_true")
     train_caho.add_argument("--no-normalize", action="store_true")
+    train_caho.add_argument("--seed", type=int, default=13)
     train_caho.set_defaults(func=cmd_train_caho)
 
     train_caho_corpus = sub.add_parser(
@@ -793,6 +809,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--save-best", action="store_true")
     train_caho_corpus.add_argument("--no-save-final", action="store_true")
     train_caho_corpus.add_argument("--no-normalize", action="store_true")
+    train_caho_corpus.add_argument("--seed", type=int, default=13)
     train_caho_corpus.set_defaults(func=cmd_train_caho_corpus)
 
     eval_caho = sub.add_parser("eval-caho", help="Encode hostnames with a CAHO checkpoint")

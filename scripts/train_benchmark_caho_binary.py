@@ -61,6 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional binary_classifier.pt checkpoint to load before training.",
     )
     parser.add_argument("--log-every", type=int, default=100)
+    parser.add_argument("--seed", type=int, default=13, help="Deterministic seed for augmentation and training order.")
     parser.add_argument("--checkpoint-every-steps", type=int, default=5000)
     parser.add_argument(
         "--checkpoint-dir",
@@ -109,6 +110,7 @@ def main() -> None:
         augmenter=augmenter,
         include_original=True,
         max_rows=args.max_rows,
+        seed=args.seed,
     )
     config = BenchmarkTrainingConfig(
         root=str(args.root),
@@ -142,6 +144,7 @@ def main() -> None:
         max_steps=args.max_steps,
         checkpoint_every_steps=args.checkpoint_every_steps,
         checkpoint_dir=str(args.checkpoint_dir or (args.out.parent / "checkpoints")),
+        seed=args.seed,
     )
     trainer = BenchmarkBinaryContrastiveTrainer(
         model,
@@ -168,6 +171,7 @@ def main() -> None:
         checkpoint_every_steps=args.checkpoint_every_steps,
         checkpoint_dir=args.checkpoint_dir or (args.out.parent / "checkpoints"),
         checkpoint_config=config,
+        seed=args.seed,
     )
     summary = trainer.fit(dataset, epochs=args.epochs)
     trainer.save(args.out, config, summary)
