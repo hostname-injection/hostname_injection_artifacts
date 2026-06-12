@@ -1,0 +1,46 @@
+{
+  "paper_section": "Section 8.4 and Appendix E public-scope accounting",
+  "public_reports": {
+    "window": "post-freeze public reports",
+    "total": 127,
+    "mapped_to_target_categories": 118,
+    "excluded": 9,
+    "exclusion_counts": {
+      "rebinding": 3,
+      "certificate-validation": 3,
+      "quic": 3
+    },
+    "paper_wording": "Public reports also mark the taxonomy boundary: 118 of 127 post-freeze reports map to target classes, with the nine exclusions being rebinding, certificate-validation, or QUIC cases."
+  },
+  "public_anchors": [
+    {
+      "name": "Cockpit remote-login RCE",
+      "target_category": "command-execution",
+      "counted_in_hib_training_or_positives": false,
+      "paper_reference": "RHSA-2026:7381 Cockpit remote code execution vulnerability"
+    },
+    {
+      "name": "Enterprise git push metadata-to-RCE",
+      "target_category": "command-execution",
+      "counted_in_hib_training_or_positives": false,
+      "paper_reference": "Securing the git push pipeline: responding to a critical remote code execution issue"
+    },
+    {
+      "name": "Koa ctx.hostname userinfo parsing",
+      "target_category": "authority-parser-confusion",
+      "counted_in_hib_training_or_positives": false,
+      "paper_reference": "Koa ctx.hostname userinfo parsing"
+    },
+    {
+      "name": "Legacy host/diagnostic reports",
+      "target_category": "diagnostic-helper-command-execution",
+      "counted_in_hib_training_or_positives": false,
+      "paper_reference": "Legacy host/diagnostic reports"
+    }
+  ],
+  "private_by_design": [
+    "Raw live tenant strings",
+    "Unresolved production strings",
+    "Exploitable private sink details"
+  ]
+}

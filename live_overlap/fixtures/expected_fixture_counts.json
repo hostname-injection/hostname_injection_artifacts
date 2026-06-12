@@ -1,0 +1,28 @@
+{
+  "paper_section": "Fixture live-overlap accounting",
+  "window": {
+    "days": 2
+  },
+  "table7": {
+    "overlap": {
+      "verified_positive": 1,
+      "verified_or_uncertain": 2,
+      "all_alerts": 3
+    },
+    "ccd_only": {
+      "verified_positive": 1,
+      "verified_or_uncertain": 1,
+      "all_alerts": 1
+    },
+    "regex_waf_only": {
+      "verified_positive": 0,
+      "verified_or_uncertain": 1,
+      "all_alerts": 2
+    }
+  },
+  "reported_derived": {},
+  "case_study_boundary": {
+    "compromise_claim": false
+  },
+  "private_by_design": []
+}

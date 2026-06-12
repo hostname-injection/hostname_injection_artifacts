@@ -1,0 +1,58 @@
+{
+  "source": "published_aggregate_production_latency",
+  "paper_sections": [
+    "Section 8.2 Figure 5 accuracy and latency",
+    "Section 8.2 Table 5 fixed-FPR baseline audit",
+    "Section 8.2 production throughput discussion"
+  ],
+  "full_path_latency": {
+    "median_ms": 0.60,
+    "p95_ms": 1.84,
+    "p99_ms": 3.92,
+    "p999_ms": 7.80,
+    "single_host_throughput_per_s": 48000,
+    "replay_concurrency": 64,
+    "batch_mode": "batch-1 replay",
+    "includes": [
+      "canonicalization",
+      "tokenization",
+      "encoding",
+      "cone_retrieval",
+      "likelihood_scoring",
+      "classification"
+    ]
+  },
+  "scoring_kernel_latency": {
+    "p50_ms": 0.04,
+    "p99_ms": 0.11,
+    "stage": "post-embedding cone retrieval and likelihood scoring"
+  },
+  "table5_alignment": {
+    "ccd": {
+      "p99_ms": 3.92,
+      "p999_ms": 7.80,
+      "queue_role": "Inline, live queue budget"
+    }
+  },
+  "baseline_context": {
+    "predeployment_baseline_count": 18,
+    "llm_slowdown_min_x": 100,
+    "llm_slowdown_max_x": 1000,
+    "learned_and_llm_candidates_not_inserted_in_shared_alert_queue": true,
+    "matched_splits": true,
+    "validation_only_model_selection": true,
+    "benign_split_conformal_thresholds": true
+  },
+  "local_smoke_boundary": {
+    "script": "scripts/benchmark_artifact_latency.py",
+    "hardware_dependent": true,
+    "expected_to_reproduce_production_latency": false,
+    "purpose": "Exercise local encoder and CCD scoring-kernel paths on evaluator hardware."
+  },
+  "private_by_design": [
+    "Raw production serving traces",
+    "Host-level deployment topology",
+    "Closed control internals",
+    "Private model-serving logs"
+  ]
+}

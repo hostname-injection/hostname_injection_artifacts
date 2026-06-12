@@ -1,0 +1,14 @@
+{
+  "release_version": "hib-v1.0",
+  "private_eval_snapshot_id": "eval-freeze-2026-06-11",
+  "private_eval_snapshot_sha256": "withheld-private-input-hash",
+  "paper_pdf_sha256": "546213db8f649ca407dea9b8d900e8e9d7b3ed825e2b798a814fe27ce6523bd1",
+  "anonymizer_version": "deid-v1.0.0",
+  "policy_version": "non-linkable-release-policy-v1.0",
+  "created_at_utc": "2026-06-11T22:20:29Z",
+  "approvals": {
+    "security": "pending|required",
+    "privacy": "pending|required",
+    "legal_or_data_owner": "pending|required"
+  }
+}

@@ -1,11 +1,59 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Iterable, List, Optional
 
 import numpy as np
 
 from .config import EncoderConfig
 from .utils import l2_normalize
+
+LOCAL_HASH_ENCODER = "ccd-local-hash-encoder"
+
+
+class _HashingSentenceModel:
+    """Deterministic local encoder used for offline smoke tests."""
+
+    def __init__(self, dim: int = 384) -> None:
+        self.dim = int(dim)
+        self.max_seq_length = 253
+
+    def eval(self):
+        return None
+
+    def parameters(self):
+        return iter(())
+
+    def encode(
+        self,
+        texts: List[str],
+        *,
+        batch_size: int = 32,
+        convert_to_numpy: bool = True,
+        convert_to_tensor: bool = False,
+        normalize_embeddings: bool = True,
+        show_progress_bar: bool = False,
+    ):
+        del batch_size, show_progress_bar
+        embeddings = np.vstack([self._embed(text) for text in texts]).astype(np.float32)
+        if normalize_embeddings:
+            embeddings = l2_normalize(embeddings)
+        if convert_to_tensor:
+            import torch
+
+            return torch.as_tensor(embeddings)
+        if convert_to_numpy:
+            return embeddings
+        return embeddings
+
+    def _embed(self, text: str) -> np.ndarray:
+        values = np.empty(self.dim, dtype=np.float32)
+        seed = str(text).encode("utf-8", errors="ignore")
+        for offset in range(0, self.dim, 16):
+            digest = hashlib.blake2b(seed + offset.to_bytes(2, "little"), digest_size=16).digest()
+            chunk = np.frombuffer(digest, dtype=np.uint8).astype(np.float32)
+            values[offset : offset + len(chunk)] = (chunk / 127.5) - 1.0
+        return values
 
 
 def _resolve_device(name: Optional[str]) -> str:
@@ -30,6 +78,9 @@ class CahoEncoder:
 
     def _load_model(self):
         if self._model is not None:
+            return
+        if self.config.model_name == LOCAL_HASH_ENCODER:
+            self._model = _HashingSentenceModel(dim=384)
             return
         try:
             from sentence_transformers import SentenceTransformer

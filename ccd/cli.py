@@ -19,7 +19,7 @@ from .csv_io import iter_malicious_csv_rows, read_malicious_csv_map, write_score
 from .io import load_model, ModelBundle, save_model
 from .line_io import read_nonempty_lines, read_parallel_lines
 from .cone import ConePartition
-from .encoder import CahoEncoder
+from .encoder import CahoEncoder, LOCAL_HASH_ENCODER
 from .augment import CAHOAugmenter, AugmentConfig, WeightedAugmentConfig
 from .edit_model import EditModel
 from .preprocess import normalize_hostname, normalization_trace
@@ -89,7 +89,7 @@ def _resolve_device(name: str) -> str:
 
 
 def _default_caho_checkpoint() -> str:
-    return "sentence-transformers/all-MiniLM-L6-v2"
+    return LOCAL_HASH_ENCODER
 
 
 def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_path: Path) -> None:
@@ -213,43 +213,15 @@ def cmd_train_caho_corpus(args: argparse.Namespace) -> None:
 
 
 def cmd_eval_caho(args: argparse.Namespace) -> None:
-    model = SentenceTransformer(args.model)
-    device = _resolve_device(args.device)
-    if device:
-        try:
-            model = model.to(device)
-        except Exception:
-            pass
-    try:
-        model.eval()
-    except Exception:
-        pass
-
     hostnames = _read_lines(args.input)
     if args.normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]
 
-    try:
-        import torch
-
-        model.eval()
-        context = torch.inference_mode if hasattr(torch, "inference_mode") else torch.no_grad
-        with context():
-            embeddings = model.encode(
-                hostnames,
-                batch_size=args.batch_size,
-                convert_to_numpy=True,
-                normalize_embeddings=args.embed_normalize,
-                show_progress_bar=False,
-            )
-    except Exception:
-        embeddings = model.encode(
-            hostnames,
-            batch_size=args.batch_size,
-            convert_to_numpy=True,
-            normalize_embeddings=args.embed_normalize,
-            show_progress_bar=False,
-        )
+    config = CCDConfig().encoder
+    config.model_name = args.model
+    config.device = args.device
+    encoder = CahoEncoder(config)
+    embeddings = encoder.encode(hostnames, batch_size=args.batch_size, normalize=args.embed_normalize)
 
     fmt = args.format
     if fmt is None:
@@ -856,7 +828,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--seed", type=int, default=13)
     train_caho_corpus.set_defaults(func=cmd_train_caho_corpus)
 
-    eval_caho = sub.add_parser("eval-caho", help="Encode hostnames with a CAHO checkpoint")
+    eval_caho = sub.add_parser("eval-caho", help="Encode hostnames with a CAHO encoder")
     eval_caho.add_argument("--model", default=_default_caho_checkpoint())
     eval_caho.add_argument("--input", required=True, type=Path)
     eval_caho.add_argument("--output", required=True, type=Path)

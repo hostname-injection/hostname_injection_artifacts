@@ -1,0 +1,6 @@
+{"tool": "codeql", "finding_id": "direct-host-shell", "verdict": "true_positive", "repository": "fixture/direct"}
+{"tool": "codeql", "finding_id": "sanitized-host", "verdict": "false_positive", "repository": "fixture/sanitized"}
+{"tool": "codeql", "finding_id": "log-warehouse-reuse", "verdict": "missed_delayed_path", "repository": "fixture/delayed"}
+{"tool": "semgrep", "finding_id": "direct-host-shell", "verdict": "tp", "repository": "fixture/direct"}
+{"tool": "semgrep", "finding_id": "log-warehouse-reuse", "verdict": "fn", "repository": "fixture/delayed"}
+{"tool": "semgrep", "finding_id": "alert-template-reuse", "verdict": "missed", "repository": "fixture/delayed"}
