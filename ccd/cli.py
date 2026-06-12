@@ -408,6 +408,7 @@ def cmd_refresh_benign(args: argparse.Namespace) -> None:
         embeddings,
         alpha=alpha,
         calibration_groups=groups,
+        drop_grouped_thresholds=args.drop_grouped_thresholds,
         approximate=args.approximate,
         approximate_k=args.approximate_k,
     )
@@ -854,6 +855,15 @@ def build_parser() -> argparse.ArgumentParser:
     refresh_benign.add_argument("--output", required=True, type=Path)
     refresh_benign.add_argument("--report", type=Path, default=None)
     refresh_benign.add_argument("--groups", type=Path, default=None, help="Optional one-calibration-group-per-benign-row file.")
+    refresh_benign.add_argument(
+        "--drop-grouped-thresholds",
+        action="store_true",
+        help=(
+            "Allow refreshing a model that already has grouped thresholds "
+            "without replacement --groups, discarding grouped thresholds and "
+            "keeping only the refreshed global threshold."
+        ),
+    )
     refresh_benign.add_argument("--alpha", type=float, default=None)
     refresh_benign.add_argument("--batch-size", type=int, default=64)
     refresh_benign.add_argument(

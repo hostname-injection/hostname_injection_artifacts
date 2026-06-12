@@ -656,7 +656,11 @@ ccd refresh-benign \
 `refresh.json` records the old threshold, new global/grouped thresholds, score
 path, and the refresh scope. The intended contract is narrow: `P_B` and
 `tau_alpha` move; `P_M`, the CAHO encoder, cone partition, and score path stay
-frozen. Omit `--groups` for a global-only refresh.
+frozen. Omit `--groups` for a global-only refresh only when the input model is
+not already carrying grouped thresholds. If the input model has tenant/window
+grouped thresholds, `ccd refresh-benign` requires replacement `--groups` and
+fails closed unless `--drop-grouped-thresholds` is passed to explicitly discard
+those grouped thresholds.
 
 ## Data Formats
 

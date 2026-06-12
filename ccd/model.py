@@ -384,6 +384,7 @@ class CCDModel:
         *,
         alpha: Optional[float] = None,
         calibration_groups: Optional[Sequence[str]] = None,
+        drop_grouped_thresholds: bool = False,
         approximate: bool = False,
         approximate_k: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -391,11 +392,20 @@ class CCDModel:
 
         This updates ``(P_B, tau_alpha)`` only. Positive references, encoder
         config, cone axes, and the score path are left fixed so the operation
-        matches the paper's benign-only drift refresh contract.
+        matches the paper's benign-only drift refresh contract. A model with
+        tenant/window grouped thresholds must be refreshed with replacement
+        groups unless the caller explicitly drops the grouped thresholds.
         """
         alpha_value = alpha if alpha is not None else self.config.calibration.alpha
         old_threshold = self.threshold
         old_grouped_thresholds = self.grouped_thresholds
+        if old_grouped_thresholds is not None and calibration_groups is None and not drop_grouped_thresholds:
+            raise ValueError(
+                "calibration_groups are required when refreshing a model with "
+                "grouped thresholds; pass drop_grouped_thresholds=True to "
+                "intentionally discard grouped thresholds and keep only the "
+                "refreshed global threshold."
+            )
         old_benign_prior = self.benign_prior.copy()
         self.update_benign_prior(benign_embeddings)
         scores = self.score_embeddings(
@@ -403,11 +413,15 @@ class CCDModel:
             approximate=approximate,
             approximate_k=approximate_k,
         )
-        threshold = self.calibrate(scores, alpha_value)
+        threshold = calibrate_threshold(scores, alpha_value)
+        self.threshold = threshold
         grouped_thresholds = None
+        grouped_thresholds_dropped = old_grouped_thresholds is not None and calibration_groups is None
         if calibration_groups is not None:
             grouped_thresholds = calibrate_thresholds_by_group(scores, calibration_groups, alpha_value)
             self.grouped_thresholds = grouped_thresholds
+        else:
+            self.grouped_thresholds = None
         return {
             "alpha": alpha_value,
             "num_samples": int(len(scores)),
@@ -419,6 +433,7 @@ class CCDModel:
             ),
             "grouped_thresholds": grouped_thresholds or {},
             "n_calibration_groups": 0 if grouped_thresholds is None else len(grouped_thresholds),
+            "grouped_thresholds_dropped": grouped_thresholds_dropped,
             "benign_prior_l1_delta": float(np.sum(np.abs(self.benign_prior - old_benign_prior))),
             "score_path": {
                 "approximate": bool(approximate),
@@ -428,6 +443,7 @@ class CCDModel:
                 "benign_prior_updated": True,
                 "threshold_updated": True,
                 "grouped_thresholds_updated": grouped_thresholds is not None,
+                "grouped_thresholds_dropped": grouped_thresholds_dropped,
                 "malicious_priors_fixed": True,
                 "encoder_config_fixed": True,
                 "cone_axes_fixed": True,

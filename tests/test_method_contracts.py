@@ -33,6 +33,7 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["code_path_evidence"]["exact_full_axis_scan_for_deployed_top_r_statistic"] is True
     assert report["derived"]["code_path_evidence"]["benign_reference_refresh_available"] is True
     assert report["derived"]["code_path_evidence"]["grouped_threshold_refresh_available"] is True
+    assert report["derived"]["code_path_evidence"]["grouped_refresh_requires_groups_or_explicit_drop"] is True
     assert report["derived"]["code_path_evidence"]["refresh_updates_pb_and_threshold_only"] is True
     assert report["derived"]["edit_manifest"]["deterministic_closure_available"] is True
     assert report["derived"]["caho_training_support"]["binary_auxiliary_head_supported"] is True

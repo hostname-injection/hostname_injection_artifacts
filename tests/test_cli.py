@@ -307,12 +307,14 @@ def test_refresh_benign_parser_smoke():
             "refresh.json",
             "--groups",
             "groups.txt",
+            "--drop-grouped-thresholds",
         ]
     )
     assert args.command == "refresh-benign"
     assert str(args.output) == "ccd_model.refreshed.npz"
     assert str(args.report) == "refresh.json"
     assert str(args.groups) == "groups.txt"
+    assert args.drop_grouped_thresholds is True
 
 
 def test_refresh_benign_saves_updated_model_bundle(tmp_path, monkeypatch):

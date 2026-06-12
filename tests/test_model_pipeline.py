@@ -137,6 +137,60 @@ def test_refresh_benign_reference_updates_grouped_thresholds_when_groups_supplie
     assert model.grouped_thresholds == report["grouped_thresholds"]
 
 
+def test_refresh_benign_reference_requires_groups_for_grouped_model():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.95, 0.05], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=9.0,
+        grouped_thresholds={"tenant-a": {"threshold": 9.0}},
+    )
+    old_prior = model.benign_prior.copy()
+    old_threshold = model.threshold
+    old_grouped = model.grouped_thresholds
+    benign_window = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32)
+
+    try:
+        model.refresh_benign_reference(benign_window, alpha=0.5)
+    except ValueError as exc:
+        assert "calibration_groups are required" in str(exc)
+    else:
+        raise AssertionError("grouped refresh without replacement groups should fail")
+
+    assert np.allclose(model.benign_prior, old_prior)
+    assert model.threshold == old_threshold
+    assert model.grouped_thresholds is old_grouped
+
+
+def test_refresh_benign_reference_can_explicitly_drop_grouped_thresholds():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.95, 0.05], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=9.0,
+        grouped_thresholds={"tenant-a": {"threshold": 9.0}},
+    )
+    benign_window = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32)
+
+    report = model.refresh_benign_reference(
+        benign_window,
+        alpha=0.5,
+        drop_grouped_thresholds=True,
+    )
+
+    assert model.grouped_thresholds is None
+    assert report["grouped_thresholds_dropped"] is True
+    assert report["refresh_scope"]["grouped_thresholds_dropped"] is True
+    assert report["refresh_scope"]["grouped_thresholds_updated"] is False
+    assert report["n_calibration_groups"] == 0
+
+
 def test_update_benign_prior_rejects_empty_embeddings():
     cones = _identity_cones()
     model = CCDModel(

@@ -326,6 +326,11 @@ def validate_code_path_evidence() -> dict[str, bool]:
     refresh_signature = inspect.signature(CCDModel.refresh_benign_reference)
     if "calibration_groups" not in refresh_signature.parameters:
         raise ValueError("CCDModel.refresh_benign_reference must support tenant/window threshold refresh")
+    if "drop_grouped_thresholds" not in refresh_signature.parameters:
+        raise ValueError("CCDModel.refresh_benign_reference must expose an explicit grouped-threshold drop control")
+    refresh_source = inspect.getsource(CCDModel.refresh_benign_reference)
+    if "calibration_groups are required" not in refresh_source or "drop_grouped_thresholds" not in refresh_source:
+        raise ValueError("grouped benign refresh must fail closed unless replacement groups or an explicit drop are provided")
     explain_signature = inspect.signature(CCDModel.explain)
     for param in ("calibration_groups", "missing_group_threshold"):
         if param not in explain_signature.parameters:
@@ -376,6 +381,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "exact_full_axis_scan_for_deployed_top_r_statistic": True,
         "benign_reference_refresh_available": True,
         "grouped_threshold_refresh_available": True,
+        "grouped_refresh_requires_groups_or_explicit_drop": True,
         "refresh_updates_pb_and_threshold_only": True,
     }
 
