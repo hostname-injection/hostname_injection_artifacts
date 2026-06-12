@@ -208,8 +208,11 @@ python scripts/train_benchmark_caho_binary.py \
 ```
 
 The validation history records the benign-only split-conformal threshold,
-clipped order-statistic rank, and strict `score > threshold` decision rule used
-for the fixed-FPR checkpoint comparison.
+clipped order-statistic rank, strict `score > threshold` decision rule, score
+source (`binary_auxiliary_head_sigmoid`), and score view
+(`canonical_view1_only`) used for the fixed-FPR checkpoint comparison. When
+`--restore-best-validation` is set, the trainer restores the encoder and
+binary head from the best validation epoch before saving.
 
 All CAHO training entry points accept `--seed` (or `--caho-seed` for
 `train-user-logins`) and default to `13`; benchmark training reports record the

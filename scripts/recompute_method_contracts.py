@@ -267,10 +267,15 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError(f"BenchmarkBinaryContrastiveTrainer.fit must expose {param} for validation-only model selection")
     if "evaluate_fixed_fpr" not in trainer_fit or "validation_model_selection" not in trainer_fit:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must record validation-only fixed-FPR model selection")
+    if "selection_rule" not in trainer_fit or "_restore_model_selection_state" not in trainer_fit:
+        raise ValueError("BenchmarkBinaryContrastiveTrainer must record and restore best validation checkpoint selection")
     if (
         "split_conformal_threshold_metadata" not in trainer_eval
         or "threshold_source" not in trainer_eval
         or "tpr_at_target_fpr" not in trainer_eval
+        or "binary_auxiliary_head_sigmoid" not in trainer_eval
+        or "canonical_view1_only" not in trainer_eval
+        or "embedding_normalization" not in trainer_eval
     ):
         raise ValueError("BenchmarkBinaryContrastiveTrainer validation selection must use auditable fixed-FPR calibration")
     if "torch.optim.AdamW" not in trainer_fit:
@@ -348,6 +353,8 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         "adamw_weight_decay_default": default_weight_decay,
         "l2_normalized_binary_inputs": True,
         "validation_only_model_selection_supported": True,
+        "validation_score_source_reported": True,
+        "validation_restore_best_state_available": True,
         "validation_fixed_fpr_order_statistic_reported": True,
         "contrastive_loss_supported": True,
         "supervised_orbit_contrastive_supported": True,

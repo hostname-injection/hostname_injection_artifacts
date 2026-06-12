@@ -198,10 +198,16 @@ def test_binary_trainer_records_validation_fixed_fpr_selection():
     selection = summary["validation_model_selection"]
     assert selection["metric"] == "tpr_at_target_fpr"
     assert selection["target_fpr"] == 0.5
+    assert selection["selection_rule"] == "maximize_tpr_at_target_fpr;ties_keep_earliest"
+    assert selection["score_source"] == "binary_auxiliary_head_sigmoid"
+    assert selection["score_view"] == "canonical_view1_only"
     assert selection["best_epoch"] == 1
     assert selection["restored_best_validation_checkpoint"] is True
     assert selection["history"][0]["status"] == "pass"
     assert selection["history"][0]["threshold_source"] == "validation_benign_scores"
+    assert selection["history"][0]["score_source"] == "binary_auxiliary_head_sigmoid"
+    assert selection["history"][0]["score_view"] == "canonical_view1_only"
+    assert selection["history"][0]["embedding_normalization"] == "l2"
     assert selection["history"][0]["alpha"] == 0.5
     assert selection["history"][0]["num_samples"] == 2
     assert selection["history"][0]["order_statistic_rank"] == 2
@@ -209,6 +215,102 @@ def test_binary_trainer_records_validation_fixed_fpr_selection():
     assert selection["history"][0]["calibration_scores"] == "benign_only"
     assert selection["history"][0]["n_validation_benign"] == 2
     assert selection["history"][0]["n_validation_positive"] == 2
+
+
+def test_binary_trainer_restores_best_validation_state():
+    torch = pytest.importorskip("torch")
+
+    class DummySentenceModel(torch.nn.Module):
+        def __init__(self, dim=4):
+            super().__init__()
+            self.dim = dim
+            self.embed = torch.nn.Embedding(256, dim)
+            self.proj = torch.nn.Linear(dim, dim)
+
+        def tokenize(self, texts):
+            ids = [sum(text.encode("utf-8")) % 256 for text in texts]
+            return {"input_ids": torch.tensor(ids, dtype=torch.long).unsqueeze(1)}
+
+        def forward(self, tokenized):
+            emb = self.embed(tokenized["input_ids"]).mean(dim=1)
+            return {"sentence_embedding": self.proj(emb)}
+
+        def get_sentence_embedding_dimension(self):
+            return self.dim
+
+    class RecordingTrainer(BenchmarkBinaryContrastiveTrainer):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.validation_states = []
+
+        def evaluate_fixed_fpr(self, dataset, *, target_fpr=1e-4):
+            del dataset
+            self.validation_states.append(
+                {key: value.detach().cpu().clone() for key, value in self.model.state_dict().items()}
+            )
+            call_index = len(self.validation_states)
+            return {
+                "status": "pass",
+                "target_fpr": float(target_fpr),
+                "threshold": 0.5,
+                "alpha": float(target_fpr),
+                "num_samples": 2,
+                "order_statistic_rank": 2,
+                "decision_rule": "score > threshold",
+                "calibration_scores": "benign_only",
+                "threshold_source": "validation_benign_scores",
+                "score_source": "binary_auxiliary_head_sigmoid",
+                "score_view": "canonical_view1_only",
+                "embedding_normalization": "l2",
+                "n_validation_rows": 4,
+                "n_validation_benign": 2,
+                "n_validation_positive": 2,
+                "false_positives": 0,
+                "true_positives": 2 if call_index == 1 else 0,
+                "observed_fpr": 0.0,
+                "tpr_at_target_fpr": 1.0 if call_index == 1 else 0.0,
+            }
+
+    trainer = RecordingTrainer(
+        DummySentenceModel(),
+        batch_size=2,
+        temperature=0.1,
+        lr=1e-2,
+        max_grad_norm=1.0,
+        scheduler="none",
+        min_lr=0.0,
+        weight_decay=0.02,
+        use_grad_cache=False,
+        grad_cache_chunk_size=2,
+        num_workers=0,
+        loss_mode="fixed",
+        loss_max_scale=100.0,
+        loss_min_scale=1.0,
+        optimize_loss=False,
+        log_every=0,
+        binary_loss_weight=0.5,
+        contrastive_loss_weight=0.5,
+        binary_hidden_dim=4,
+        seed=17,
+    )
+
+    summary = trainer.fit(
+        _TinyViewDataset(),
+        epochs=2,
+        validation_dataset=_TinyViewDataset(),
+        validation_target_fpr=0.5,
+        restore_best_validation=True,
+    )
+
+    assert summary["validation_model_selection"]["best_epoch"] == 1
+    assert summary["validation_model_selection"]["restored_best_validation_checkpoint"] is True
+    assert len(trainer.validation_states) == 2
+    assert any(
+        not torch.allclose(trainer.validation_states[0][key], trainer.validation_states[1][key])
+        for key in trainer.validation_states[0]
+    )
+    restored = trainer.model.state_dict()
+    assert all(torch.allclose(restored[key].cpu(), trainer.validation_states[0][key]) for key in restored)
 
 
 def test_binary_auxiliary_head_trains_on_both_views():

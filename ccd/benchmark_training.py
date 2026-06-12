@@ -553,6 +553,9 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
             summary["validation_model_selection"] = {
                 "metric": "tpr_at_target_fpr",
                 "target_fpr": float(validation_target_fpr),
+                "selection_rule": "maximize_tpr_at_target_fpr;ties_keep_earliest",
+                "score_source": "binary_auxiliary_head_sigmoid",
+                "score_view": "canonical_view1_only",
                 "best_epoch": None if best_validation is None else int(best_validation["epoch"]),
                 "best_validation_tpr_at_target_fpr": None
                 if best_validation is None
@@ -612,6 +615,9 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
                 "status": "unavailable",
                 "reason": "validation set must contain at least one benign and one positive row",
                 "target_fpr": float(target_fpr),
+                "score_source": "binary_auxiliary_head_sigmoid",
+                "score_view": "canonical_view1_only",
+                "embedding_normalization": "l2",
                 "n_validation_rows": int(score_arr.size),
                 "n_validation_benign": int(benign_scores.size),
                 "n_validation_positive": int(positive_scores.size),
@@ -629,6 +635,9 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
             "target_fpr": float(target_fpr),
             **calibration_metadata,
             "threshold_source": "validation_benign_scores",
+            "score_source": "binary_auxiliary_head_sigmoid",
+            "score_view": "canonical_view1_only",
+            "embedding_normalization": "l2",
             "n_validation_rows": int(score_arr.size),
             "n_validation_benign": int(np.sum(benign)),
             "n_validation_positive": int(np.sum(positive)),

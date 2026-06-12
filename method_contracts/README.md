@@ -17,6 +17,7 @@ threshold lookup, edit-manifest coverage,
 deterministic finite-edit certificate closure, CAHO two-view contrastive
 training plus an L2-normalized binary head with explicit AdamW weight decay,
 Appendix C CAHO deployed-recipe defaults in the benchmark binary trainer,
+validation-only fixed-FPR score provenance and best-epoch restoration,
 exact full-axis scanning for the deployed top-R cone sketch that bypasses LSH
 by default for certification/calibration,
 calibrated-margin certificates with deterministic enumeration fallback, CAHO
