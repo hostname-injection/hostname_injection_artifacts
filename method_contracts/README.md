@@ -20,6 +20,8 @@ Appendix C CAHO deployed-recipe defaults in the benchmark binary trainer,
 validation-only fixed-FPR score provenance and best-epoch restoration,
 exact full-axis scanning for the deployed top-R cone sketch that bypasses LSH
 by default for certification/calibration,
+score-path rejection of non-finite, zero-norm, or dimension-incompatible
+embeddings,
 calibrated-margin certificates with deterministic enumeration fallback, CAHO
 supervised orbit contrastive training with benign diversity preserved,
 grouped-threshold explanations for decision inspection, benign-only

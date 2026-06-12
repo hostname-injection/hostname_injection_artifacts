@@ -649,6 +649,19 @@ def validate_code_path_evidence() -> dict[str, bool]:
         or refresh_model.grouped_thresholds is not old_grouped
     ):
         raise ValueError("failed grouped refresh must leave P_B, threshold, and grouped thresholds unchanged")
+    for score_call in (
+        lambda: refresh_model.score_embeddings(np.array([[1.0, float("nan")]], dtype=np.float32)),
+        lambda: refresh_model.score_embeddings(np.array([[float("inf"), 0.0]], dtype=np.float32), approximate_k=1),
+        lambda: refresh_model.score_embeddings(np.array([[0.0, 0.0]], dtype=np.float32)),
+        lambda: refresh_model.explain_embeddings(np.array([[1.0, float("nan")]], dtype=np.float32)),
+    ):
+        try:
+            score_call()
+        except ValueError as exc:
+            if "finite" not in str(exc) and "non-zero" not in str(exc):
+                raise
+        else:
+            raise ValueError("score and explanation paths must reject invalid embeddings")
     certify_signature = inspect.signature(CCDModel.certify)
     for param in ("method", "sketch_lipschitz", "embedding_rotation_bound"):
         if param not in certify_signature.parameters:
@@ -695,6 +708,8 @@ def validate_code_path_evidence() -> dict[str, bool]:
     torch_score_source = inspect.getsource(CCDModel._score_embeddings_torch)
     topk_score_source = inspect.getsource(CCDModel._score_embeddings_topk)
     fast_score_source = inspect.getsource(CCDModel._score_embeddings_fast)
+    score_embeddings_source = inspect.getsource(CCDModel.score_embeddings)
+    coerce_score_source = inspect.getsource(CCDModel._coerce_score_embeddings)
     vector_score_source = inspect.getsource(ccd_score_logpriors.__globals__["ccd_scores_logpriors_topk"])
     torch_kernel_source = inspect.getsource(ccd_score_logpriors.__globals__["ccd_scores_torch"])
     if "nearest_axes" not in cone_sketch_source or "use_lsh=use_lsh" not in cone_sketch_source:
@@ -712,6 +727,10 @@ def validate_code_path_evidence() -> dict[str, bool]:
         raise ValueError("CCDModel._score_embeddings_torch must route through the normalized torch score kernel")
     if "ccd_scores_logpriors_topk" not in topk_score_source:
         raise ValueError("CCDModel._score_embeddings_topk must route through the normalized vector top-k score path")
+    if "_coerce_score_embeddings" not in score_embeddings_source:
+        raise ValueError("CCDModel.score_embeddings must validate embeddings before scoring")
+    if "finite non-zero norms" not in coerce_score_source or "must contain only finite values" not in coerce_score_source:
+        raise ValueError("CCDModel score paths must reject non-finite and zero-norm embeddings")
     return {
         "eq1_logsumexp_score_path_available": True,
         "normalizer_decodes_utf8_percent_runs": True,
@@ -719,6 +738,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "raw_artifact_csv_roundtrip_available": True,
         "global_score_csv_thresholds_available": True,
         "score_paths_normalize_unit_embeddings": True,
+        "score_paths_reject_invalid_embeddings": True,
         "mixture_weights_normalized": True,
         "split_conformal_calibration_available": True,
         "split_conformal_rejects_non_finite_scores": True,

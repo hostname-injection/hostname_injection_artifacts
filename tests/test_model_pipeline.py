@@ -527,6 +527,78 @@ def test_score_raises_with_no_malicious_priors():
     assert False, "Expected ValueError when malicious_priors is empty"
 
 
+def test_score_embeddings_accepts_single_vector():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+    )
+
+    scores = model.score_embeddings(np.array([1.0, 0.0], dtype=np.float32))
+
+    assert scores.shape == (1,)
+    assert scores[0] < 0.0
+
+
+def test_score_embeddings_rejects_invalid_embeddings_before_scoring():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+    )
+
+    invalid_calls = [
+        lambda: model.score_embeddings(np.array([[1.0, float("nan")]], dtype=np.float32)),
+        lambda: model.score_embeddings(np.array([[float("inf"), 0.0]], dtype=np.float32), approximate_k=1),
+        lambda: model.score_embeddings(np.array([[0.0, 0.0]], dtype=np.float32)),
+        lambda: model.score_embeddings(np.array([[1.0, 0.0, 0.0]], dtype=np.float32)),
+    ]
+    try:
+        import torch
+
+        invalid_calls.extend(
+            [
+                lambda: model.score_embeddings(torch.tensor([[1.0, float("nan")]], dtype=torch.float32)),
+                lambda: model.score_embeddings(torch.tensor([[0.0, 0.0]], dtype=torch.float32)),
+            ]
+        )
+    except Exception:
+        pass
+
+    for call in invalid_calls:
+        try:
+            call()
+        except ValueError:
+            continue
+        raise AssertionError("Expected invalid score embedding input to fail before scoring")
+
+
+def test_explain_embeddings_rejects_invalid_embeddings_before_scoring():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=0.0,
+    )
+
+    try:
+        model.explain_embeddings(np.array([[1.0, float("nan")]], dtype=np.float32))
+    except ValueError as exc:
+        assert "finite" in str(exc)
+        return
+
+    assert False, "Expected invalid explanation embedding input to fail before scoring"
+
+
 def test_ccd_model_from_embeddings_end_to_end():
     config = CCDConfig()
     config.cone = ConeConfig(dim=2, num_cones=2, active_cones=1, temperature=1.0, use_lsh=False)

@@ -70,17 +70,18 @@ class CCDModel:
         if approximate_k is not None:
             if approximate_k <= 0:
                 raise ValueError("approximate_k must be positive")
+        embeddings = self._coerce_score_embeddings(embeddings)
         try:
             import torch
-
-            if isinstance(embeddings, torch.Tensor):
-                if approximate_k is not None:
-                    if approximate_k == 1:
-                        return self._score_embeddings_fast(embeddings)
-                    return self._score_embeddings_topk(embeddings, approximate_k)
-                return self._score_embeddings_torch(embeddings)
         except Exception:
-            pass
+            torch = None
+
+        if torch is not None and isinstance(embeddings, torch.Tensor):
+            if approximate_k is not None:
+                if approximate_k == 1:
+                    return self._score_embeddings_fast(embeddings)
+                return self._score_embeddings_topk(embeddings, approximate_k)
+            return self._score_embeddings_torch(embeddings)
         if approximate_k is not None:
             if approximate_k == 1:
                 return self._score_embeddings_fast(embeddings)
@@ -117,9 +118,8 @@ class CCDModel:
         except Exception:
             pass
 
-        if embeddings.ndim == 1:
-            embeddings = embeddings.reshape(1, -1)
-        embeddings = l2_normalize(np.asarray(embeddings, dtype=np.float32), axis=1)
+        embeddings = self._coerce_score_embeddings(embeddings)
+        embeddings = l2_normalize(embeddings, axis=1)
         if thresholds is not None and len(thresholds) != len(embeddings):
             raise ValueError("thresholds must have one value per embedding")
         if calibration_groups is not None and len(calibration_groups) != len(embeddings):
@@ -403,6 +403,47 @@ class CCDModel:
         self.benign_prior = build_benign_prior(benign_embeddings, self.cones, self.config.prior)
         self._invalidate_prior_caches()
         return self.benign_prior
+
+    def _coerce_score_embeddings(self, embeddings):
+        try:
+            import torch
+
+            if isinstance(embeddings, torch.Tensor):
+                if embeddings.ndim == 1:
+                    embeddings = embeddings.unsqueeze(0)
+                if embeddings.ndim != 2:
+                    raise ValueError("embeddings must be a 1D or 2D array")
+                if embeddings.shape[1] != self.cones.axes.shape[1]:
+                    raise ValueError(
+                        "embeddings dimension does not match cone axes: "
+                        f"{embeddings.shape[1]} != {self.cones.axes.shape[1]}"
+                    )
+                if not torch.isfinite(embeddings).all().item():
+                    raise ValueError("embeddings must contain only finite values")
+                if embeddings.shape[0] > 0:
+                    norms = torch.linalg.vector_norm(embeddings.float(), dim=1)
+                    if not torch.isfinite(norms).all().item() or torch.any(norms <= 0.0).item():
+                        raise ValueError("embeddings rows must have finite non-zero norms")
+                return embeddings
+        except ImportError:
+            pass
+
+        embeddings = np.asarray(embeddings, dtype=np.float32)
+        if embeddings.ndim == 1:
+            embeddings = embeddings.reshape(1, -1)
+        if embeddings.ndim != 2:
+            raise ValueError("embeddings must be a 1D or 2D array")
+        if embeddings.shape[1] != self.cones.axes.shape[1]:
+            raise ValueError(
+                "embeddings dimension does not match cone axes: "
+                f"{embeddings.shape[1]} != {self.cones.axes.shape[1]}"
+            )
+        if not np.isfinite(embeddings).all():
+            raise ValueError("embeddings must contain only finite values")
+        norms = np.linalg.norm(embeddings, axis=1)
+        if not np.isfinite(norms).all() or np.any(norms <= 0.0):
+            raise ValueError("embeddings rows must have finite non-zero norms")
+        return embeddings
 
     def _coerce_benign_embeddings(self, benign_embeddings: np.ndarray) -> np.ndarray:
         try:

@@ -740,6 +740,8 @@ scores = model.score(["example.com"], normalize=True)
 
 - Cone sketching and likelihood-ratio scoring follow Eq. (1) in the paper:
   `S(q) = log sum_k pi_k exp(n0 * (H(q; P_B) - H(q; P_M,k)))`.
+- CCD scoring and explanation paths reject non-finite, zero-norm, or
+  dimension-incompatible embeddings before applying the deployed score path.
 - The deployed normalizer decodes valid UTF-8 percent runs before Unicode/IDNA
   normalization, while retaining a byte-residue fallback for malformed runs.
   Certificate output includes a per-row normalization trace for URL-like
