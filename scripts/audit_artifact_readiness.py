@@ -61,6 +61,21 @@ FORBIDDEN_TRACKING_PATTERNS = tuple(
     )
 )
 PLACEHOLDER_PATTERNS = ("example.org", "REPLACE_WITH")
+MODEL_ARTIFACT_SUFFIXES = {".ckpt", ".pt", ".pth", ".safetensors"}
+MODEL_ARTIFACT_DIR_SUFFIX = "_model_checkpoint"
+MODEL_ARTIFACT_EXCLUDED_DIRS = {
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "ccd.egg-info",
+    "dist",
+    "htmlcov",
+    "out",
+}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -75,6 +90,28 @@ def iter_text_files(path: Path) -> Iterable[Path]:
         for child in sorted(path.rglob("*")):
             if child.is_file() and child.suffix.lower() not in {".gz", ".zip", ".pt", ".safetensors", ".npz", ".pyc"}:
                 yield child
+
+
+def iter_package_visible_paths(root: Path) -> Iterable[Path]:
+    for child in sorted(root.rglob("*")):
+        rel = child.relative_to(root)
+        if any(part in MODEL_ARTIFACT_EXCLUDED_DIRS for part in rel.parts):
+            continue
+        yield child
+
+
+def check_no_pretrained_model_artifacts(manifest: dict[str, Any]) -> list[str]:
+    del manifest
+    failures: list[str] = []
+    for path in iter_package_visible_paths(ROOT):
+        rel = path.relative_to(ROOT).as_posix()
+        if path.is_dir():
+            if path.name.endswith(MODEL_ARTIFACT_DIR_SUFFIX):
+                failures.append(f"pretrained/checkpoint directory is package-visible: {rel}")
+            continue
+        if path.suffix in MODEL_ARTIFACT_SUFFIXES:
+            failures.append(f"pretrained/checkpoint weight file is package-visible: {rel}")
+    return failures
 
 
 def check_required_files(manifest: dict[str, Any]) -> list[str]:
@@ -555,6 +592,7 @@ def audit(manifest_path: Path, *, skip_gates: bool = False, strict_final: bool =
         "claims": check_claims(manifest),
         "claim_script_targets": check_claim_script_targets(manifest),
         "metadata_template": check_metadata_template(manifest),
+        "model_artifact_scan": check_no_pretrained_model_artifacts(manifest),
         "public_privacy_scan": check_public_privacy_scan(manifest),
         "portability_scan": check_portability_scan(manifest),
         "tracking_scan": check_tracking_scan(manifest),

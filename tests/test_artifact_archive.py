@@ -55,3 +55,22 @@ def test_archive_excludes_internal_codex_brief(tmp_path: Path) -> None:
 
     assert "CODEX_DEIDENTIFICATION_IMPLEMENTATION_BRIEF.md" in result["excluded_files"]
     assert "CODEX_DEIDENTIFICATION_IMPLEMENTATION_BRIEF.md" not in result["top_level_bytes"]
+
+
+def test_archive_excludes_model_checkpoints_and_weights(tmp_path: Path) -> None:
+    (tmp_path / "README.md").write_text("artifact\n", encoding="utf-8")
+    (tmp_path / "ARTIFACT_MANIFEST.json").write_text(
+        json.dumps({"required_files": ["README.md"]}),
+        encoding="utf-8",
+    )
+    model_dir = tmp_path / "caho_model_checkpoint"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
+    (model_dir / "model.safetensors").write_text("weights", encoding="utf-8")
+    (tmp_path / "binary_classifier.pt").write_text("weights", encoding="utf-8")
+
+    files = {path.relative_to(tmp_path).as_posix() for path in archive.iter_artifact_files(tmp_path)}
+
+    assert "caho_model_checkpoint/config.json" not in files
+    assert "caho_model_checkpoint/model.safetensors" not in files
+    assert "binary_classifier.pt" not in files

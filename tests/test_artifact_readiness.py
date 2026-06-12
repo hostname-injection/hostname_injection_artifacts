@@ -39,7 +39,7 @@ def test_artifact_manifest_has_claim_scripts_and_required_files() -> None:
     assert requirements["packaging"]["container_required"] is False
     assert requirements["tracking"]["web_tracking_embedded"] is False
     assert manifest["full_tests"]["command"] == "python -m pytest -q"
-    assert manifest["full_tests"]["last_observed"] == "282 passed, 1 skipped"
+    assert manifest["full_tests"]["last_observed"] == "284 passed, 1 skipped"
     assert (ROOT / manifest["badge_readiness"]).exists()
     assert manifest["claims"]
     claim_text = " ".join(claim["claim"] for claim in manifest["claims"])
@@ -175,6 +175,19 @@ def test_tracking_scan_rejects_web_analytics(tmp_path, monkeypatch) -> None:
     failures = readiness.check_tracking_scan({"tracking_scan_paths": ["page.html"]})
 
     assert failures == [f"web tracking pattern found in page.html: {pattern}"]
+
+
+def test_model_artifact_scan_rejects_package_visible_weights(tmp_path, monkeypatch) -> None:
+    model_dir = tmp_path / "caho_model_checkpoint"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "binary_classifier.pt").write_text("weights", encoding="utf-8")
+    monkeypatch.setattr(readiness, "ROOT", tmp_path)
+
+    failures = readiness.check_no_pretrained_model_artifacts({})
+
+    assert "pretrained/checkpoint directory is package-visible: caho_model_checkpoint" in failures
+    assert "pretrained/checkpoint weight file is package-visible: binary_classifier.pt" in failures
 
 
 def test_strict_final_audit_reports_publication_blockers() -> None:

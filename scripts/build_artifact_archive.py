@@ -18,8 +18,10 @@ DEFAULT_EXCLUDED_DIRS = {
     ".venv",
     "__pycache__",
     "ccd.egg-info",
+    "caho_model_checkpoint",
     "checkpoints",
     "dist",
+    "out",
 }
 DEFAULT_EXCLUDED_FILES = {
     ".DS_Store",
@@ -27,9 +29,14 @@ DEFAULT_EXCLUDED_FILES = {
     "uv.lock",
 }
 DEFAULT_EXCLUDED_SUFFIXES = {
+    ".ckpt",
+    ".pt",
+    ".pth",
     ".pyc",
     ".pyo",
+    ".safetensors",
 }
+MODEL_CHECKPOINT_DIR_SUFFIX = "_model_checkpoint"
 
 
 def load_manifest(path: Path) -> dict[str, Any]:
@@ -39,6 +46,8 @@ def load_manifest(path: Path) -> dict[str, Any]:
 def should_exclude(path: Path, root: Path) -> bool:
     rel = path.relative_to(root)
     if any(part in DEFAULT_EXCLUDED_DIRS for part in rel.parts):
+        return True
+    if any(part.endswith(MODEL_CHECKPOINT_DIR_SUFFIX) for part in rel.parts):
         return True
     if path.name in DEFAULT_EXCLUDED_FILES:
         return True
