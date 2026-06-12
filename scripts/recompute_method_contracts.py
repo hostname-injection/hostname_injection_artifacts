@@ -468,6 +468,8 @@ def validate_code_path_evidence() -> dict[str, bool]:
     explain_embeddings_source = inspect.getsource(CCDModel.explain_embeddings)
     if "l2_normalize" not in explain_embeddings_source:
         raise ValueError("CCDModel.explain_embeddings must normalize embeddings before reporting cone evidence")
+    if "log_malicious_over_benign" not in explain_embeddings_source or "min(mal_vals" not in explain_embeddings_source:
+        raise ValueError("CCDModel.explain_embeddings must report per-family log-ratio cone evidence")
     explain_cli_source = (ROOT / "ccd" / "explain.py").read_text(encoding="utf-8")
     for token in (
         "threshold_source",
@@ -621,6 +623,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "model_predict_grouped_thresholds_available": True,
         "grouped_decision_explanations_available": True,
         "explanations_use_normalized_cone_evidence": True,
+        "explanations_report_family_log_ratio_evidence": True,
         "explanations_record_threshold_and_score_scope": True,
         "exact_certificate_enumeration_available": True,
         "calibrated_margin_certificate_available": True,

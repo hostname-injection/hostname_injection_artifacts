@@ -146,7 +146,9 @@ class CCDModel:
                 sim = float(self.cones.axes[cone_idx] @ u)
                 log_b = float(log_benign[cone_idx])
                 mal_vals = {fam: float(log_malicious[fam][cone_idx]) for fam in families}
+                log_ratio_vals = {fam: float(value - log_b) for fam, value in mal_vals.items()}
                 best_family = max(mal_vals, key=mal_vals.get) if mal_vals else None
+                min_family = min(mal_vals, key=mal_vals.get) if mal_vals else None
                 cone_details.append(
                     {
                         "cone": cone_idx,
@@ -154,8 +156,15 @@ class CCDModel:
                         "weight": weight,
                         "log_benign": log_b,
                         "log_malicious": mal_vals,
+                        "log_malicious_over_benign": log_ratio_vals,
                         "best_malicious_family": best_family,
-                        "min_malicious_family": best_family,
+                        "min_malicious_family": min_family,
+                        "best_log_malicious_over_benign": None
+                        if best_family is None
+                        else log_ratio_vals[best_family],
+                        "min_log_malicious_over_benign": None
+                        if min_family is None
+                        else log_ratio_vals[min_family],
                     }
                 )
             explanation = {

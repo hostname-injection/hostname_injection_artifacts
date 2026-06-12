@@ -26,6 +26,25 @@ def _simple_model():
     )
 
 
+def _multi_family_model():
+    cone = ConeConfig(dim=2, num_cones=2, active_cones=1, temperature=1.0, use_lsh=False)
+    config = CCDConfig(cone=cone)
+    axes = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+    cones = ConePartition.build(cone, axes=axes)
+    benign_prior = np.array([0.8, 0.2], dtype=np.float32)
+    malicious_priors = {
+        "fam-low": np.array([0.2, 0.8], dtype=np.float32),
+        "fam-high": np.array([0.9, 0.1], dtype=np.float32),
+    }
+    return CCDModel(
+        config=config,
+        encoder=DummyEncoder(),
+        cones=cones,
+        benign_prior=benign_prior,
+        malicious_priors=malicious_priors,
+    )
+
+
 def test_explain_embeddings_top_cones():
     model = _simple_model()
     embeddings = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
@@ -40,6 +59,23 @@ def test_explain_embeddings_top_cones():
     assert explanations[1]["top_cones"][0]["cone"] == 1
     assert explanations[0]["score"] < 0.0
     assert explanations[1]["score"] > 0.0
+
+
+def test_explain_embeddings_reports_family_log_ratio_evidence():
+    model = _multi_family_model()
+    explanations = model.explain_embeddings(
+        np.array([[1.0, 0.0]], dtype=np.float32),
+        hostnames=["a.example"],
+        top_k=1,
+    )
+
+    cone = explanations[0]["top_cones"][0]
+    assert cone["best_malicious_family"] == "fam-high"
+    assert cone["min_malicious_family"] == "fam-low"
+    assert cone["log_malicious_over_benign"]["fam-high"] > 0.0
+    assert cone["log_malicious_over_benign"]["fam-low"] < 0.0
+    assert cone["best_log_malicious_over_benign"] == cone["log_malicious_over_benign"]["fam-high"]
+    assert cone["min_log_malicious_over_benign"] == cone["log_malicious_over_benign"]["fam-low"]
 
 
 def test_explain_embeddings_reports_normalized_cosine_similarity():
