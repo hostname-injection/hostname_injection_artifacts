@@ -1,3 +1,4 @@
+import csv
 import json
 import sys
 
@@ -90,6 +91,40 @@ def test_score_cli_applies_grouped_thresholds(tmp_path, monkeypatch):
     assert lines[0] == "hostname,calibration_group,threshold,score,prediction"
     assert lines[1].endswith("tenant-a,0.700000,0.600000,0")
     assert lines[2].endswith("tenant-b,0.400000,0.600000,1")
+
+
+def test_score_cli_preserves_raw_artifact_commas(tmp_path, monkeypatch):
+    input_path = tmp_path / "input.txt"
+    output_path = tmp_path / "out.csv"
+    input_path.write_text("alpha,one.example\n", encoding="utf-8")
+
+    class DummyModel:
+        threshold = 0.5
+        grouped_thresholds = None
+
+        def score(self, hostnames, batch_size=32, normalize=True, approximate=False, approximate_k=None):
+            return np.array([0.6], dtype=np.float32)
+
+    monkeypatch.setattr(score_cli, "load_model", lambda _: DummyModel())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ccd-score",
+            "--model",
+            "model.npz",
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--no-normalize",
+        ],
+    )
+
+    assert score_cli.main() == 0
+    with output_path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.reader(handle))
+    assert rows == [["hostname", "score", "prediction"], ["alpha,one.example", "0.600000", "1"]]
 
 
 def test_score_cli_rejects_empty_group_ids(tmp_path, monkeypatch):

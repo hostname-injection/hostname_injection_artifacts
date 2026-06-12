@@ -7,6 +7,7 @@ from pathlib import Path
 from sentence_transformers import SentenceTransformer
 
 from ccd.augment import CAHOAugmenter, AugmentConfig, WeightedAugmentConfig
+from ccd.csv_io import iter_malicious_csv_rows
 from ccd.preprocess import normalize_hostname
 from ccd.train import CAHODataset, CAHOTrainer, ContrastiveTrainer, Sample
 
@@ -16,16 +17,10 @@ def read_lines(path: Path):
 
 
 def read_malicious_csv(path: Path):
-    out = []
-    for line in path.read_text(errors="ignore").splitlines():
-        if not line.strip() or line.lower().startswith("hostname"):
-            continue
-        parts = [p.strip() for p in line.split(",")]
-        if len(parts) < 2:
-            continue
-        host, family = parts[0], parts[1]
-        out.append(Sample(host, is_malicious=True, family=family))
-    return out
+    return [
+        Sample(host, is_malicious=True, family=family)
+        for host, family in iter_malicious_csv_rows(path)
+    ]
 
 
 def maybe_normalize(samples, enable: bool):

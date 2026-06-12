@@ -678,7 +678,8 @@ global threshold, and grouped thresholds.
 ## Data Formats
 
 - `benign.txt`: one hostname per line.
-- `malicious.csv`: `hostname,family` per line (header optional).
+- `malicious.csv`: standard CSV with `hostname,family` columns (header optional);
+  quote fields that contain commas or other CSV metacharacters.
 - `queries.txt`: one hostname per line.
 
 ## Configuration

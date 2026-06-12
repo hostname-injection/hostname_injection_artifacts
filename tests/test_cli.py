@@ -1,3 +1,4 @@
+import csv
 import json
 from types import SimpleNamespace
 
@@ -119,6 +120,13 @@ def test_score_parser_smoke():
     )
     assert args.command == "score"
     assert str(args.groups) == "groups.txt"
+
+
+def test_read_malicious_csv_preserves_quoted_raw_hostname_fields(tmp_path):
+    path = tmp_path / "malicious.csv"
+    path.write_text('hostname,family\n"cmd,one""two.example",cmd\n', encoding="utf-8")
+
+    assert cli_module._read_malicious_csv(path) == {"cmd": ['cmd,one"two.example']}
 
 
 def test_calibrate_parser_smoke():
@@ -252,6 +260,38 @@ def test_score_applies_grouped_thresholds(tmp_path, monkeypatch):
     assert lines[0] == "hostname,calibration_group,threshold,score,prediction"
     assert lines[1].endswith("tenant-a,0.700000,0.600000,0")
     assert lines[2].endswith("tenant-b,0.400000,0.600000,1")
+
+
+def test_score_csv_preserves_raw_artifact_commas(tmp_path, monkeypatch):
+    queries = tmp_path / "queries.txt"
+    queries.write_text("alpha,one.example\n", encoding="utf-8")
+    output = tmp_path / "scores.csv"
+
+    dummy_model = SimpleNamespace(
+        threshold=0.5,
+        grouped_thresholds=None,
+        score=lambda hostnames, **_kwargs: np.array([0.6], dtype=np.float32),
+    )
+    monkeypatch.setattr(cli_module, "load_model", lambda _path: dummy_model)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "score",
+            "--model",
+            "model.npz",
+            "--input",
+            str(queries),
+            "--output",
+            str(output),
+            "--no-normalize",
+        ]
+    )
+    args.func(args)
+
+    with output.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.reader(handle))
+    assert rows == [["hostname", "score", "prediction"], ["alpha,one.example", "0.600000", "1"]]
 
 
 def test_score_uses_grouped_thresholds_from_model_bundle(tmp_path, monkeypatch):

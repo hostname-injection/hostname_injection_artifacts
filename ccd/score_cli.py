@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from .calibration import threshold_for_group
+from .csv_io import write_score_csv
 from .io import load_model
 from .line_io import read_nonempty_lines, read_parallel_lines
 from .preprocess import normalize_hostname
@@ -78,15 +79,14 @@ def main() -> int:
         row_thresholds = np.full(len(scores), threshold, dtype=np.float64)
     preds = scores > row_thresholds
 
-    with args.output.open("w") as f:
-        if groups is None:
-            f.write("hostname,score,prediction\n")
-            for h, s, p in zip(hostnames, scores, preds):
-                f.write(f"{h},{s:.6f},{int(p)}\n")
-        else:
-            f.write("hostname,calibration_group,threshold,score,prediction\n")
-            for h, g, t, s, p in zip(hostnames, groups, row_thresholds, scores, preds):
-                f.write(f"{h},{g},{t:.6f},{s:.6f},{int(p)}\n")
+    write_score_csv(
+        args.output,
+        hostnames,
+        scores,
+        preds,
+        groups=groups,
+        thresholds=row_thresholds if groups is not None else None,
+    )
     print(f"Wrote scores to {args.output}")
     return 0
 

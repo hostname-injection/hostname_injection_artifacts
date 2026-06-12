@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import importlib.util
 import inspect
 import json
@@ -23,6 +24,7 @@ from ccd.calibration import calibrate_thresholds_by_group, threshold_for_group
 from ccd.certify import deterministic_single_edit_neighbors, enumerate_edit_ball, randomized_smoothing_certificate
 from ccd.cone import ConePartition
 from ccd.config import CCDConfig, ConeConfig, EncoderConfig
+from ccd.csv_io import read_malicious_csv_map, write_score_csv
 from ccd.edit_model import DEFAULT_EDITS, EDIT_MANIFEST_VERSION, EditModel
 from ccd.encoder import CahoEncoder
 from ccd.io import MODEL_FORMAT_VERSION, ModelBundle
@@ -371,6 +373,18 @@ def validate_code_path_evidence() -> dict[str, bool]:
         raise ValueError("CCDModel must expose update_benign_prior for P_B refresh")
     if not callable(getattr(CCDModel, "refresh_benign_reference", None)):
         raise ValueError("CCDModel must expose refresh_benign_reference for benign-only drift refresh")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        malicious_csv = tmp_path / "malicious.csv"
+        malicious_csv.write_text('hostname,family\n"cmd,one""two.example",cmd\n', encoding="utf-8")
+        if read_malicious_csv_map(malicious_csv) != {"cmd": ['cmd,one"two.example']}:
+            raise ValueError("malicious CSV reader must preserve quoted raw hostname fields")
+        scores_csv = tmp_path / "scores.csv"
+        write_score_csv(scores_csv, ["alpha,one.example"], [0.6], [True])
+        with scores_csv.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.reader(handle))
+        if rows != [["hostname", "score", "prediction"], ["alpha,one.example", "0.600000", "1"]]:
+            raise ValueError("score CSV writer must quote raw hostname fields when needed")
     refresh_signature = inspect.signature(CCDModel.refresh_benign_reference)
     if "calibration_groups" not in refresh_signature.parameters:
         raise ValueError("CCDModel.refresh_benign_reference must support tenant/window threshold refresh")
@@ -500,6 +514,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
     return {
         "eq1_logsumexp_score_path_available": True,
         "normalizer_decodes_utf8_percent_runs": True,
+        "raw_artifact_csv_roundtrip_available": True,
         "score_paths_normalize_unit_embeddings": True,
         "mixture_weights_normalized": True,
         "split_conformal_calibration_available": True,

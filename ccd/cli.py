@@ -15,6 +15,7 @@ from .corpus import (
     read_hostnames_from_jsonl_dir,
     read_hostnames_from_txt_dir,
 )
+from .csv_io import iter_malicious_csv_rows, read_malicious_csv_map, write_score_csv
 from .io import load_model, ModelBundle, save_model
 from .line_io import read_nonempty_lines, read_parallel_lines
 from .cone import ConePartition
@@ -50,16 +51,7 @@ def _read_parallel_lines(path: Path, expected_len: int, *, field_name: str) -> L
 
 
 def _read_malicious_csv(path: Path) -> Dict[str, List[str]]:
-    out: Dict[str, List[str]] = {}
-    for line in path.read_text(errors="ignore").splitlines():
-        if not line.strip() or line.lower().startswith("hostname"):
-            continue
-        parts = [p.strip() for p in line.split(",")]
-        if len(parts) < 2:
-            continue
-        host, family = parts[0], parts[1]
-        out.setdefault(family, []).append(host)
-    return out
+    return read_malicious_csv_map(path)
 
 
 def _apply_normalization(hosts: List[str]) -> List[str]:
@@ -162,15 +154,10 @@ def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_pat
 def cmd_train_caho(args: argparse.Namespace) -> None:
     benign_hosts = _read_lines(args.benign)
     benign_samples = [Sample(h, is_malicious=False, family=None) for h in benign_hosts]
-    malicious_samples = []
-    for line in args.malicious.read_text(errors="ignore").splitlines():
-        if not line.strip() or line.lower().startswith("hostname"):
-            continue
-        parts = [p.strip() for p in line.split(",")]
-        if len(parts) < 2:
-            continue
-        host, family = parts[0], parts[1]
-        malicious_samples.append(Sample(host, is_malicious=True, family=family))
+    malicious_samples = [
+        Sample(host, is_malicious=True, family=family)
+        for host, family in iter_malicious_csv_rows(args.malicious)
+    ]
 
     samples = benign_samples + malicious_samples
     if not args.no_normalize:
@@ -341,15 +328,14 @@ def cmd_score(args: argparse.Namespace) -> None:
         row_thresholds = np.full(len(scores), threshold, dtype=np.float64)
     preds = scores > row_thresholds
 
-    with args.output.open("w") as f:
-        if groups is None:
-            f.write("hostname,score,prediction\n")
-            for h, s, p in zip(hostnames, scores, preds):
-                f.write(f"{h},{s:.6f},{int(p)}\n")
-        else:
-            f.write("hostname,calibration_group,threshold,score,prediction\n")
-            for h, g, t, s, p in zip(hostnames, groups, row_thresholds, scores, preds):
-                f.write(f"{h},{g},{t:.6f},{s:.6f},{int(p)}\n")
+    write_score_csv(
+        args.output,
+        hostnames,
+        scores,
+        preds,
+        groups=groups,
+        thresholds=row_thresholds if groups is not None else None,
+    )
     print(f"Wrote scores to {args.output}")
 
 

@@ -10,6 +10,7 @@ import numpy as np
 
 from ccd.config import CCDConfig
 from ccd.cone import ConePartition
+from ccd.csv_io import read_malicious_csv_map
 from ccd.encoder import CahoEncoder
 from ccd.io import ModelBundle, save_model
 from ccd.priors import build_benign_prior, build_malicious_priors
@@ -21,17 +22,7 @@ def read_lines(path: Path) -> List[str]:
 
 
 def read_malicious_csv(path: Path) -> Dict[str, List[str]]:
-    # CSV with columns: hostname,family
-    out: Dict[str, List[str]] = {}
-    for line in path.read_text(errors="ignore").splitlines():
-        if not line.strip() or line.lower().startswith("hostname"):
-            continue
-        parts = [p.strip() for p in line.split(",")]
-        if len(parts) < 2:
-            continue
-        host, family = parts[0], parts[1]
-        out.setdefault(family, []).append(host)
-    return out
+    return read_malicious_csv_map(path)
 
 
 def apply_normalization(hosts: List[str]) -> List[str]:
