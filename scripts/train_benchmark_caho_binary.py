@@ -69,6 +69,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Directory for improved intermediate model checkpoints. Defaults to OUT's run directory/checkpoints.",
     )
+    parser.add_argument(
+        "--validation-root",
+        type=Path,
+        default=None,
+        help="Optional validation-only benchmark root for Appendix C fixed-FPR model selection.",
+    )
+    parser.add_argument("--validation-max-rows", type=int, default=None, help="Debug only: limit validation rows.")
+    parser.add_argument("--validation-target-fpr", type=float, default=1e-4)
+    parser.add_argument(
+        "--restore-best-validation",
+        action="store_true",
+        help="Save the epoch with best validation TPR at --validation-target-fpr instead of the final epoch.",
+    )
     parser.add_argument("--max-rows", type=int, default=None, help="Debug only: limit rows loaded by the benchmark Dataset.")
     parser.add_argument("--max-steps", type=int, default=None, help="Debug only: stop after this many optimizer steps.")
     return parser
@@ -81,6 +94,10 @@ def validate_args(args: argparse.Namespace) -> argparse.Namespace:
             "the Appendix C binary trainer requires supervised orbit labels in the "
             "contrastive loss. Omit --grad-cache for paper-aligned binary training."
         )
+    if not 0.0 < float(args.validation_target_fpr) < 1.0:
+        raise RuntimeError("--validation-target-fpr must be in (0, 1).")
+    if args.restore_best_validation and args.validation_root is None:
+        raise RuntimeError("--restore-best-validation requires --validation-root.")
     return args
 
 
@@ -112,6 +129,16 @@ def main() -> None:
         max_rows=args.max_rows,
         seed=args.seed,
     )
+    validation_dataset = None
+    if args.validation_root is not None:
+        validation_dataset = BenchmarkCAHOViewDataset(
+            args.validation_root,
+            normalize_text=args.normalize_text,
+            augmenter=augmenter,
+            include_original=True,
+            max_rows=args.validation_max_rows,
+            seed=args.seed,
+        )
     config = BenchmarkTrainingConfig(
         root=str(args.root),
         model=args.model,
@@ -145,6 +172,9 @@ def main() -> None:
         checkpoint_every_steps=args.checkpoint_every_steps,
         checkpoint_dir=str(args.checkpoint_dir or (args.out.parent / "checkpoints")),
         seed=args.seed,
+        validation_root=None if args.validation_root is None else str(args.validation_root),
+        validation_target_fpr=args.validation_target_fpr,
+        restore_best_validation=args.restore_best_validation,
     )
     trainer = BenchmarkBinaryContrastiveTrainer(
         model,
@@ -173,7 +203,13 @@ def main() -> None:
         checkpoint_config=config,
         seed=args.seed,
     )
-    summary = trainer.fit(dataset, epochs=args.epochs)
+    summary = trainer.fit(
+        dataset,
+        epochs=args.epochs,
+        validation_dataset=validation_dataset,
+        validation_target_fpr=args.validation_target_fpr,
+        restore_best_validation=args.restore_best_validation,
+    )
     trainer.save(args.out, config, summary)
     print(f"Saved benchmark CAHO+binary model to {args.out}")
     print(summary)

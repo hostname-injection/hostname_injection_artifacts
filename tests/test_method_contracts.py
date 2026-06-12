@@ -53,6 +53,7 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["caho_training_support"]["general_supcon_view_alignment"] is True
     assert report["derived"]["caho_training_support"]["benign_orbit_labels_preserve_diversity"] is True
     assert report["derived"]["caho_training_support"]["l2_normalized_binary_inputs"] is True
+    assert report["derived"]["caho_training_support"]["validation_only_model_selection_supported"] is True
     assert report["derived"]["caho_training_support"]["deterministic_training_seed_supported"] is True
     assert report["derived"]["caho_training_support"]["adamw_weight_decay_default"] == 0.01
     assert report["derived"]["caho_training_support"]["benchmark_binary_training_script_defaults"] == {

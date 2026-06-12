@@ -195,6 +195,18 @@ fail closed. This binary-head trainer intentionally rejects `--grad-cache`
 because the Appendix C objective requires supervised orbit labels inside the
 contrastive loss; GradCache remains available on the regular pairwise CAHO
 trainers.
+For paper-style model selection, pass a validation-only benchmark root and
+select the checkpoint by validation TPR at the target false-positive rate:
+
+```bash
+python scripts/train_benchmark_caho_binary.py \
+  --root HostnameCommandInjectionBenchmark/train \
+  --validation-root HostnameCommandInjectionBenchmark/validation \
+  --validation-target-fpr 1e-4 \
+  --restore-best-validation \
+  --out caho_model_checkpoint
+```
+
 All CAHO training entry points accept `--seed` (or `--caho-seed` for
 `train-user-logins`) and default to `13`; benchmark training reports record the
 seed so augmentation/order replay is explicit.

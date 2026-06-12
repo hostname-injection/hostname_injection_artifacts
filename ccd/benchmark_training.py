@@ -7,6 +7,8 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
+import numpy as np
+
 from .augment import AugmentConfig, CAHOAugmenter, WeightedAugmentConfig
 from .benchmark_dataset import (
     BenchmarkFamily,
@@ -14,6 +16,7 @@ from .benchmark_dataset import (
     BenchmarkTextField,
     HostnameCommandInjectionBenchmarkDataset,
 )
+from .calibration import calibrate_threshold
 from .preprocess import normalize_hostname
 from .train import (
     ContrastiveLoss,
@@ -59,6 +62,9 @@ class BenchmarkTrainingConfig:
     checkpoint_every_steps: int = 5000
     checkpoint_dir: Optional[str] = None
     seed: Optional[int] = 13
+    validation_root: Optional[str] = None
+    validation_target_fpr: float = 1e-4
+    restore_best_validation: bool = False
 
 
 class BenchmarkCAHOViewDataset:
@@ -407,7 +413,15 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
             torch.nn.Linear(hidden_dim, 1),
         )
 
-    def fit(self, dataset: BenchmarkCAHOViewDataset, *, epochs: int = 1) -> Dict[str, Any]:
+    def fit(
+        self,
+        dataset: BenchmarkCAHOViewDataset,
+        *,
+        epochs: int = 1,
+        validation_dataset: Optional[BenchmarkCAHOViewDataset] = None,
+        validation_target_fpr: float = 1e-4,
+        restore_best_validation: bool = False,
+    ) -> Dict[str, Any]:
         import torch
         import torch.nn.functional as F
         from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -465,6 +479,10 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
         total_contrastive = 0.0
         total_binary = 0.0
         recent_losses = deque(maxlen=self.checkpoint_every_steps or 1)
+        validation_history: list[dict[str, Any]] = []
+        best_validation: Optional[dict[str, Any]] = None
+        best_validation_state: Optional[dict[str, dict[str, Any]]] = None
+        stopped_early = False
         for _epoch in range(epochs):
             if hasattr(dataset, "set_epoch"):
                 dataset.set_epoch(_epoch)
@@ -508,8 +526,131 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
                         train_summary=_training_summary(steps, total_loss, total_contrastive, total_binary),
                     )
                 if self.max_steps is not None and steps >= self.max_steps:
-                    return _training_summary(steps, total_loss, total_contrastive, total_binary)
-        return _training_summary(steps, total_loss, total_contrastive, total_binary)
+                    stopped_early = True
+                    break
+
+            if validation_dataset is not None:
+                validation_report = self.evaluate_fixed_fpr(
+                    validation_dataset,
+                    target_fpr=validation_target_fpr,
+                )
+                validation_report["epoch"] = _epoch + 1
+                validation_history.append(validation_report)
+                if validation_report.get("status") == "pass":
+                    current_metric = float(validation_report["tpr_at_target_fpr"])
+                    if best_validation is None or current_metric > float(best_validation["tpr_at_target_fpr"]):
+                        best_validation = dict(validation_report)
+                        if restore_best_validation:
+                            best_validation_state = self._capture_model_selection_state()
+
+            if stopped_early:
+                break
+
+        summary: Dict[str, Any] = _training_summary(steps, total_loss, total_contrastive, total_binary)
+        if validation_history:
+            if restore_best_validation and best_validation_state is not None:
+                self._restore_model_selection_state(best_validation_state)
+            summary["validation_model_selection"] = {
+                "metric": "tpr_at_target_fpr",
+                "target_fpr": float(validation_target_fpr),
+                "best_epoch": None if best_validation is None else int(best_validation["epoch"]),
+                "best_validation_tpr_at_target_fpr": None
+                if best_validation is None
+                else float(best_validation["tpr_at_target_fpr"]),
+                "restored_best_validation_checkpoint": bool(restore_best_validation and best_validation_state is not None),
+                "history": validation_history,
+            }
+        return summary
+
+    def evaluate_fixed_fpr(
+        self,
+        dataset: BenchmarkCAHOViewDataset,
+        *,
+        target_fpr: float = 1e-4,
+    ) -> dict[str, Any]:
+        import torch
+        import torch.nn.functional as F
+        from torch.utils.data import DataLoader
+
+        if self.classifier is None:
+            raise ValueError("classifier must be initialized before validation evaluation")
+        if not 0.0 < float(target_fpr) < 1.0:
+            raise ValueError("target_fpr must be in (0, 1)")
+
+        model_was_training = bool(getattr(self.model, "training", False))
+        classifier_was_training = bool(getattr(self.classifier, "training", False))
+        self.model.eval()
+        self.classifier.eval()
+        scores: list[float] = []
+        labels_out: list[int] = []
+        loader = DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            collate_fn=_collate_views,
+            num_workers=self.num_workers,
+            pin_memory=next(self.model.parameters()).device.type == "cuda",
+        )
+        with torch.no_grad():
+            for v1, _v2, labels in loader:
+                embeddings = F.normalize(self._embed_view(v1), dim=1)
+                logits = self.classifier(embeddings).squeeze(-1)
+                scores.extend(torch.sigmoid(logits).detach().cpu().numpy().astype(float).tolist())
+                labels_out.extend(labels.detach().cpu().numpy().astype(int).tolist())
+
+        if model_was_training:
+            self.model.train()
+        if classifier_was_training:
+            self.classifier.train()
+
+        score_arr = np.asarray(scores, dtype=np.float64)
+        label_arr = np.asarray(labels_out, dtype=np.int64)
+        benign_scores = score_arr[label_arr == 0]
+        positive_scores = score_arr[label_arr == 1]
+        if benign_scores.size == 0 or positive_scores.size == 0:
+            return {
+                "status": "unavailable",
+                "reason": "validation set must contain at least one benign and one positive row",
+                "target_fpr": float(target_fpr),
+                "n_validation_rows": int(score_arr.size),
+                "n_validation_benign": int(benign_scores.size),
+                "n_validation_positive": int(positive_scores.size),
+            }
+
+        threshold = float(calibrate_threshold(benign_scores, alpha=float(target_fpr)))
+        predictions = score_arr > threshold
+        benign = label_arr == 0
+        positive = label_arr == 1
+        fp = int(np.sum(predictions & benign))
+        tp = int(np.sum(predictions & positive))
+        return {
+            "status": "pass",
+            "target_fpr": float(target_fpr),
+            "threshold": threshold,
+            "n_validation_rows": int(score_arr.size),
+            "n_validation_benign": int(np.sum(benign)),
+            "n_validation_positive": int(np.sum(positive)),
+            "false_positives": fp,
+            "true_positives": tp,
+            "observed_fpr": fp / max(int(np.sum(benign)), 1),
+            "tpr_at_target_fpr": tp / max(int(np.sum(positive)), 1),
+        }
+
+    def _capture_model_selection_state(self) -> dict[str, dict[str, Any]]:
+        assert self.classifier is not None
+        return {
+            "model": {key: value.detach().cpu().clone() for key, value in self.model.state_dict().items()},
+            "classifier": {
+                key: value.detach().cpu().clone()
+                for key, value in self.classifier.state_dict().items()
+            },
+        }
+
+    def _restore_model_selection_state(self, state: Mapping[str, Mapping[str, Any]]) -> None:
+        assert self.classifier is not None
+        device = next(self.model.parameters()).device
+        self.model.load_state_dict({key: value.to(device) for key, value in state["model"].items()})
+        self.classifier.load_state_dict({key: value.to(device) for key, value in state["classifier"].items()})
 
     def _should_checkpoint(self, steps: int, recent_losses) -> bool:
         return (

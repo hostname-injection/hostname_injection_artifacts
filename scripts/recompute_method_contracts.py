@@ -211,9 +211,11 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
     dataset_getitem = inspect.getsource(BenchmarkCAHOViewDataset.__getitem__)
     dataset_init_signature = inspect.signature(BenchmarkCAHOViewDataset)
     trainer_init_signature = inspect.signature(BenchmarkContrastiveTrainer)
+    binary_fit_signature = inspect.signature(BenchmarkBinaryContrastiveTrainer.fit)
     general_trainer_fit = inspect.getsource(CAHOTrainer.fit)
     supcon_source = inspect.getsource(supcon_loss)
     trainer_fit = inspect.getsource(BenchmarkBinaryContrastiveTrainer.fit)
+    trainer_eval = inspect.getsource(BenchmarkBinaryContrastiveTrainer.evaluate_fixed_fpr)
     report_source = inspect.getsource(BenchmarkBinaryContrastiveTrainer.save.__globals__["_write_report"])
     trainer_loss = inspect.getsource(BenchmarkContrastiveTrainer._contrastive_loss)
     trainer_save = inspect.getsource(BenchmarkBinaryContrastiveTrainer.save)
@@ -245,6 +247,13 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must fail closed for GradCache supervised-orbit mismatch")
     if "binary_cross_entropy_with_logits" not in trainer_fit:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must train a binary auxiliary head")
+    for param in ("validation_dataset", "validation_target_fpr", "restore_best_validation"):
+        if param not in binary_fit_signature.parameters:
+            raise ValueError(f"BenchmarkBinaryContrastiveTrainer.fit must expose {param} for validation-only model selection")
+    if "evaluate_fixed_fpr" not in trainer_fit or "validation_model_selection" not in trainer_fit:
+        raise ValueError("BenchmarkBinaryContrastiveTrainer must record validation-only fixed-FPR model selection")
+    if "calibrate_threshold" not in trainer_eval or "tpr_at_target_fpr" not in trainer_eval:
+        raise ValueError("BenchmarkBinaryContrastiveTrainer validation selection must use fixed-FPR calibration")
     if "torch.optim.AdamW" not in trainer_fit:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must use AdamW")
     if "weight_decay=self.weight_decay" not in trainer_fit:
@@ -292,6 +301,12 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         )
     if getattr(parser_defaults, "require_cuda", None) is not False:
         raise ValueError("train_benchmark_caho_binary.py must default to portable CPU/auto debug execution")
+    if getattr(parser_defaults, "validation_root", "missing") is not None:
+        raise ValueError("train_benchmark_caho_binary.py validation selection must be opt-in")
+    if float(getattr(parser_defaults, "validation_target_fpr", 0.0)) != 1e-4:
+        raise ValueError("train_benchmark_caho_binary.py validation target FPR must default to 1e-4")
+    if getattr(parser_defaults, "restore_best_validation", None) is not False:
+        raise ValueError("train_benchmark_caho_binary.py must not restore a validation checkpoint unless requested")
     if not callable(getattr(train_script, "validate_args", None)):
         raise ValueError("train_benchmark_caho_binary.py must expose validate_args")
     try:
@@ -313,6 +328,7 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         "adamw_supported": True,
         "adamw_weight_decay_default": default_weight_decay,
         "l2_normalized_binary_inputs": True,
+        "validation_only_model_selection_supported": True,
         "contrastive_loss_supported": True,
         "supervised_orbit_contrastive_supported": True,
         "general_supcon_view_alignment": True,
