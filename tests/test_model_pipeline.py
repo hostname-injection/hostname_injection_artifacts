@@ -165,6 +165,41 @@ def test_refresh_benign_reference_requires_groups_for_grouped_model():
     assert model.grouped_thresholds is old_grouped
 
 
+def test_refresh_benign_reference_rolls_back_group_calibration_failures():
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.95, 0.05], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=9.0,
+        grouped_thresholds={"tenant-a": {"threshold": 9.0}},
+    )
+    query = np.array([[0.0, 1.0]], dtype=np.float32)
+    old_prior = model.benign_prior.copy()
+    old_threshold = model.threshold
+    old_grouped = model.grouped_thresholds
+    old_score = float(model.score_embeddings(query)[0])
+    benign_window = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32)
+
+    try:
+        model.refresh_benign_reference(
+            benign_window,
+            alpha=0.5,
+            calibration_groups=["tenant-a"],
+        )
+    except ValueError as exc:
+        assert "same length" in str(exc)
+    else:
+        raise AssertionError("grouped refresh with mismatched groups should fail")
+
+    assert np.allclose(model.benign_prior, old_prior)
+    assert model.threshold == old_threshold
+    assert model.grouped_thresholds is old_grouped
+    assert float(model.score_embeddings(query)[0]) == old_score
+
+
 def test_refresh_benign_reference_can_explicitly_drop_grouped_thresholds():
     cones = _identity_cones()
     model = CCDModel(

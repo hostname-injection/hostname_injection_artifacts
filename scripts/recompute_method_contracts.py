@@ -11,6 +11,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -20,8 +22,9 @@ from ccd.benchmark_training import BenchmarkBinaryContrastiveTrainer, BenchmarkC
 from ccd.calibration import calibrate_thresholds_by_group, threshold_for_group
 from ccd.certify import enumerate_edit_ball, randomized_smoothing_certificate
 from ccd.cone import ConePartition
-from ccd.config import CCDConfig
+from ccd.config import CCDConfig, ConeConfig, EncoderConfig
 from ccd.edit_model import DEFAULT_EDITS, EDIT_MANIFEST_VERSION, EditModel
+from ccd.encoder import CahoEncoder
 from ccd.io import MODEL_FORMAT_VERSION, ModelBundle
 from ccd.line_io import read_parallel_lines
 from ccd.model import CCDModel
@@ -348,6 +351,8 @@ def validate_code_path_evidence() -> dict[str, bool]:
     refresh_source = inspect.getsource(CCDModel.refresh_benign_reference)
     if "calibration_groups are required" not in refresh_source or "drop_grouped_thresholds" not in refresh_source:
         raise ValueError("grouped benign refresh must fail closed unless replacement groups or an explicit drop are provided")
+    if "_coerce_benign_embeddings" not in refresh_source or "except Exception" not in refresh_source:
+        raise ValueError("grouped benign refresh must roll back partial P_B/threshold updates on calibration failure")
     explain_signature = inspect.signature(CCDModel.explain)
     for param in ("calibration_groups", "missing_group_threshold"):
         if param not in explain_signature.parameters:
@@ -394,6 +399,36 @@ def validate_code_path_evidence() -> dict[str, bool]:
                 raise
         else:
             raise ValueError("group metadata files must reject empty group ids")
+    cone_config = ConeConfig(dim=2, num_cones=2, active_cones=1, temperature=1.0, use_lsh=False)
+    cones = ConePartition.build(cone_config, axes=np.eye(2, dtype=np.float32))
+    refresh_model = CCDModel(
+        config=CCDConfig(cone=cone_config),
+        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+        cones=cones,
+        benign_prior=np.array([0.95, 0.05], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=9.0,
+        grouped_thresholds={"tenant-a": {"threshold": 9.0}},
+    )
+    old_prior = refresh_model.benign_prior.copy()
+    old_threshold = refresh_model.threshold
+    old_grouped = refresh_model.grouped_thresholds
+    try:
+        refresh_model.refresh_benign_reference(
+            np.array([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32),
+            alpha=0.5,
+            calibration_groups=["tenant-a"],
+        )
+    except ValueError:
+        pass
+    else:
+        raise ValueError("grouped refresh with mismatched groups must fail")
+    if (
+        not np.allclose(refresh_model.benign_prior, old_prior)
+        or refresh_model.threshold != old_threshold
+        or refresh_model.grouped_thresholds is not old_grouped
+    ):
+        raise ValueError("failed grouped refresh must leave P_B, threshold, and grouped thresholds unchanged")
     certify_signature = inspect.signature(CCDModel.certify)
     for param in ("method", "sketch_lipschitz", "embedding_rotation_bound"):
         if param not in certify_signature.parameters:
@@ -448,6 +483,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "benign_reference_refresh_available": True,
         "grouped_threshold_refresh_available": True,
         "grouped_refresh_requires_groups_or_explicit_drop": True,
+        "grouped_refresh_rolls_back_on_calibration_failure": True,
         "refresh_updates_pb_and_threshold_only": True,
     }
 

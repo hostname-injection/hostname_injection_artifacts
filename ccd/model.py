@@ -369,6 +369,12 @@ class CCDModel:
         configuration remain fixed. This is the drift-refresh operation
         described in the paper; it is intentionally narrower than retraining.
         """
+        benign_embeddings = self._coerce_benign_embeddings(benign_embeddings)
+        self.benign_prior = build_benign_prior(benign_embeddings, self.cones, self.config.prior)
+        self._invalidate_prior_caches()
+        return self.benign_prior
+
+    def _coerce_benign_embeddings(self, benign_embeddings: np.ndarray) -> np.ndarray:
         try:
             import torch
 
@@ -388,9 +394,7 @@ class CCDModel:
                 "benign_embeddings dimension does not match cone axes: "
                 f"{benign_embeddings.shape[1]} != {self.cones.axes.shape[1]}"
             )
-        self.benign_prior = build_benign_prior(benign_embeddings, self.cones, self.config.prior)
-        self._invalidate_prior_caches()
-        return self.benign_prior
+        return benign_embeddings
 
     def refresh_benign_reference(
         self,
@@ -421,21 +425,33 @@ class CCDModel:
                 "refreshed global threshold."
             )
         old_benign_prior = self.benign_prior.copy()
-        self.update_benign_prior(benign_embeddings)
-        scores = self.score_embeddings(
-            benign_embeddings,
-            approximate=approximate,
-            approximate_k=approximate_k,
-        )
-        threshold = calibrate_threshold(scores, alpha_value)
+        benign_embeddings = self._coerce_benign_embeddings(benign_embeddings)
+        new_benign_prior = build_benign_prior(benign_embeddings, self.cones, self.config.prior)
+
+        self.benign_prior = new_benign_prior
+        self._invalidate_prior_caches()
+        try:
+            scores = self.score_embeddings(
+                benign_embeddings,
+                approximate=approximate,
+                approximate_k=approximate_k,
+            )
+            threshold = calibrate_threshold(scores, alpha_value)
+            grouped_thresholds = (
+                calibrate_thresholds_by_group(scores, calibration_groups, alpha_value)
+                if calibration_groups is not None
+                else None
+            )
+        except Exception:
+            self.benign_prior = old_benign_prior
+            self.threshold = old_threshold
+            self.grouped_thresholds = old_grouped_thresholds
+            self._invalidate_prior_caches()
+            raise
+
         self.threshold = threshold
-        grouped_thresholds = None
         grouped_thresholds_dropped = old_grouped_thresholds is not None and calibration_groups is None
-        if calibration_groups is not None:
-            grouped_thresholds = calibrate_thresholds_by_group(scores, calibration_groups, alpha_value)
-            self.grouped_thresholds = grouped_thresholds
-        else:
-            self.grouped_thresholds = None
+        self.grouped_thresholds = grouped_thresholds
         return {
             "alpha": alpha_value,
             "num_samples": int(len(scores)),

@@ -668,7 +668,9 @@ frozen. Omit `--groups` for a global-only refresh only when the input model is
 not already carrying grouped thresholds. If the input model has tenant/window
 grouped thresholds, `ccd refresh-benign` requires replacement `--groups` and
 fails closed unless `--drop-grouped-thresholds` is passed to explicitly discard
-those grouped thresholds.
+those grouped thresholds. Refresh is transactional: if recalibration or grouped
+threshold validation fails, the in-memory model keeps the previous `P_B`,
+global threshold, and grouped thresholds.
 
 ## Data Formats
 
