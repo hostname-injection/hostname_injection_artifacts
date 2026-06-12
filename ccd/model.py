@@ -618,6 +618,7 @@ class CCDModel:
         if torch is not None and isinstance(embeddings, torch.Tensor):
             if embeddings.ndim == 1:
                 embeddings = embeddings.unsqueeze(0)
+            embeddings = torch.nn.functional.normalize(embeddings.float(), p=2, dim=1)
             cache = self._get_torch_cache(embeddings.device)
             sims = embeddings @ cache["axes"].T
             idx = torch.argmax(sims, dim=1)
@@ -626,6 +627,7 @@ class CCDModel:
 
         if embeddings.ndim == 1:
             embeddings = embeddings.reshape(1, -1)
+        embeddings = l2_normalize(np.asarray(embeddings, dtype=np.float32), axis=1)
         scores = self._get_fast_cone_scores()
         sims = embeddings @ self.cones.axes.T
         idx = np.argmax(sims, axis=1)

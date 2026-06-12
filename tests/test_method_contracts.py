@@ -24,6 +24,7 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["ccd_defaults"]["num_cones"] == 4096
     assert report["derived"]["ccd_defaults"]["active_cones"] == 8
     assert report["derived"]["code_path_evidence"]["eq1_logsumexp_score_path_available"] is True
+    assert report["derived"]["code_path_evidence"]["score_paths_normalize_unit_embeddings"] is True
     assert report["derived"]["code_path_evidence"]["exact_score_bypasses_lsh_by_default"] is True
     assert report["derived"]["code_path_evidence"]["grouped_split_conformal_calibration_available"] is True
     assert report["derived"]["code_path_evidence"]["tenant_window_threshold_resolution_available"] is True

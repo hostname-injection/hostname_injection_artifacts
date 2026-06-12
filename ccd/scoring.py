@@ -6,7 +6,7 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 import numpy as np
 
 from .cone import ConePartition
-from .utils import stable_log, softmax
+from .utils import l2_normalize, stable_log, softmax
 
 
 def _logsumexp(values: np.ndarray, axis=None) -> np.ndarray:
@@ -164,6 +164,7 @@ def ccd_scores_logpriors_topk(
     effective_count = _validate_effective_count(effective_count)
     if embeddings.ndim == 1:
         embeddings = embeddings.reshape(1, -1)
+    embeddings = l2_normalize(np.asarray(embeddings, dtype=np.float32), axis=1)
     num_cones = axes.shape[0]
     k = max(1, min(int(k), num_cones))
 
@@ -207,8 +208,9 @@ def ccd_scores_torch(
     if embeddings.ndim == 1:
         embeddings = embeddings.unsqueeze(0)
 
-    if embeddings.dtype in (torch.float16, torch.bfloat16):
+    if embeddings.dtype != torch.float32:
         embeddings = embeddings.float()
+    embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
 
     if axes.dtype != torch.float32:
         axes = axes.float()

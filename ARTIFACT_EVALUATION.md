@@ -151,7 +151,8 @@ preservation, binary auxiliary loss over both L2-normalized CAHO views,
 fail-closed GradCache handling for the supervised binary trainer, and explicit AdamW
 weight decay, Appendix C CAHO deployed-recipe defaults in the benchmark binary
 trainer, exact full-axis scanning for the deployed top-R cone sketch that
-bypasses LSH by default for calibration/certification, calibrated-margin certificates with
+bypasses LSH by default for calibration/certification, unit-embedding normalization
+across exact, torch, top-k, and fast scoring paths, calibrated-margin certificates with
 deterministic enumeration fallback, benign-only P_B/threshold refresh, and
 global/grouped calibrated-threshold bundle persistence. The paper-claim coverage script validated 33 coverage items
 covering five contributions, Eq. 1, Proposition 5.1, Lemma C.1, Figures 1-7,

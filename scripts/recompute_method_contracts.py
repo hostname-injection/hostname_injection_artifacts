@@ -382,12 +382,29 @@ def validate_code_path_evidence() -> dict[str, bool]:
         raise ValueError("ConePartition.cone_sketch must bypass LSH by default for exact scoring")
     cone_sketch_source = inspect.getsource(ConePartition.cone_sketch)
     nearest_axes_source = inspect.getsource(ConePartition.nearest_axes)
+    torch_score_source = inspect.getsource(CCDModel._score_embeddings_torch)
+    topk_score_source = inspect.getsource(CCDModel._score_embeddings_topk)
+    fast_score_source = inspect.getsource(CCDModel._score_embeddings_fast)
+    vector_score_source = inspect.getsource(ccd_score_logpriors.__globals__["ccd_scores_logpriors_topk"])
+    torch_kernel_source = inspect.getsource(ccd_score_logpriors.__globals__["ccd_scores_torch"])
     if "nearest_axes" not in cone_sketch_source or "use_lsh=use_lsh" not in cone_sketch_source:
         raise ValueError("ConePartition.cone_sketch must route through nearest_axes with explicit LSH control")
     if "self.axes @ u" not in nearest_axes_source:
         raise ValueError("ConePartition.nearest_axes must support exact full-axis scan fallback")
+    for name, source in (
+        ("torch score path", torch_kernel_source),
+        ("vector top-k score path", vector_score_source),
+        ("model fast score path", fast_score_source),
+    ):
+        if "normalize" not in source and "l2_normalize" not in source:
+            raise ValueError(f"{name} must normalize embeddings onto the unit sphere")
+    if "ccd_scores_torch" not in torch_score_source:
+        raise ValueError("CCDModel._score_embeddings_torch must route through the normalized torch score kernel")
+    if "ccd_scores_logpriors_topk" not in topk_score_source:
+        raise ValueError("CCDModel._score_embeddings_topk must route through the normalized vector top-k score path")
     return {
         "eq1_logsumexp_score_path_available": True,
+        "score_paths_normalize_unit_embeddings": True,
         "mixture_weights_normalized": True,
         "split_conformal_calibration_available": True,
         "grouped_split_conformal_calibration_available": True,
