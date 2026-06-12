@@ -5,6 +5,8 @@ import argparse
 import subprocess
 import sys
 
+from ccd.train import CAHO_94GB_GRAD_CACHE_CHUNK_SIZE
+
 
 def _build_command(args) -> list[str]:
     cmd = [
@@ -99,7 +101,7 @@ def main() -> int:
     parser.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     parser.add_argument("--out", required=True)
     parser.add_argument("--epochs", type=int, default=1)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--temperature", type=float, default=0.07)
     parser.add_argument("--loss", choices=["supcon", "contrastive"], default="supcon")
@@ -111,7 +113,7 @@ def main() -> int:
     parser.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     parser.add_argument("--min-lr", type=float, default=1e-5)
     parser.add_argument("--grad-cache", action="store_true")
-    parser.add_argument("--grad-cache-chunk-size", type=int, default=128)
+    parser.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     parser.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     parser.add_argument("--contrastive-max-scale", type=float, default=100.0)
     parser.add_argument("--contrastive-min-scale", type=float, default=1.0)

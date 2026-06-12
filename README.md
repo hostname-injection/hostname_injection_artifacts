@@ -180,15 +180,19 @@ ccd train-caho \
   --loss contrastive \
   --augmenter weighted \
   --grad-cache \
-  --grad-cache-chunk-size 128
+  --batch-size 49152 \
+  --grad-cache-chunk-size 8192
 ```
 
 The deployed-style benchmark trainer with the binary auxiliary head is exposed
 by `scripts/train_benchmark_caho_binary.py`; it trains the same two-view CAHO
 path with supervised orbit contrastive loss, explicit AdamW weight decay, and
 an L2-normalized binary classifier head over both CAHO views. Its defaults
-match the Appendix C deployed recipe (`lr=1e-4`, weight decay `1e-2`, batch
-size `256`, up to `50` epochs). For a local parser/training-loop smoke on
+target a 94 GB CUDA card for the actual non-GradCache objective
+(`batch_size=16384`) while retaining the Appendix C optimizer recipe
+(`lr=1e-4`, weight decay `1e-2`, up to `50` epochs). Pass `--batch-size 256`
+when you need the literal Appendix C batch-size setting. For a local
+parser/training-loop smoke on
 commodity hardware, use `--device cpu --max-rows ... --max-steps ...`; use
 `--require-cuda` when replaying a GPU training run and you want CPU fallback to
 fail closed. This binary-head trainer intentionally rejects `--grad-cache`
@@ -232,8 +236,8 @@ ccd train-caho-corpus \
   --augmenter weighted \
   --contrastive-loss learnable \
   --grad-cache \
-  --grad-cache-chunk-size 128 \
-  --batch-size 8192 \
+  --grad-cache-chunk-size 8192 \
+  --batch-size 49152 \
   --epochs 20 \
   --num-workers 1 \
   --save-best \
@@ -256,8 +260,8 @@ python scripts/train_caho_corpus.py \
   --augmenter weighted \
   --contrastive-loss learnable \
   --grad-cache \
-  --grad-cache-chunk-size 128 \
-  --batch-size 8192 \
+  --grad-cache-chunk-size 8192 \
+  --batch-size 49152 \
   --epochs 20 \
   --num-workers 1 \
   --save-best \
@@ -752,9 +756,10 @@ scores = model.score(["example.com"], normalize=True)
   `P_M`, cone axes, encoder config, and scoring config remain fixed. Refresh
   windows must contain finite embeddings before `P_B` or thresholds are
   updated.
-- CCD model bundles fail closed on non-finite or shape-incompatible cone axes,
-  malformed prior arrays, invalid effective counts, and mixture weights that
-  do not match the serialized malicious priors before scoring or certification.
+- CCD model bundles and in-memory detectors fail closed on mismatched cone
+  configuration, non-unit or shape-incompatible cone axes, malformed prior
+  arrays, invalid effective counts, bad thresholds, and mixture weights that do
+  not match the serialized malicious priors before scoring or certification.
 - The edit model E1–E12 is implemented in `ccd/edit_model.py`; emitted
   stability certificates can use calibrated-margin bounds and otherwise use
   deterministic finite-edit closure. Certification inputs fail closed on

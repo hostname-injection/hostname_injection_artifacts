@@ -10,6 +10,7 @@ import numpy as np
 from .calibration import (
     calibrate_threshold,
     calibrate_thresholds_by_group,
+    coerce_finite_threshold,
     conformal_p_value,
     split_conformal_threshold_metadata,
     threshold_for_group,
@@ -42,6 +43,9 @@ class CCDModel:
     _log_malicious_priors: Optional[Dict[str, np.ndarray]] = field(default=None, init=False, repr=False)
     _torch_cache: Dict[str, Dict[str, Any]] = field(default_factory=dict, init=False, repr=False)
     _fast_cone_scores: Optional[np.ndarray] = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._validate_model_state()
 
     @classmethod
     def from_embeddings(
@@ -264,6 +268,89 @@ class CCDModel:
             embeddings = self.encoder.encode(hostnames, batch_size=batch_size, normalize=True)
 
         return self.score_embeddings(embeddings, approximate=approximate, approximate_k=approximate_k)
+
+    def _validate_model_state(self) -> None:
+        """Reject malformed in-memory detector state before it can score."""
+        if self.config.cone.to_dict() != self.cones.config.to_dict():
+            raise ValueError("model config cone must match cone partition config")
+
+        expected_shape = (int(self.config.cone.num_cones), int(self.config.cone.dim))
+        axes = np.asarray(self.cones.axes, dtype=np.float32)
+        if axes.ndim != 2 or axes.shape != expected_shape:
+            raise ValueError(
+                "cone axes shape must match model config: "
+                f"observed {axes.shape}, expected {expected_shape}"
+            )
+        if not np.isfinite(axes).all():
+            raise ValueError("cone axes must contain only finite values")
+        axis_norms = np.linalg.norm(axes, axis=1)
+        if not np.isfinite(axis_norms).all() or np.any(axis_norms <= 0.0):
+            raise ValueError("cone axes rows must have finite non-zero norms")
+        if not np.allclose(axis_norms, 1.0, rtol=1e-5, atol=1e-5):
+            raise ValueError("cone axes must be unit-normalized")
+        self.cones.axes = axes
+
+        self.benign_prior = self._validate_prior_vector(
+            self.benign_prior,
+            "benign_prior",
+            expected_shape[0],
+        )
+        if not self.malicious_priors:
+            raise ValueError("malicious_priors is empty; CCD requires at least one malicious prior.")
+        validated_malicious: Dict[str, np.ndarray] = {}
+        for name, prior in self.malicious_priors.items():
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("malicious_priors keys must be non-empty strings")
+            if name in validated_malicious:
+                raise ValueError("malicious_priors keys must be unique")
+            validated_malicious[name] = self._validate_prior_vector(
+                prior,
+                f"malicious_priors[{name!r}]",
+                expected_shape[0],
+            )
+        self.malicious_priors = validated_malicious
+
+        self._validate_scoring_config(list(validated_malicious))
+        if self.threshold is not None:
+            self.threshold = coerce_finite_threshold(self.threshold)
+        if self.grouped_thresholds is not None:
+            if not isinstance(self.grouped_thresholds, dict):
+                raise ValueError("grouped_thresholds must be an object")
+            for group in self.grouped_thresholds:
+                threshold_for_group(group, self.threshold, self.grouped_thresholds, missing="error")
+
+    @staticmethod
+    def _validate_prior_vector(prior: np.ndarray, name: str, expected_len: int) -> np.ndarray:
+        arr = np.asarray(prior, dtype=np.float64)
+        if arr.ndim != 1 or arr.shape[0] != expected_len:
+            raise ValueError(f"{name} must be a 1D prior with {expected_len} entries")
+        if not np.isfinite(arr).all():
+            raise ValueError(f"{name} must contain only finite values")
+        if np.any(arr < 0.0):
+            raise ValueError(f"{name} must be non-negative")
+        total = float(arr.sum())
+        if not math.isfinite(total) or total <= 0.0:
+            raise ValueError(f"{name} must have positive finite mass")
+        if not np.isclose(total, 1.0, rtol=1e-5, atol=1e-6):
+            raise ValueError(f"{name} must sum to 1.0")
+        return arr.astype(np.float32)
+
+    def _validate_scoring_config(self, malicious_names: Sequence[str]) -> None:
+        effective_count = float(self.config.scoring.effective_count)
+        if not math.isfinite(effective_count) or effective_count <= 0.0:
+            raise ValueError("scoring.effective_count must be finite and positive")
+        weights = dict(self.config.scoring.mixture_weights or {})
+        if weights:
+            weight_names = set(weights)
+            malicious_name_set = set(malicious_names)
+            missing = sorted(malicious_name_set - weight_names)
+            extra = sorted(weight_names - malicious_name_set)
+            if missing or extra:
+                raise ValueError(
+                    "scoring.mixture_weights must match malicious_priors exactly: "
+                    f"missing={missing}, extra={extra}"
+                )
+        mixture_log_weights(malicious_names, weights)
 
     def predict(
         self,

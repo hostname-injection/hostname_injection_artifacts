@@ -5,25 +5,36 @@ import argparse
 import os
 from pathlib import Path
 
-from sentence_transformers import SentenceTransformer
-
 from ccd.benchmark_training import (
+    CAHO_94GB_ACTUAL_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     BenchmarkCAHOViewDataset,
     BenchmarkContrastiveTrainer,
     BenchmarkTrainingConfig,
     build_augmenter,
+    resolve_caho_batch_size,
     resolve_device,
     save_encoder_only,
 )
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train regular CAHO over the full benchmark Dataset.")
     parser.add_argument("--root", type=Path, default=Path(os.environ.get("HIB_BENCHMARK_ROOT", "HostnameCommandInjectionBenchmark")))
     parser.add_argument("--model", default="caho_model_checkpoint")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--epochs", type=int, default=1)
-    parser.add_argument("--batch-size", type=int, default=8192)
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help=(
+            "Effective contrastive batch size. Defaults to "
+            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with --grad-cache and "
+            f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
+        ),
+    )
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--weight-decay", type=float, default=0.01)
     parser.add_argument("--temperature", type=float, default=0.07)
@@ -31,7 +42,7 @@ def main() -> None:
     parser.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     parser.add_argument("--min-lr", type=float, default=1e-5)
     parser.add_argument("--grad-cache", action="store_true")
-    parser.add_argument("--grad-cache-chunk-size", type=int, default=128)
+    parser.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--augmenter", choices=["edit", "weighted", "hybrid"], default="weighted")
@@ -48,11 +59,19 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=13, help="Deterministic seed for augmentation and training order.")
     parser.add_argument("--max-rows", type=int, default=None, help="Debug only: limit rows loaded by the benchmark Dataset.")
     parser.add_argument("--max-steps", type=int, default=None, help="Debug only: stop after this many optimizer steps.")
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
+    args.batch_size = resolve_caho_batch_size(args.batch_size, use_grad_cache=args.grad_cache)
 
     device = resolve_device(args.device)
     if device != "cuda":
         raise RuntimeError(f"CUDA training was requested, but resolved device is {device!r}.")
+
+    from sentence_transformers import SentenceTransformer
 
     model_path = str(args.out) if args.resume and args.out.exists() else args.model
     model = SentenceTransformer(model_path).to(device)

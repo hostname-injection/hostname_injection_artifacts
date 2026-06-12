@@ -9,6 +9,27 @@ import numpy as np
 from .augment import CAHOAugmenter
 
 
+CAHO_94GB_ACTUAL_BATCH_SIZE = 16_384
+CAHO_94GB_GRAD_CACHE_BATCH_SIZE = 49_152
+CAHO_94GB_GRAD_CACHE_CHUNK_SIZE = 8_192
+
+
+def resolve_caho_batch_size(batch_size: Optional[int], *, use_grad_cache: bool) -> int:
+    """Resolve CAHO training batch defaults for a 94 GB CUDA card.
+
+    The non-GradCache default keeps the full two-view contrastive graph resident
+    while leaving headroom for optimizer state. GradCache can use a larger
+    effective batch because encoder activations are replayed in chunks.
+    """
+    if batch_size is None:
+        value = CAHO_94GB_GRAD_CACHE_BATCH_SIZE if use_grad_cache else CAHO_94GB_ACTUAL_BATCH_SIZE
+    else:
+        value = int(batch_size)
+    if value <= 0:
+        raise ValueError("CAHO batch size must be positive")
+    return value
+
+
 @dataclass(frozen=True)
 class Sample:
     hostname: str
@@ -242,7 +263,7 @@ class CAHOTrainer:
     def __init__(
         self,
         model,
-        batch_size: int = 64,
+        batch_size: int = CAHO_94GB_ACTUAL_BATCH_SIZE,
         temperature: float = 0.07,
         lr: float = 2e-5,
         seed: Optional[int] = None,
@@ -319,14 +340,14 @@ class ContrastiveTrainer:
     def __init__(
         self,
         model,
-        batch_size: int = 1024,
+        batch_size: int = CAHO_94GB_ACTUAL_BATCH_SIZE,
         temperature: float = 0.1,
         lr: float = 5e-4,
         max_grad_norm: float = 1.0,
         scheduler: str = "cosine",
         min_lr: float = 1e-5,
         use_grad_cache: bool = False,
-        grad_cache_chunk_size: int = 128,
+        grad_cache_chunk_size: int = CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
         num_workers: int = 0,
         empty_cache: bool = False,
         loss_mode: str = "fixed",

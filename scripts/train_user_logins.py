@@ -9,7 +9,15 @@ from ccd.config import CCDConfig
 from ccd.encoder import CahoEncoder
 from ccd.io import save_model
 from ccd.augment import CAHOAugmenter, AugmentConfig, WeightedAugmentConfig
-from ccd.train import CAHODataset, CAHOTrainer, ContrastiveTrainer
+from ccd.train import (
+    CAHO_94GB_ACTUAL_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+    CAHODataset,
+    CAHOTrainer,
+    ContrastiveTrainer,
+    resolve_caho_batch_size,
+)
 from ccd.user_logins import (
     DEFAULT_HOSTNAME_COLUMN,
     DEFAULT_USER_LOGINS_COLUMN,
@@ -73,7 +81,16 @@ def main() -> None:
         help="Base SentenceTransformer model for CAHO fine-tuning",
     )
     parser.add_argument("--caho-epochs", type=int, default=1)
-    parser.add_argument("--caho-batch-size", type=int, default=64)
+    parser.add_argument(
+        "--caho-batch-size",
+        type=int,
+        default=None,
+        help=(
+            "Effective CAHO batch size. Defaults to "
+            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with --caho-grad-cache and "
+            f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
+        ),
+    )
     parser.add_argument("--caho-lr", type=float, default=2e-5)
     parser.add_argument("--caho-temperature", type=float, default=0.07)
     parser.add_argument("--caho-loss", choices=["supcon", "contrastive"], default="supcon")
@@ -85,7 +102,7 @@ def main() -> None:
     parser.add_argument("--caho-scheduler", choices=["cosine", "none"], default="cosine")
     parser.add_argument("--caho-min-lr", type=float, default=1e-5)
     parser.add_argument("--caho-grad-cache", action="store_true", help="Enable GradCache for CAHO training")
-    parser.add_argument("--caho-grad-cache-chunk-size", type=int, default=128)
+    parser.add_argument("--caho-grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     parser.add_argument("--caho-contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     parser.add_argument("--caho-contrastive-max-scale", type=float, default=100.0)
     parser.add_argument("--caho-contrastive-min-scale", type=float, default=1.0)
@@ -216,10 +233,14 @@ def main() -> None:
             include_original=args.caho_loss == "contrastive",
             seed=args.caho_seed,
         )
+        caho_batch_size = resolve_caho_batch_size(
+            args.caho_batch_size,
+            use_grad_cache=args.caho_grad_cache,
+        )
         if args.caho_loss == "contrastive":
             trainer = ContrastiveTrainer(
                 model,
-                batch_size=args.caho_batch_size,
+                batch_size=caho_batch_size,
                 temperature=args.caho_temperature,
                 lr=args.caho_lr,
                 max_grad_norm=args.caho_max_grad_norm,
@@ -240,7 +261,7 @@ def main() -> None:
         else:
             trainer = CAHOTrainer(
                 model,
-                batch_size=args.caho_batch_size,
+                batch_size=caho_batch_size,
                 temperature=args.caho_temperature,
                 lr=args.caho_lr,
                 seed=args.caho_seed,

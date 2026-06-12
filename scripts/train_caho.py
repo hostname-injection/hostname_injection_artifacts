@@ -9,7 +9,16 @@ from sentence_transformers import SentenceTransformer
 from ccd.augment import CAHOAugmenter, AugmentConfig, WeightedAugmentConfig
 from ccd.csv_io import iter_malicious_csv_rows
 from ccd.preprocess import normalize_hostname
-from ccd.train import CAHODataset, CAHOTrainer, ContrastiveTrainer, Sample
+from ccd.train import (
+    CAHO_94GB_ACTUAL_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+    CAHODataset,
+    CAHOTrainer,
+    ContrastiveTrainer,
+    Sample,
+    resolve_caho_batch_size,
+)
 
 
 def read_lines(path: Path):
@@ -39,7 +48,16 @@ def main() -> None:
     parser.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--epochs", type=int, default=1)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help=(
+            "Effective CAHO batch size. Defaults to "
+            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with --grad-cache and "
+            f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
+        ),
+    )
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--temperature", type=float, default=0.07)
     parser.add_argument("--loss", choices=["supcon", "contrastive"], default="supcon")
@@ -51,7 +69,7 @@ def main() -> None:
     parser.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     parser.add_argument("--min-lr", type=float, default=1e-5)
     parser.add_argument("--grad-cache", action="store_true", help="Enable GradCache for large batches")
-    parser.add_argument("--grad-cache-chunk-size", type=int, default=128)
+    parser.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     parser.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     parser.add_argument("--contrastive-max-scale", type=float, default=100.0)
     parser.add_argument("--contrastive-min-scale", type=float, default=1.0)
@@ -65,6 +83,7 @@ def main() -> None:
     parser.add_argument("--no-normalize", action="store_true", help="Skip hostname normalization")
     parser.add_argument("--seed", type=int, default=13, help="Deterministic seed for augmentation and training order")
     args = parser.parse_args()
+    args.batch_size = resolve_caho_batch_size(args.batch_size, use_grad_cache=args.grad_cache)
 
     benign_hosts = read_lines(args.benign)
     benign_samples = [Sample(h, is_malicious=False, family=None) for h in benign_hosts]

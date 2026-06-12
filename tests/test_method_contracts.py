@@ -30,6 +30,7 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["code_path_evidence"]["global_score_csv_thresholds_available"] is True
     assert report["derived"]["code_path_evidence"]["score_paths_normalize_unit_embeddings"] is True
     assert report["derived"]["code_path_evidence"]["score_paths_reject_invalid_embeddings"] is True
+    assert report["derived"]["code_path_evidence"]["model_state_rejects_invalid_configuration"] is True
     assert report["derived"]["code_path_evidence"]["cone_partition_rejects_invalid_axes"] is True
     assert report["derived"]["code_path_evidence"]["prior_training_rejects_invalid_inputs"] is True
     assert report["derived"]["code_path_evidence"]["exact_score_bypasses_lsh_by_default"] is True
@@ -73,12 +74,20 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["caho_training_support"]["deterministic_training_seed_supported"] is True
     assert report["derived"]["caho_training_support"]["adamw_weight_decay_default"] == 0.01
     assert report["derived"]["caho_training_support"]["benchmark_binary_training_script_defaults"] == {
-        "batch_size": 256,
         "device": "auto",
         "epochs": 50,
         "lr": 0.0001,
         "seed": 13,
         "weight_decay": 0.01,
+    }
+    assert report["derived"]["caho_training_support"]["benchmark_binary_training_script_94gb_defaults"] == {
+        "actual_batch_size": 16384,
+        "grad_cache_chunk_size": 8192,
+    }
+    assert report["derived"]["caho_training_support"]["benchmark_gradcache_training_script_94gb_defaults"] == {
+        "actual_batch_size": 16384,
+        "grad_cache_effective_batch_size": 49152,
+        "grad_cache_chunk_size": 8192,
     }
     assert report["derived"]["caho_training_support"]["benchmark_binary_training_script_has_cuda_gate"] is True
     assert report["derived"]["bundle_contracts"]["optional_calibrated_threshold_serialization"] is True

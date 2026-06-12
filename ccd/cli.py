@@ -24,7 +24,16 @@ from .augment import CAHOAugmenter, AugmentConfig, WeightedAugmentConfig
 from .edit_model import EditModel
 from .preprocess import normalize_hostname, normalization_trace
 from .priors import build_benign_prior, build_malicious_priors
-from .train import CAHODataset, CAHOTrainer, ContrastiveTrainer, Sample
+from .train import (
+    CAHO_94GB_ACTUAL_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+    CAHODataset,
+    CAHOTrainer,
+    ContrastiveTrainer,
+    Sample,
+    resolve_caho_batch_size,
+)
 import numpy as np
 from .calibration import (
     calibrate_thresholds_by_group,
@@ -120,11 +129,12 @@ def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_pat
         include_original=args.loss == "contrastive",
         seed=args.seed,
     )
+    batch_size = resolve_caho_batch_size(args.batch_size, use_grad_cache=args.grad_cache)
 
     if args.loss == "contrastive":
         trainer = ContrastiveTrainer(
             model,
-            batch_size=args.batch_size,
+            batch_size=batch_size,
             temperature=args.temperature,
             lr=args.lr,
             max_grad_norm=args.max_grad_norm,
@@ -146,7 +156,7 @@ def _train_caho_samples(args: argparse.Namespace, samples: List[Sample], out_pat
     else:
         trainer = CAHOTrainer(
             model,
-            batch_size=args.batch_size,
+            batch_size=batch_size,
             temperature=args.temperature,
             lr=args.lr,
             seed=args.seed,
@@ -671,11 +681,15 @@ def cmd_train_user_logins(args: argparse.Namespace) -> None:
             include_original=args.caho_loss == "contrastive",
             seed=args.caho_seed,
         )
+        caho_batch_size = resolve_caho_batch_size(
+            args.caho_batch_size,
+            use_grad_cache=args.caho_grad_cache,
+        )
 
         if args.caho_loss == "contrastive":
             trainer = ContrastiveTrainer(
                 model,
-                batch_size=args.caho_batch_size,
+                batch_size=caho_batch_size,
                 temperature=args.caho_temperature,
                 lr=args.caho_lr,
                 max_grad_norm=args.caho_max_grad_norm,
@@ -696,7 +710,7 @@ def cmd_train_user_logins(args: argparse.Namespace) -> None:
         else:
             trainer = CAHOTrainer(
                 model,
-                batch_size=args.caho_batch_size,
+                batch_size=caho_batch_size,
                 temperature=args.caho_temperature,
                 lr=args.caho_lr,
                 seed=args.caho_seed,
@@ -757,7 +771,16 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     train_caho.add_argument("--out", required=True, type=Path)
     train_caho.add_argument("--epochs", type=int, default=1)
-    train_caho.add_argument("--batch-size", type=int, default=64)
+    train_caho.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help=(
+            "Effective CAHO batch size. Defaults to "
+            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with --grad-cache and "
+            f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
+        ),
+    )
     train_caho.add_argument("--lr", type=float, default=2e-5)
     train_caho.add_argument("--temperature", type=float, default=0.07)
     train_caho.add_argument("--loss", choices=["supcon", "contrastive"], default="supcon")
@@ -769,7 +792,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     train_caho.add_argument("--min-lr", type=float, default=1e-5)
     train_caho.add_argument("--grad-cache", action="store_true", help="Enable GradCache for large batches")
-    train_caho.add_argument("--grad-cache-chunk-size", type=int, default=128)
+    train_caho.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     train_caho.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     train_caho.add_argument("--contrastive-max-scale", type=float, default=100.0)
     train_caho.add_argument("--contrastive-min-scale", type=float, default=1.0)
@@ -799,7 +822,16 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     train_caho_corpus.add_argument("--out", required=True, type=Path)
     train_caho_corpus.add_argument("--epochs", type=int, default=1)
-    train_caho_corpus.add_argument("--batch-size", type=int, default=64)
+    train_caho_corpus.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help=(
+            "Effective CAHO batch size. Defaults to "
+            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with --grad-cache and "
+            f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
+        ),
+    )
     train_caho_corpus.add_argument("--lr", type=float, default=2e-5)
     train_caho_corpus.add_argument("--temperature", type=float, default=0.07)
     train_caho_corpus.add_argument("--loss", choices=["supcon", "contrastive"], default="supcon")
@@ -811,7 +843,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_caho_corpus.add_argument("--scheduler", choices=["cosine", "none"], default="cosine")
     train_caho_corpus.add_argument("--min-lr", type=float, default=1e-5)
     train_caho_corpus.add_argument("--grad-cache", action="store_true", help="Enable GradCache for large batches")
-    train_caho_corpus.add_argument("--grad-cache-chunk-size", type=int, default=128)
+    train_caho_corpus.add_argument("--grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     train_caho_corpus.add_argument("--contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     train_caho_corpus.add_argument("--contrastive-max-scale", type=float, default=100.0)
     train_caho_corpus.add_argument("--contrastive-min-scale", type=float, default=1.0)
@@ -1013,7 +1045,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Base SentenceTransformer model for CAHO fine-tuning",
     )
     train_user_logins.add_argument("--caho-epochs", type=int, default=1)
-    train_user_logins.add_argument("--caho-batch-size", type=int, default=64)
+    train_user_logins.add_argument(
+        "--caho-batch-size",
+        type=int,
+        default=None,
+        help=(
+            "Effective CAHO batch size. Defaults to "
+            f"{CAHO_94GB_GRAD_CACHE_BATCH_SIZE} with --caho-grad-cache and "
+            f"{CAHO_94GB_ACTUAL_BATCH_SIZE} otherwise for 94 GB VRAM."
+        ),
+    )
     train_user_logins.add_argument("--caho-lr", type=float, default=2e-5)
     train_user_logins.add_argument("--caho-temperature", type=float, default=0.07)
     train_user_logins.add_argument("--caho-loss", choices=["supcon", "contrastive"], default="supcon")
@@ -1029,7 +1070,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable GradCache for CAHO training",
     )
-    train_user_logins.add_argument("--caho-grad-cache-chunk-size", type=int, default=128)
+    train_user_logins.add_argument("--caho-grad-cache-chunk-size", type=int, default=CAHO_94GB_GRAD_CACHE_CHUNK_SIZE)
     train_user_logins.add_argument("--caho-contrastive-loss", choices=["fixed", "learnable"], default="fixed")
     train_user_logins.add_argument("--caho-contrastive-max-scale", type=float, default=100.0)
     train_user_logins.add_argument("--caho-contrastive-min-scale", type=float, default=1.0)

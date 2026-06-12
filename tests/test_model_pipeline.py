@@ -347,6 +347,62 @@ def test_save_model_rejects_invalid_scoring_config(tmp_path):
     assert False, "Expected ValueError for invalid scoring config at save time"
 
 
+def test_model_construction_rejects_invalid_state():
+    cones = _identity_cones()
+    invalid_calls = [
+        lambda: CCDModel(
+            config=CCDConfig(),
+            encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+            cones=cones,
+            benign_prior=np.array([0.7, 0.3], dtype=np.float32),
+            malicious_priors={"fam": np.array([0.2, 0.8], dtype=np.float32)},
+        ),
+        lambda: CCDModel(
+            config=CCDConfig(cone=cones.config),
+            encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+            cones=cones,
+            benign_prior=np.array([0.7, float("nan")], dtype=np.float32),
+            malicious_priors={"fam": np.array([0.2, 0.8], dtype=np.float32)},
+        ),
+        lambda: CCDModel(
+            config=CCDConfig(cone=cones.config),
+            encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+            cones=cones,
+            benign_prior=np.array([0.7, 0.3], dtype=np.float32),
+            malicious_priors={"fam": np.array([0.2, 0.7], dtype=np.float32)},
+        ),
+        lambda: CCDModel(
+            config=CCDConfig(cone=cones.config, scoring=ScoringConfig(mixture_weights={"other": 1.0})),
+            encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+            cones=cones,
+            benign_prior=np.array([0.7, 0.3], dtype=np.float32),
+            malicious_priors={"fam": np.array([0.2, 0.8], dtype=np.float32)},
+        ),
+        lambda: CCDModel(
+            config=CCDConfig(cone=cones.config),
+            encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+            cones=cones,
+            benign_prior=np.array([0.7, 0.3], dtype=np.float32),
+            malicious_priors={"fam": np.array([0.2, 0.8], dtype=np.float32)},
+            threshold=float("nan"),
+        ),
+        lambda: CCDModel(
+            config=CCDConfig(cone=cones.config),
+            encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+            cones=ConePartition(axes=np.array([[2.0, 0.0], [0.0, 1.0]], dtype=np.float32), config=cones.config),
+            benign_prior=np.array([0.7, 0.3], dtype=np.float32),
+            malicious_priors={"fam": np.array([0.2, 0.8], dtype=np.float32)},
+        ),
+    ]
+
+    for call in invalid_calls:
+        try:
+            call()
+        except ValueError:
+            continue
+        raise AssertionError("Expected malformed CCDModel state to fail at construction")
+
+
 def test_calibration_and_p_value():
     scores = np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32)
     threshold = calibrate_threshold(scores, alpha=0.25)
@@ -587,7 +643,7 @@ def test_model_score_normalization():
     benign_prior = np.array([0.9, 0.1], dtype=np.float32)
     malicious_priors = {"m": np.array([0.1, 0.9], dtype=np.float32)}
     model = CCDModel(
-        config=CCDConfig(),
+        config=CCDConfig(cone=cones.config),
         encoder=encoder,
         cones=cones,
         benign_prior=benign_prior,
@@ -601,18 +657,17 @@ def test_model_score_normalization():
     assert encoder.seen == [host]
 
 
-def test_score_raises_with_no_malicious_priors():
+def test_model_construction_raises_with_no_malicious_priors():
     cones = _identity_cones()
     benign_prior = np.array([0.5, 0.5], dtype=np.float32)
-    model = CCDModel(
-        config=CCDConfig(),
-        encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
-        cones=cones,
-        benign_prior=benign_prior,
-        malicious_priors={},
-    )
     try:
-        _ = model.score_embeddings(np.array([[1.0, 0.0]], dtype=np.float32))
+        CCDModel(
+            config=CCDConfig(cone=cones.config),
+            encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+            cones=cones,
+            benign_prior=benign_prior,
+            malicious_priors={},
+        )
     except ValueError:
         return
     assert False, "Expected ValueError when malicious_priors is empty"

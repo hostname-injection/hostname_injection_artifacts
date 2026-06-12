@@ -6,10 +6,14 @@ from types import SimpleNamespace
 import pytest
 
 from ccd.benchmark_training import (
+    CAHO_94GB_ACTUAL_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
     BenchmarkBinaryContrastiveTrainer,
     BenchmarkChunkShuffleSampler,
     BenchmarkTrainingConfig,
     _orbit_labels,
+    resolve_caho_batch_size,
 )
 
 
@@ -434,6 +438,32 @@ def test_benchmark_binary_script_rejects_grad_cache():
 
     with pytest.raises(RuntimeError, match="supervised orbit labels"):
         module.validate_args(args)
+
+
+def test_benchmark_caho_94gb_batch_defaults():
+    assert resolve_caho_batch_size(None, use_grad_cache=False) == CAHO_94GB_ACTUAL_BATCH_SIZE
+    assert resolve_caho_batch_size(None, use_grad_cache=True) == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
+    assert CAHO_94GB_GRAD_CACHE_CHUNK_SIZE == 8192
+
+    binary_script = Path(__file__).resolve().parents[1] / "scripts" / "train_benchmark_caho_binary.py"
+    binary_spec = importlib.util.spec_from_file_location("_test_train_benchmark_caho_binary_defaults", binary_script)
+    assert binary_spec is not None and binary_spec.loader is not None
+    binary_module = importlib.util.module_from_spec(binary_spec)
+    binary_spec.loader.exec_module(binary_module)
+    binary_args = binary_module.build_parser().parse_args(["--out", "unused-output"])
+    assert binary_args.batch_size == CAHO_94GB_ACTUAL_BATCH_SIZE
+    assert binary_args.grad_cache_chunk_size == CAHO_94GB_GRAD_CACHE_CHUNK_SIZE
+
+    regular_script = Path(__file__).resolve().parents[1] / "scripts" / "train_benchmark_caho.py"
+    regular_spec = importlib.util.spec_from_file_location("_test_train_benchmark_caho_defaults", regular_script)
+    assert regular_spec is not None and regular_spec.loader is not None
+    regular_module = importlib.util.module_from_spec(regular_spec)
+    regular_spec.loader.exec_module(regular_module)
+    regular_args = regular_module.build_parser().parse_args(["--out", "unused-output"])
+    gradcache_args = regular_module.build_parser().parse_args(["--out", "unused-output", "--grad-cache"])
+    assert resolve_caho_batch_size(regular_args.batch_size, use_grad_cache=False) == CAHO_94GB_ACTUAL_BATCH_SIZE
+    assert resolve_caho_batch_size(gradcache_args.batch_size, use_grad_cache=True) == CAHO_94GB_GRAD_CACHE_BATCH_SIZE
+    assert regular_args.grad_cache_chunk_size == CAHO_94GB_GRAD_CACHE_CHUNK_SIZE
 
 
 def test_benchmark_binary_script_validation_selection_args():

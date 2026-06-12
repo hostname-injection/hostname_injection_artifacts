@@ -37,7 +37,15 @@ from ccd.model import CCDModel
 from ccd.preprocess import normalize_hostname, normalization_trace
 from ccd.priors import build_benign_prior, build_malicious_priors
 from ccd.scoring import ccd_score_logpriors, mixture_log_weights
-from ccd.train import CAHOTrainer, supcon_loss, supervised_orbit_contrastive_loss
+from ccd.train import (
+    CAHO_94GB_ACTUAL_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
+    CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+    CAHOTrainer,
+    resolve_caho_batch_size,
+    supcon_loss,
+    supervised_orbit_contrastive_loss,
+)
 
 
 EXPECTED_TABLE1_LAYERS = ("cone_count_model", "split_calibration", "edit_closure")
@@ -239,8 +247,14 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         ROOT / "scripts" / "train_benchmark_caho_binary.py",
         name="_artifact_train_benchmark_caho_binary",
     )
+    regular_train_script = load_python_module(
+        ROOT / "scripts" / "train_benchmark_caho.py",
+        name="_artifact_train_benchmark_caho",
+    )
     if not callable(getattr(train_script, "build_parser", None)):
         raise ValueError("train_benchmark_caho_binary.py must expose build_parser for contract checks")
+    if not callable(getattr(regular_train_script, "build_parser", None)):
+        raise ValueError("train_benchmark_caho.py must expose build_parser for contract checks")
     if "view1" not in dataset_getitem or "view2" not in dataset_getitem:
         raise ValueError("BenchmarkCAHOViewDataset must emit two views per string")
     if "seed" not in dataset_init_signature.parameters or "_rng_for_index" not in dataset_getitem:
@@ -306,7 +320,6 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
     expected_script_defaults = {
         "lr": require_number(recipe.get("learning_rate"), path="paper_deployed_recipe.learning_rate"),
         "weight_decay": deployed_weight_decay,
-        "batch_size": int(require_number(recipe.get("batch_size"), path="paper_deployed_recipe.batch_size")),
         "epochs": int(require_number(recipe.get("max_epochs"), path="paper_deployed_recipe.max_epochs")),
         "device": "auto",
         "seed": 13,
@@ -314,16 +327,32 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
     observed_script_defaults = {
         "lr": float(parser_defaults.lr),
         "weight_decay": float(parser_defaults.weight_decay),
-        "batch_size": int(parser_defaults.batch_size),
         "epochs": int(parser_defaults.epochs),
         "device": str(parser_defaults.device),
         "seed": int(parser_defaults.seed),
     }
     if observed_script_defaults != expected_script_defaults:
         raise ValueError(
-            "train_benchmark_caho_binary.py defaults must match the paper deployed recipe: "
+            "train_benchmark_caho_binary.py optimizer/run defaults must match the paper deployed recipe: "
             f"observed {observed_script_defaults!r}, expected {expected_script_defaults!r}"
         )
+    if int(parser_defaults.batch_size) != CAHO_94GB_ACTUAL_BATCH_SIZE:
+        raise ValueError("train_benchmark_caho_binary.py must default to the 94 GB actual CAHO batch size")
+    if int(parser_defaults.grad_cache_chunk_size) != CAHO_94GB_GRAD_CACHE_CHUNK_SIZE:
+        raise ValueError("train_benchmark_caho_binary.py must expose the 94 GB GradCache chunk default")
+    regular_defaults = regular_train_script.build_parser().parse_args(["--out", "unused-output"])
+    regular_gradcache_defaults = regular_train_script.build_parser().parse_args(
+        ["--out", "unused-output", "--grad-cache"]
+    )
+    if resolve_caho_batch_size(regular_defaults.batch_size, use_grad_cache=False) != CAHO_94GB_ACTUAL_BATCH_SIZE:
+        raise ValueError("regular CAHO trainer must default to the 94 GB actual batch size")
+    if (
+        resolve_caho_batch_size(regular_gradcache_defaults.batch_size, use_grad_cache=True)
+        != CAHO_94GB_GRAD_CACHE_BATCH_SIZE
+    ):
+        raise ValueError("regular CAHO GradCache trainer must default to the 94 GB effective batch size")
+    if int(regular_defaults.grad_cache_chunk_size) != CAHO_94GB_GRAD_CACHE_CHUNK_SIZE:
+        raise ValueError("regular CAHO trainer must default to the 94 GB GradCache chunk size")
     if getattr(parser_defaults, "require_cuda", None) is not False:
         raise ValueError("train_benchmark_caho_binary.py must default to portable CPU/auto debug execution")
     if getattr(parser_defaults, "validation_root", "missing") is not None:
@@ -363,6 +392,15 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         "benign_orbit_labels_preserve_diversity": True,
         "deterministic_training_seed_supported": True,
         "benchmark_binary_training_script_defaults": observed_script_defaults,
+        "benchmark_binary_training_script_94gb_defaults": {
+            "actual_batch_size": int(parser_defaults.batch_size),
+            "grad_cache_chunk_size": int(parser_defaults.grad_cache_chunk_size),
+        },
+        "benchmark_gradcache_training_script_94gb_defaults": {
+            "actual_batch_size": CAHO_94GB_ACTUAL_BATCH_SIZE,
+            "grad_cache_effective_batch_size": CAHO_94GB_GRAD_CACHE_BATCH_SIZE,
+            "grad_cache_chunk_size": CAHO_94GB_GRAD_CACHE_CHUNK_SIZE,
+        },
         "benchmark_binary_training_script_has_cuda_gate": True,
         "paper_deployed_recipe": {
             "learning_rate": require_number(recipe.get("learning_rate"), path="paper_deployed_recipe.learning_rate"),
@@ -646,6 +684,46 @@ def validate_code_path_evidence() -> dict[str, bool]:
         threshold=9.0,
         grouped_thresholds={"tenant-a": {"threshold": 9.0}},
     )
+    for invalid_model_call in (
+        lambda: CCDModel(
+            config=CCDConfig(),
+            encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+            cones=cones,
+            benign_prior=np.array([0.95, 0.05], dtype=np.float32),
+            malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        ),
+        lambda: CCDModel(
+            config=CCDConfig(cone=cone_config),
+            encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+            cones=cones,
+            benign_prior=np.array([0.95, float("nan")], dtype=np.float32),
+            malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        ),
+        lambda: CCDModel(
+            config=CCDConfig(
+                cone=cone_config,
+                scoring=ScoringConfig(mixture_weights={"other": 1.0}),
+            ),
+            encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+            cones=cones,
+            benign_prior=np.array([0.95, 0.05], dtype=np.float32),
+            malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        ),
+        lambda: CCDModel(
+            config=CCDConfig(cone=cone_config),
+            encoder=CahoEncoder(EncoderConfig(model_name="sentence-transformers/all-MiniLM-L6-v2")),
+            cones=cones,
+            benign_prior=np.array([0.95, 0.05], dtype=np.float32),
+            malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+            threshold=float("nan"),
+        ),
+    ):
+        try:
+            invalid_model_call()
+        except ValueError:
+            pass
+        else:
+            raise ValueError("CCDModel construction must reject malformed deployed state")
     old_prior = refresh_model.benign_prior.copy()
     old_threshold = refresh_model.threshold
     old_grouped = refresh_model.grouped_thresholds
@@ -795,6 +873,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "global_score_csv_thresholds_available": True,
         "score_paths_normalize_unit_embeddings": True,
         "score_paths_reject_invalid_embeddings": True,
+        "model_state_rejects_invalid_configuration": True,
         "cone_partition_rejects_invalid_axes": True,
         "prior_training_rejects_invalid_inputs": True,
         "mixture_weights_normalized": True,

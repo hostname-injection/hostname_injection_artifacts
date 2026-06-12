@@ -149,8 +149,9 @@ coverage, global and tenant/window grouped split-conformal thresholding, CAHO
 supervised orbit contrastive/binary-head training support with benign diversity
 preservation, binary auxiliary loss over both L2-normalized CAHO views,
 fail-closed GradCache handling for the supervised binary trainer, and explicit AdamW
-weight decay, Appendix C CAHO deployed-recipe defaults in the benchmark binary
-trainer, exact full-axis scanning for the deployed top-R cone sketch that
+weight decay, Appendix C CAHO deployed-recipe optimizer defaults in the benchmark binary
+trainer plus 94 GB CUDA batch defaults for replay-scale actual and regular
+GradCache CAHO training, exact full-axis scanning for the deployed top-R cone sketch that
 bypasses LSH by default for calibration/certification, unit-embedding normalization
 across exact, torch, top-k, and fast scoring paths, calibrated-margin certificates with
 deterministic enumeration fallback, benign-only P_B/threshold refresh, and
