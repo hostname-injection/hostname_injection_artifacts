@@ -435,15 +435,17 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
                 optim.zero_grad()
                 if gc_module is not None:
                     contrastive_loss = gc_module(v1, v2)
-                    binary_loss = self._binary_backward_microbatched(v1, labels)
+                    binary_loss = self._binary_backward_microbatched(v1, v2, labels)
                     loss_for_log = _as_float(contrastive_loss) + _as_float(binary_loss)
                 else:
                     e1 = self._embed_view(v1)
                     e2 = self._embed_view(v2)
                     contrastive_loss = self._contrastive_loss(e1, e2, labels)
                     labels_t = labels.to(e1.device, dtype=torch.float32)
-                    logits = self.classifier(F.normalize(e1, dim=1)).squeeze(-1)
-                    binary_loss = F.binary_cross_entropy_with_logits(logits, labels_t) * self.binary_loss_weight
+                    binary_embeddings = torch.cat([F.normalize(e1, dim=1), F.normalize(e2, dim=1)], dim=0)
+                    binary_labels = labels_t.repeat(2)
+                    logits = self.classifier(binary_embeddings).squeeze(-1)
+                    binary_loss = F.binary_cross_entropy_with_logits(logits, binary_labels) * self.binary_loss_weight
                     combined_loss = contrastive_loss + binary_loss
                     combined_loss.backward()
                     loss_for_log = float(combined_loss.item())
@@ -516,7 +518,7 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
     def _contrastive_loss(self, e1, e2, labels=None):
         return super()._contrastive_loss(e1, e2, labels) * self.contrastive_loss_weight
 
-    def _binary_backward_microbatched(self, v1: List[str], labels) -> Any:
+    def _binary_backward_microbatched(self, v1: List[str], v2: List[str], labels) -> Any:
         import torch
         import torch.nn.functional as F
 
@@ -525,15 +527,17 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
         labels = labels.to(device, dtype=torch.float32)
         total_loss = None
         batch_size = len(v1)
+        total_items = max(1, batch_size * 2)
         chunk = max(1, int(self.grad_cache_chunk_size))
-        for start in range(0, batch_size, chunk):
-            end = min(start + chunk, batch_size)
-            embeddings = self._embed_view(v1[start:end])
-            logits = self.classifier(F.normalize(embeddings, dim=1)).squeeze(-1)
-            loss = F.binary_cross_entropy_with_logits(logits, labels[start:end])
-            loss = loss * self.binary_loss_weight * ((end - start) / batch_size)
-            loss.backward()
-            total_loss = loss.detach() if total_loss is None else total_loss + loss.detach()
+        for view in (v1, v2):
+            for start in range(0, batch_size, chunk):
+                end = min(start + chunk, batch_size)
+                embeddings = self._embed_view(view[start:end])
+                logits = self.classifier(F.normalize(embeddings, dim=1)).squeeze(-1)
+                loss = F.binary_cross_entropy_with_logits(logits, labels[start:end])
+                loss = loss * self.binary_loss_weight * ((end - start) / total_items)
+                loss.backward()
+                total_loss = loss.detach() if total_loss is None else total_loss + loss.detach()
         return total_loss if total_loss is not None else torch.tensor(0.0, device=device)
 
     def _load_binary_classifier_if_requested(self, embedding_dim: int) -> None:
@@ -623,6 +627,7 @@ def _write_report(out: Path, config: BenchmarkTrainingConfig, train_summary: Map
             "name": "supervised_orbit_contrastive_loss",
             "benign_orbits": "unique_per_batch_item",
             "positive_orbits": "shared_positive_label_when_family_labels_are_unavailable",
+            "binary_auxiliary_head_views": "both_l2_normalized_views",
             "grad_cache_boundary": "GradCache mode uses pairwise two-view contrastive loss because the GradCache loss hook does not receive labels.",
         },
         "train_summary": dict(train_summary),

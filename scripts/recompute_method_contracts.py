@@ -214,6 +214,10 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("BenchmarkContrastiveTrainer must use supervised orbit contrastive labels")
     if "F.normalize" not in trainer_fit:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must L2-normalize classifier inputs")
+    if "torch.cat([F.normalize(e1, dim=1), F.normalize(e2, dim=1)]" not in trainer_fit:
+        raise ValueError("BenchmarkBinaryContrastiveTrainer must train the binary head on both CAHO views")
+    if "_binary_backward_microbatched(v1, v2, labels)" not in trainer_fit:
+        raise ValueError("GradCache binary auxiliary path must also train on both CAHO views")
     if "binary_cross_entropy_with_logits" not in trainer_fit:
         raise ValueError("BenchmarkBinaryContrastiveTrainer must train a binary auxiliary head")
     if "torch.optim.AdamW" not in trainer_fit:
@@ -265,6 +269,7 @@ def validate_caho_support(expected: Mapping[str, Any]) -> dict[str, Any]:
         "weighted_benign_augmentations": sorted(benign_weights),
         "weighted_malicious_augmentations": sorted(malicious_weights),
         "binary_auxiliary_head_supported": True,
+        "binary_auxiliary_head_trains_both_views": True,
         "two_view_dataset_supported": True,
         "adamw_supported": True,
         "adamw_weight_decay_default": default_weight_decay,

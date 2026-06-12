@@ -186,11 +186,12 @@ ccd train-caho \
 The deployed-style benchmark trainer with the binary auxiliary head is exposed
 by `scripts/train_benchmark_caho_binary.py`; it trains the same two-view CAHO
 path with supervised orbit contrastive loss, explicit AdamW weight decay, and
-an L2-normalized binary classifier head. Its defaults match the Appendix C
-deployed recipe (`lr=1e-4`, weight decay `1e-2`, batch size `256`, up to
-`50` epochs). For a local parser/training-loop smoke on commodity hardware,
-use `--device cpu --max-rows ... --max-steps ...`; use `--require-cuda` when
-replaying a GPU training run and you want CPU fallback to fail closed.
+an L2-normalized binary classifier head over both CAHO views. Its defaults
+match the Appendix C deployed recipe (`lr=1e-4`, weight decay `1e-2`, batch
+size `256`, up to `50` epochs). For a local parser/training-loop smoke on
+commodity hardware, use `--device cpu --max-rows ... --max-steps ...`; use
+`--require-cuda` when replaying a GPU training run and you want CPU fallback to
+fail closed.
 
 ### Replicating The Full Corpus Training Script
 
