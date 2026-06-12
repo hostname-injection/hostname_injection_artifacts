@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import math
 import random
 import re
@@ -14,6 +16,8 @@ from .edit_model import DEFAULT_EDITS, HOMOGLYPHS, QUOTE_COMMENT_FRAGMENTS, TLD_
 
 
 _PERCENT_RUN_RE = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
+_HEX_LABEL_RE = re.compile(r"[0-9A-Fa-f]{2,}")
+_BASE64URL_LABEL_RE = re.compile(r"[A-Za-z0-9_-]{2,}")
 
 
 def cone_margin(prototypes: np.ndarray, u: np.ndarray) -> Tuple[int, float]:
@@ -95,6 +99,34 @@ def _punycode_variants(label: str) -> Set[str]:
             elif any(ord(ch) > 127 for ch in label):
                 out.add(label.encode("idna").decode("ascii"))
         except Exception:
+            pass
+    out.discard(label)
+    return out
+
+
+def _safe_decoded_label(value: str) -> bool:
+    return bool(value) and all(ch.isprintable() and ch not in "\r\n\t." for ch in value)
+
+
+def _hex_base_variants(label: str) -> Set[str]:
+    out: Set[str] = set()
+    if label:
+        out.add(label.encode("utf-8").hex())
+        out.add(base64.urlsafe_b64encode(label.encode("utf-8")).decode("ascii").rstrip("="))
+    if len(label) % 2 == 0 and _HEX_LABEL_RE.fullmatch(label):
+        try:
+            decoded = bytes.fromhex(label).decode("utf-8")
+            if _safe_decoded_label(decoded):
+                out.add(decoded)
+        except (UnicodeDecodeError, ValueError):
+            pass
+    if _BASE64URL_LABEL_RE.fullmatch(label):
+        padded = label + "=" * (-len(label) % 4)
+        try:
+            decoded = base64.b64decode(padded.encode("ascii"), altchars=b"-_", validate=True).decode("utf-8")
+            if _safe_decoded_label(decoded):
+                out.add(decoded)
+        except (binascii.Error, UnicodeDecodeError, ValueError):
             pass
     out.discard(label)
     return out
@@ -195,6 +227,13 @@ def deterministic_single_edit_neighbors(host: str, edit_model: Optional[EditMode
         for i in range(0, len(host) + 1):
             for fragment in QUOTE_COMMENT_FRAGMENTS:
                 out.add(host[:i] + fragment + host[i:])
+
+    if "E12_hex_base" in names:
+        for i, label in enumerate(labels):
+            for variant in _hex_base_variants(label):
+                changed = list(labels)
+                changed[i] = variant
+                out.add(".".join(changed))
 
     out.discard(host)
     return sorted(out)

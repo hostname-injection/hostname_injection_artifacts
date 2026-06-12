@@ -66,7 +66,7 @@
     "effective_count_positive": true
   },
   "expected_edit_manifest": {
-    "version": "Eraw-public-v1",
+    "version": "Eraw-public-v2",
     "required_prefixes": [
       "E1",
       "E2",
@@ -78,7 +78,8 @@
       "E8",
       "E9",
       "E10",
-      "E11"
+      "E11",
+      "E12"
     ],
     "requires_deterministic_closure": true,
     "randomized_sampling_only_exploratory": true

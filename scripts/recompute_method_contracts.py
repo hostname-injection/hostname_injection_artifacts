@@ -170,6 +170,16 @@ def validate_edit_manifest(expected: Mapping[str, Any]) -> dict[str, Any]:
     )
     if "café.example" not in utf8_neighbors:
         raise ValueError("E6 deterministic closure must decode complete UTF-8 percent runs")
+    hex_base_neighbors = deterministic_single_edit_neighbors(
+        "evil.example",
+        EditModel(edits=["E12_hex_base"]),
+    )
+    if "6576696c.example" not in hex_base_neighbors or "ZXZpbA.example" not in hex_base_neighbors:
+        raise ValueError("E12 deterministic closure must cover hex/base label encodings")
+    if "evil.example" not in deterministic_single_edit_neighbors("6576696c.example", EditModel(edits=["E12_hex_base"])):
+        raise ValueError("E12 deterministic closure must decode hex label encodings")
+    if "evil.example" not in deterministic_single_edit_neighbors("ZXZpbA.example", EditModel(edits=["E12_hex_base"])):
+        raise ValueError("E12 deterministic closure must decode base64url label encodings")
     return {
         "version": version,
         "n_default_edits": len(edit_names),
@@ -177,6 +187,7 @@ def validate_edit_manifest(expected: Mapping[str, Any]) -> dict[str, Any]:
         "required_prefixes": prefixes,
         "deterministic_closure_available": True,
         "utf8_percent_run_closure": True,
+        "hex_base_edit_closure": True,
         "randomized_smoothing_boundary_documented": True,
     }
 

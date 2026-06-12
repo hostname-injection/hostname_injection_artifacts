@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import random
 import re
 import unicodedata
@@ -9,6 +11,8 @@ from typing import Callable, Dict, List, Optional, Sequence
 
 _PERCENT_RE = re.compile(r"%[0-9A-Fa-f]{2}")
 _PERCENT_RUN_RE = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
+_HEX_LABEL_RE = re.compile(r"[0-9A-Fa-f]{2,}")
+_BASE64URL_LABEL_RE = re.compile(r"[A-Za-z0-9_-]{2,}")
 
 # Small confusable map (extensible)
 HOMOGLYPHS = {
@@ -39,7 +43,7 @@ TLD_CONFUSABLES = {
 }
 
 QUOTE_COMMENT_FRAGMENTS = ["'", '"', "`", "${", "}", "--", "/*", "*/", "#"]
-EDIT_MANIFEST_VERSION = "Eraw-public-v1"
+EDIT_MANIFEST_VERSION = "Eraw-public-v2"
 
 
 @dataclass
@@ -225,6 +229,52 @@ def edit_quote_comment_fragment(host: str, rng: random.Random) -> str:
     return host[:idx] + fragment + host[idx:]
 
 
+def _safe_text(value: str) -> bool:
+    return bool(value) and all(ch.isprintable() and ch not in "\r\n\t." for ch in value)
+
+
+def _decode_hex_label(label: str) -> Optional[str]:
+    if len(label) % 2 != 0 or not _HEX_LABEL_RE.fullmatch(label):
+        return None
+    try:
+        decoded = bytes.fromhex(label).decode("utf-8")
+    except (UnicodeDecodeError, ValueError):
+        return None
+    return decoded if decoded != label and _safe_text(decoded) else None
+
+
+def _decode_base64_label(label: str) -> Optional[str]:
+    if not _BASE64URL_LABEL_RE.fullmatch(label):
+        return None
+    padded = label + "=" * (-len(label) % 4)
+    try:
+        decoded = base64.b64decode(padded.encode("ascii"), altchars=b"-_", validate=True).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError, ValueError):
+        return None
+    return decoded if decoded != label and _safe_text(decoded) else None
+
+
+def edit_hex_base_encoding(host: str, rng: random.Random) -> str:
+    labels = host.split(".")
+    candidates = [(i, label) for i, label in enumerate(labels) if label]
+    if not candidates:
+        return host
+    i, label = rng.choice(candidates)
+    transforms = [
+        label.encode("utf-8").hex(),
+        base64.urlsafe_b64encode(label.encode("utf-8")).decode("ascii").rstrip("="),
+    ]
+    hex_decoded = _decode_hex_label(label)
+    if hex_decoded is not None:
+        transforms.append(hex_decoded)
+    base64_decoded = _decode_base64_label(label)
+    if base64_decoded is not None:
+        transforms.append(base64_decoded)
+    replacement = rng.choice([value for value in transforms if value and value != label] or [label])
+    labels[i] = replacement
+    return ".".join(labels)
+
+
 DEFAULT_EDITS = {
     "E1_percent": EditOp("E1_percent", edit_percent_encoding),
     "E2_homoglyph": EditOp("E2_homoglyph", edit_homoglyph),
@@ -238,6 +288,7 @@ DEFAULT_EDITS = {
     "E9_label_transpose": EditOp("E9_label_transpose", edit_label_transpose),
     "E10_tld_swap": EditOp("E10_tld_swap", edit_tld_swap),
     "E11_quote_comment": EditOp("E11_quote_comment", edit_quote_comment_fragment),
+    "E12_hex_base": EditOp("E12_hex_base", edit_hex_base_encoding),
 }
 
 

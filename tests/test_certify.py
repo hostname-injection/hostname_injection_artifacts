@@ -113,6 +113,26 @@ def test_utf8_percent_neighbors_decode_complete_runs():
     assert "café.example" in neighbors
 
 
+def test_hex_base_neighbors_encode_and_decode_labels():
+    encoded = deterministic_single_edit_neighbors(
+        "evil.example",
+        EditModel(edits=["E12_hex_base"]),
+    )
+    decoded_hex = deterministic_single_edit_neighbors(
+        "6576696c.example",
+        EditModel(edits=["E12_hex_base"]),
+    )
+    decoded_base64 = deterministic_single_edit_neighbors(
+        "ZXZpbA.example",
+        EditModel(edits=["E12_hex_base"]),
+    )
+
+    assert "6576696c.example" in encoded
+    assert "ZXZpbA.example" in encoded
+    assert "evil.example" in decoded_hex
+    assert "evil.example" in decoded_base64
+
+
 def test_enumerate_edit_ball_includes_origin_and_radius_neighbors():
     edit_model = EditModel(edits=["E5_case"])
     ball = enumerate_edit_ball("ab.com", radius=1, edit_model=edit_model)

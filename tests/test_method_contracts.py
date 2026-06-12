@@ -45,6 +45,7 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["code_path_evidence"]["refresh_updates_pb_and_threshold_only"] is True
     assert report["derived"]["edit_manifest"]["deterministic_closure_available"] is True
     assert report["derived"]["edit_manifest"]["utf8_percent_run_closure"] is True
+    assert report["derived"]["edit_manifest"]["hex_base_edit_closure"] is True
     assert report["derived"]["caho_training_support"]["binary_auxiliary_head_supported"] is True
     assert report["derived"]["caho_training_support"]["binary_auxiliary_head_trains_both_views"] is True
     assert report["derived"]["caho_training_support"]["binary_gradcache_fails_closed"] is True

@@ -91,7 +91,7 @@ expected16 = "The output validates Table 2 denominator units, validates Appendix
 
 claim17 = "Table 1 and Appendix C method contracts are executable and release-safe."
 script17 = "https://example.org/REPLACE_WITH_FINAL_ARTIFACT_URL/blob/main/scripts/recompute_method_contracts.py"
-expected17 = "The output validates Table 1 contract rows, checks CCD default configuration against Appendix C, verifies E1-E11 edit-manifest coverage and deterministic finite-edit closure, confirms CAHO two-view contrastive training plus an L2-normalized binary head with explicit AdamW weight decay, and confirms model bundles can persist config, axes, priors, and calibrated thresholds."
+expected17 = "The output validates Table 1 contract rows, checks CCD default configuration against Appendix C, verifies E1-E12 edit-manifest coverage and deterministic finite-edit closure, confirms CAHO two-view contrastive training plus an L2-normalized binary head with explicit AdamW weight decay, and confirms model bundles can persist config, axes, priors, and calibrated thresholds."
 
 claim18 = "Named paper claims, figures, tables, equations, and appendices are mapped to artifact evidence and external boundaries."
 script18 = "https://example.org/REPLACE_WITH_FINAL_ARTIFACT_URL/blob/main/scripts/recompute_paper_claim_coverage.py"

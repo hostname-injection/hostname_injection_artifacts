@@ -391,7 +391,7 @@ python scripts/recompute_method_contracts.py
 This validates Eq. 1 score-path availability, exact full-axis scanning for the
 deployed top-R cone sketch that bypasses LSH by default for
 calibration/certification, fixed-FPR global and tenant/window
-grouped calibration defaults, 4096-cone/top-8 CCD configuration, E1-E11
+grouped calibration defaults, 4096-cone/top-8 CCD configuration, E1-E12
 finite-edit coverage, deterministic certificate closure, calibrated-margin
 certificates with deterministic enumeration fallback, CAHO two-view supervised
 orbit contrastive training plus an L2-normalized binary head with explicit
@@ -728,7 +728,7 @@ scores = model.score(["example.com"], normalize=True)
   normalization, while retaining a byte-residue fallback for malformed runs.
 - Benign drift refresh is implemented as a narrow `(P_B, tau_alpha)` update;
   `P_M`, cone axes, encoder config, and scoring config remain fixed.
-- The edit model E1–E11 is implemented in `ccd/edit_model.py`; emitted
+- The edit model E1–E12 is implemented in `ccd/edit_model.py`; emitted
   stability certificates can use calibrated-margin bounds and otherwise use
   deterministic finite-edit closure.
 - The CAHO augmentation sets match the paper’s benign/malicious design.

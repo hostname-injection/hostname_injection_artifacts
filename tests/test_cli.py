@@ -553,7 +553,7 @@ def test_certify_writes_scope_and_combined_method_args(tmp_path, monkeypatch):
         "decode_utf8_percent_runs": True,
         "idna_roundtrip": True,
     }
-    assert payload["edit_manifest"]["version"] == "Eraw-public-v1"
+    assert payload["edit_manifest"]["version"] == "Eraw-public-v2"
     assert payload["certificates"][0]["normalized_hostname"] == "www.example.com"
     assert payload["certificates"][0]["calibration_group"] == "tenant-a"
     assert payload["certificates"][0]["threshold_source"] == "model_bundle_grouped_thresholds"
