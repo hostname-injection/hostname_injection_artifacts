@@ -201,6 +201,12 @@ def test_binary_trainer_records_validation_fixed_fpr_selection():
     assert selection["best_epoch"] == 1
     assert selection["restored_best_validation_checkpoint"] is True
     assert selection["history"][0]["status"] == "pass"
+    assert selection["history"][0]["threshold_source"] == "validation_benign_scores"
+    assert selection["history"][0]["alpha"] == 0.5
+    assert selection["history"][0]["num_samples"] == 2
+    assert selection["history"][0]["order_statistic_rank"] == 2
+    assert selection["history"][0]["decision_rule"] == "score > threshold"
+    assert selection["history"][0]["calibration_scores"] == "benign_only"
     assert selection["history"][0]["n_validation_benign"] == 2
     assert selection["history"][0]["n_validation_positive"] == 2
 

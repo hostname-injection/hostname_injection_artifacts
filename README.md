@@ -207,6 +207,10 @@ python scripts/train_benchmark_caho_binary.py \
   --out caho_model_checkpoint
 ```
 
+The validation history records the benign-only split-conformal threshold,
+clipped order-statistic rank, and strict `score > threshold` decision rule used
+for the fixed-FPR checkpoint comparison.
+
 All CAHO training entry points accept `--seed` (or `--caho-seed` for
 `train-user-logins`) and default to `13`; benchmark training reports record the
 seed so augmentation/order replay is explicit.

@@ -16,7 +16,7 @@ from .benchmark_dataset import (
     BenchmarkTextField,
     HostnameCommandInjectionBenchmarkDataset,
 )
-from .calibration import calibrate_threshold
+from .calibration import split_conformal_threshold_metadata
 from .preprocess import normalize_hostname
 from .train import (
     ContrastiveLoss,
@@ -617,7 +617,8 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
                 "n_validation_positive": int(positive_scores.size),
             }
 
-        threshold = float(calibrate_threshold(benign_scores, alpha=float(target_fpr)))
+        calibration_metadata = split_conformal_threshold_metadata(benign_scores, alpha=float(target_fpr))
+        threshold = float(calibration_metadata["threshold"])
         predictions = score_arr > threshold
         benign = label_arr == 0
         positive = label_arr == 1
@@ -626,7 +627,8 @@ class BenchmarkBinaryContrastiveTrainer(BenchmarkContrastiveTrainer):
         return {
             "status": "pass",
             "target_fpr": float(target_fpr),
-            "threshold": threshold,
+            **calibration_metadata,
+            "threshold_source": "validation_benign_scores",
             "n_validation_rows": int(score_arr.size),
             "n_validation_benign": int(np.sum(benign)),
             "n_validation_positive": int(np.sum(positive)),
