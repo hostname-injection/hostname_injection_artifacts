@@ -268,8 +268,16 @@ def main() -> int:
             raise RuntimeError("expected five explanation rows")
         if parsed_explanations.get("grouped_thresholds_used") is not True:
             raise RuntimeError("expected grouped thresholds in explanation smoke output")
+        if parsed_explanations.get("grouped_thresholds_source") != "model_bundle_grouped_thresholds":
+            raise RuntimeError("expected grouped threshold source in explanation smoke output")
+        if parsed_explanations.get("decision_rule") != "score > threshold":
+            raise RuntimeError("expected decision rule in explanation smoke output")
+        if not isinstance(parsed_explanations.get("score_path"), dict):
+            raise RuntimeError("expected score path in explanation smoke output")
         if any("calibration_group" not in row for row in parsed_explanations.get("explanations", [])):
             raise RuntimeError("expected calibration_group on each explanation row")
+        if any("threshold_source" not in row for row in parsed_explanations.get("explanations", [])):
+            raise RuntimeError("expected threshold_source on each explanation row")
 
         run(
             [

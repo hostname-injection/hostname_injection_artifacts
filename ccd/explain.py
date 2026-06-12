@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import List
 
+from .calibration import SPLIT_CONFORMAL_DECISION_RULE
 from .io import load_model
 from .line_io import read_nonempty_lines, read_parallel_lines
 from .preprocess import normalize_hostname
@@ -46,12 +47,21 @@ def main() -> int:
     if not args.no_normalize:
         hostnames = [normalize_hostname(h) for h in hostnames]
     groups = read_parallel_lines(args.groups, len(hostnames), "groups") if args.groups else None
+    threshold_source = "model_bundle_threshold" if model.threshold is not None else "default_zero_threshold"
     if args.threshold is not None:
         model.threshold = args.threshold
+        threshold_source = "cli_threshold"
+    grouped_thresholds = getattr(model, "grouped_thresholds", None)
+    grouped_thresholds_source = "model_bundle_grouped_thresholds" if grouped_thresholds else "none"
     if args.calibration:
         calib = json.loads(args.calibration.read_text())
-        model.threshold = float(calib.get("threshold", model.threshold or 0.0))
-        model.grouped_thresholds = calib.get("grouped_thresholds", getattr(model, "grouped_thresholds", None))
+        if "threshold" in calib:
+            model.threshold = float(calib["threshold"])
+            threshold_source = "calibration_file_threshold"
+        if "grouped_thresholds" in calib:
+            model.grouped_thresholds = calib.get("grouped_thresholds", grouped_thresholds)
+            grouped_thresholds = model.grouped_thresholds
+            grouped_thresholds_source = "calibration_file_grouped_thresholds" if grouped_thresholds else "none"
 
     explanations = model.explain(
         hostnames,
@@ -63,12 +73,39 @@ def main() -> int:
         approximate=args.approximate,
         approximate_k=args.approximate_k,
     )
+    for index, row in enumerate(explanations):
+        row["decision_rule"] = SPLIT_CONFORMAL_DECISION_RULE
+        row_threshold_source = threshold_source
+        if groups is not None:
+            group_name = str(groups[index]).strip()
+            if grouped_thresholds and group_name in grouped_thresholds:
+                row_threshold_source = grouped_thresholds_source
+            elif not args.require_group_thresholds:
+                row_threshold_source = f"{threshold_source}_fallback"
+        row["threshold_source"] = row_threshold_source
 
     payload = {
         "model": str(args.model),
         "count": len(explanations),
         "top_k": args.top_k,
+        "threshold": float(model.threshold if model.threshold is not None else 0.0),
+        "threshold_source": threshold_source,
+        "grouped_thresholds_source": grouped_thresholds_source,
         "grouped_thresholds_used": groups is not None,
+        "decision_rule": SPLIT_CONFORMAL_DECISION_RULE,
+        "score_path": {
+            "approximate": bool(args.approximate or args.approximate_k is not None),
+            "approximate_k": args.approximate_k if args.approximate_k is not None else (1 if args.approximate else None),
+            "normalized_inputs": not args.no_normalize,
+        },
+        "normalizer": {
+            "enabled": not args.no_normalize,
+            "function": "ccd.preprocess.normalize_hostname" if not args.no_normalize else None,
+            "unicode_form": "NFKC" if not args.no_normalize else None,
+            "decode_percent": True if not args.no_normalize else None,
+            "decode_utf8_percent_runs": True if not args.no_normalize else None,
+            "idna_roundtrip": True if not args.no_normalize else None,
+        },
         "explanations": explanations,
     }
 

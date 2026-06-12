@@ -223,9 +223,21 @@ def test_explain_cli_outputs_json(tmp_path, monkeypatch):
     assert seen["calibration_groups"] == ["tenant-a", "tenant-b"]
     assert seen["missing_group_threshold"] == "error"
     assert data["count"] == 1
+    assert data["threshold"] == 0.5
+    assert data["threshold_source"] == "model_bundle_threshold"
+    assert data["grouped_thresholds_source"] == "model_bundle_grouped_thresholds"
     assert data["grouped_thresholds_used"] is True
+    assert data["decision_rule"] == "score > threshold"
+    assert data["score_path"] == {
+        "approximate": False,
+        "approximate_k": None,
+        "normalized_inputs": True,
+    }
+    assert data["normalizer"]["function"] == "ccd.preprocess.normalize_hostname"
     assert data["explanations"][0]["hostname"] == "alpha.example"
     assert data["explanations"][0]["calibration_group"] == "tenant-a"
+    assert data["explanations"][0]["decision_rule"] == "score > threshold"
+    assert data["explanations"][0]["threshold_source"] == "model_bundle_grouped_thresholds"
 
 
 def test_diagnostics_cli_runs(monkeypatch):

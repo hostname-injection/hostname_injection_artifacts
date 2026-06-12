@@ -468,6 +468,16 @@ def validate_code_path_evidence() -> dict[str, bool]:
     explain_embeddings_source = inspect.getsource(CCDModel.explain_embeddings)
     if "l2_normalize" not in explain_embeddings_source:
         raise ValueError("CCDModel.explain_embeddings must normalize embeddings before reporting cone evidence")
+    explain_cli_source = (ROOT / "ccd" / "explain.py").read_text(encoding="utf-8")
+    for token in (
+        "threshold_source",
+        "grouped_thresholds_source",
+        "decision_rule",
+        "score_path",
+        '"normalizer"',
+    ):
+        if token not in explain_cli_source:
+            raise ValueError(f"explanation JSON must record {token} scope metadata")
     predict_signature = inspect.signature(CCDModel.predict)
     for param in ("calibration_groups", "missing_group_threshold"):
         if param not in predict_signature.parameters:
@@ -611,6 +621,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "model_predict_grouped_thresholds_available": True,
         "grouped_decision_explanations_available": True,
         "explanations_use_normalized_cone_evidence": True,
+        "explanations_record_threshold_and_score_scope": True,
         "exact_certificate_enumeration_available": True,
         "calibrated_margin_certificate_available": True,
         "combined_cmc_then_enumeration_certificate_available": True,
