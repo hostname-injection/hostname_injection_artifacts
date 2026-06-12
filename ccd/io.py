@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 import math
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 
 import numpy as np
 
@@ -47,9 +47,10 @@ def save_model(path: Path, bundle: ModelBundle) -> None:
             raise ValueError("threshold must be finite when present")
         payload["threshold"] = np.array([threshold], dtype=np.float64)
     if bundle.grouped_thresholds:
-        for group in bundle.grouped_thresholds:
-            threshold_for_group(group, bundle.threshold, bundle.grouped_thresholds, missing="error")
-        payload["grouped_thresholds"] = np.array([json.dumps(bundle.grouped_thresholds, sort_keys=True)])
+        _validate_grouped_thresholds(bundle.grouped_thresholds, default_threshold=bundle.threshold)
+        payload["grouped_thresholds"] = np.array(
+            [json.dumps(bundle.grouped_thresholds, sort_keys=True, allow_nan=False)]
+        )
     np.savez(path, **payload)
 
 
@@ -66,10 +67,13 @@ def load_model(path: Path) -> CCDModel:
     if "threshold" in data.files:
         threshold = float(data["threshold"][0])
         if not math.isfinite(threshold):
-            threshold = None
+            raise ValueError("threshold must be finite when present")
     grouped_thresholds = None
     if "grouped_thresholds" in data.files:
         grouped_thresholds = json.loads(str(data["grouped_thresholds"][0]))
+        if not isinstance(grouped_thresholds, dict):
+            raise ValueError("grouped_thresholds must be an object")
+        _validate_grouped_thresholds(grouped_thresholds, default_threshold=threshold)
 
     cones = ConePartition.build(config.cone, axes=axes)
     malicious = {name: mal_priors[i] for i, name in enumerate(names)}
@@ -84,3 +88,12 @@ def load_model(path: Path) -> CCDModel:
         grouped_thresholds=grouped_thresholds,
     )
     return model
+
+
+def _validate_grouped_thresholds(
+    grouped_thresholds: Mapping[str, Any],
+    *,
+    default_threshold: Optional[float],
+) -> None:
+    for group in grouped_thresholds:
+        threshold_for_group(group, default_threshold, grouped_thresholds, missing="error")

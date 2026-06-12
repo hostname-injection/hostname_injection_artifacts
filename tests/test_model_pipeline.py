@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 
 from ccd.calibration import calibrate_threshold, conformal_p_value
@@ -69,6 +71,50 @@ def test_save_load_roundtrip(tmp_path):
     assert model.config.to_dict() == config.to_dict()
     assert model.threshold == 0.42
     assert model.grouped_thresholds == {"tenant-a": {"threshold": 0.73, "num_samples": 2}}
+
+
+def _write_raw_model_bundle(path, *, threshold=None, grouped_thresholds=None):
+    config = CCDConfig(cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False))
+    payload = {
+        "axes": np.eye(2, dtype=np.float32),
+        "benign_prior": np.array([0.7, 0.3], dtype=np.float32),
+        "malicious_priors": np.array([[0.2, 0.8]], dtype=np.float32),
+        "malicious_names": np.array(["fam"]),
+        "config": np.array([json.dumps(config.to_dict())]),
+        "format_version": np.array(["1.2"]),
+    }
+    if threshold is not None:
+        payload["threshold"] = np.array([threshold], dtype=np.float64)
+    if grouped_thresholds is not None:
+        payload["grouped_thresholds"] = np.array([json.dumps(grouped_thresholds)])
+    np.savez(path, **payload)
+
+
+def test_load_model_rejects_non_finite_threshold(tmp_path):
+    path = tmp_path / "bad_threshold.npz"
+    _write_raw_model_bundle(path, threshold=float("nan"))
+
+    try:
+        load_model(path)
+    except ValueError as exc:
+        assert "threshold" in str(exc)
+        assert "finite" in str(exc)
+        return
+
+    assert False, "Expected ValueError for non-finite serialized threshold"
+
+
+def test_load_model_rejects_invalid_grouped_thresholds(tmp_path):
+    path = tmp_path / "bad_grouped_thresholds.npz"
+    _write_raw_model_bundle(path, threshold=0.5, grouped_thresholds={"tenant-a": {"num_samples": 2}})
+
+    try:
+        load_model(path)
+    except ValueError as exc:
+        assert "threshold" in str(exc)
+        return
+
+    assert False, "Expected ValueError for grouped threshold without threshold value"
 
 
 def test_calibration_and_p_value():

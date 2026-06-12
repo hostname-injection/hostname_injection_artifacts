@@ -31,7 +31,7 @@ from ccd.config import CCDConfig, ConeConfig, EncoderConfig
 from ccd.csv_io import read_malicious_csv_map, write_score_csv
 from ccd.edit_model import DEFAULT_EDITS, EDIT_MANIFEST_VERSION, EditModel
 from ccd.encoder import CahoEncoder
-from ccd.io import MODEL_FORMAT_VERSION, ModelBundle
+from ccd.io import MODEL_FORMAT_VERSION, ModelBundle, load_model
 from ccd.line_io import read_parallel_lines
 from ccd.model import CCDModel
 from ccd.preprocess import normalize_hostname, normalization_trace
@@ -386,6 +386,26 @@ def validate_bundle_contracts(required_value: object) -> dict[str, Any]:
         raise ValueError("CCDModel must carry an optional threshold")
     if "grouped_thresholds" not in model_fields:
         raise ValueError("CCDModel must carry optional grouped thresholds")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "bad_model.npz"
+        config = CCDConfig(cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False))
+        payload = {
+            "axes": np.eye(2, dtype=np.float32),
+            "benign_prior": np.array([0.7, 0.3], dtype=np.float32),
+            "malicious_priors": np.array([[0.2, 0.8]], dtype=np.float32),
+            "malicious_names": np.array(["fam"]),
+            "config": np.array([json.dumps(config.to_dict())]),
+            "format_version": np.array([MODEL_FORMAT_VERSION]),
+            "threshold": np.array([float("nan")], dtype=np.float64),
+        }
+        np.savez(path, **payload)
+        try:
+            load_model(path)
+        except ValueError as exc:
+            if "threshold" not in str(exc) or "finite" not in str(exc):
+                raise
+        else:
+            raise ValueError("ModelBundle loading must reject non-finite calibrated thresholds")
     return {
         "model_format_version": MODEL_FORMAT_VERSION,
         "config_serialization": True,
@@ -393,6 +413,7 @@ def validate_bundle_contracts(required_value: object) -> dict[str, Any]:
         "prior_serialization": True,
         "optional_calibrated_threshold_serialization": True,
         "optional_grouped_calibrated_threshold_serialization": True,
+        "load_rejects_invalid_calibrated_thresholds": True,
     }
 
 

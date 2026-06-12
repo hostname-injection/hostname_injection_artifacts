@@ -72,6 +72,7 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["caho_training_support"]["benchmark_binary_training_script_has_cuda_gate"] is True
     assert report["derived"]["bundle_contracts"]["optional_calibrated_threshold_serialization"] is True
     assert report["derived"]["bundle_contracts"]["optional_grouped_calibrated_threshold_serialization"] is True
+    assert report["derived"]["bundle_contracts"]["load_rejects_invalid_calibrated_thresholds"] is True
 
 
 def test_method_contracts_reject_missing_edit_manifest_prefix(tmp_path: Path) -> None:
