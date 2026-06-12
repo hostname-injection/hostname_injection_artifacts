@@ -4,7 +4,7 @@ import numpy as np
 
 from ccd.calibration import calibrate_threshold, conformal_p_value
 from ccd.cone import ConePartition
-from ccd.config import CCDConfig, ConeConfig, EncoderConfig, PriorConfig
+from ccd.config import CCDConfig, ConeConfig, EncoderConfig, PriorConfig, ScoringConfig
 from ccd.encoder import CahoEncoder
 from ccd.edit_model import EditModel
 from ccd.io import ModelBundle, load_model, save_model
@@ -117,10 +117,11 @@ def _write_raw_model_bundle(
     benign_prior=None,
     malicious_priors=None,
     malicious_names=None,
+    config=None,
     threshold=None,
     grouped_thresholds=None,
 ):
-    config = CCDConfig(cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False))
+    config = config or CCDConfig(cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False))
     payload = {
         "axes": np.eye(2, dtype=np.float32) if axes is None else axes,
         "benign_prior": np.array([0.7, 0.3], dtype=np.float32)
@@ -291,6 +292,59 @@ def test_save_model_rejects_empty_malicious_priors(tmp_path):
         return
 
     assert False, "Expected ValueError for a ModelBundle without malicious priors"
+
+
+def test_load_model_rejects_invalid_scoring_config(tmp_path):
+    bad_count_path = tmp_path / "bad_effective_count.npz"
+    bad_count_config = CCDConfig(
+        cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False),
+        scoring=ScoringConfig(effective_count=float("nan")),
+    )
+    _write_raw_model_bundle(bad_count_path, config=bad_count_config)
+
+    try:
+        load_model(bad_count_path)
+    except ValueError as exc:
+        assert "effective_count" in str(exc)
+        assert "finite" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for non-finite effective_count")
+
+    bad_weights_path = tmp_path / "bad_mixture_weights.npz"
+    bad_weights_config = CCDConfig(
+        cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False),
+        scoring=ScoringConfig(mixture_weights={"other": 1.0}),
+    )
+    _write_raw_model_bundle(bad_weights_path, config=bad_weights_config)
+
+    try:
+        load_model(bad_weights_path)
+    except ValueError as exc:
+        assert "mixture_weights" in str(exc)
+        return
+
+    assert False, "Expected ValueError for mixture weights that do not match malicious priors"
+
+
+def test_save_model_rejects_invalid_scoring_config(tmp_path):
+    config = CCDConfig(
+        cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False),
+        scoring=ScoringConfig(mixture_weights={"other": 1.0}),
+    )
+    bad_bundle = ModelBundle(
+        axes=np.eye(2, dtype=np.float32),
+        benign_prior=np.array([0.7, 0.3], dtype=np.float32),
+        malicious_priors={"fam": np.array([0.2, 0.8], dtype=np.float32)},
+        config=config,
+    )
+
+    try:
+        save_model(tmp_path / "bad_scoring.npz", bad_bundle)
+    except ValueError as exc:
+        assert "mixture_weights" in str(exc)
+        return
+
+    assert False, "Expected ValueError for invalid scoring config at save time"
 
 
 def test_calibration_and_p_value():

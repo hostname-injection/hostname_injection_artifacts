@@ -752,8 +752,9 @@ scores = model.score(["example.com"], normalize=True)
   `P_M`, cone axes, encoder config, and scoring config remain fixed. Refresh
   windows must contain finite embeddings before `P_B` or thresholds are
   updated.
-- CCD model bundles fail closed on non-finite or shape-incompatible cone axes
-  and malformed prior arrays before scoring or certification.
+- CCD model bundles fail closed on non-finite or shape-incompatible cone axes,
+  malformed prior arrays, invalid effective counts, and mixture weights that
+  do not match the serialized malicious priors before scoring or certification.
 - The edit model E1–E12 is implemented in `ccd/edit_model.py`; emitted
   stability certificates can use calibrated-margin bounds and otherwise use
   deterministic finite-edit closure. Certification inputs fail closed on

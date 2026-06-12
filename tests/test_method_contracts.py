@@ -87,6 +87,8 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["bundle_contracts"]["load_rejects_invalid_cone_axes"] is True
     assert report["derived"]["bundle_contracts"]["load_rejects_invalid_prior_arrays"] is True
     assert report["derived"]["bundle_contracts"]["save_rejects_invalid_prior_arrays"] is True
+    assert report["derived"]["bundle_contracts"]["load_rejects_invalid_scoring_config"] is True
+    assert report["derived"]["bundle_contracts"]["save_rejects_invalid_scoring_config"] is True
 
 
 def test_method_contracts_reject_missing_edit_manifest_prefix(tmp_path: Path) -> None:

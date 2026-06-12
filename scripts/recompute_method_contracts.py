@@ -27,7 +27,7 @@ from ccd.calibration import (
 )
 from ccd.certify import deterministic_single_edit_neighbors, enumerate_edit_ball, randomized_smoothing_certificate
 from ccd.cone import ConePartition
-from ccd.config import CCDConfig, ConeConfig, EncoderConfig
+from ccd.config import CCDConfig, ConeConfig, EncoderConfig, ScoringConfig
 from ccd.csv_io import read_malicious_csv_map, write_score_csv
 from ccd.edit_model import DEFAULT_EDITS, EDIT_MANIFEST_VERSION, EditModel
 from ccd.encoder import CahoEncoder
@@ -458,6 +458,39 @@ def validate_bundle_contracts(required_value: object) -> dict[str, Any]:
                 raise
         else:
             raise ValueError("ModelBundle saving must reject invalid priors")
+        bad_scoring_path = tmp_path / "bad_scoring.npz"
+        bad_scoring_config = CCDConfig(
+            cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False),
+            scoring=ScoringConfig(mixture_weights={"other": 1.0}),
+        )
+        bad_scoring_payload = {
+            **payload,
+            "config": np.array([json.dumps(bad_scoring_config.to_dict())]),
+            "threshold": np.array([0.5], dtype=np.float64),
+        }
+        np.savez(bad_scoring_path, **bad_scoring_payload)
+        try:
+            load_model(bad_scoring_path)
+        except ValueError as exc:
+            if "mixture_weights" not in str(exc):
+                raise
+        else:
+            raise ValueError("ModelBundle loading must reject inconsistent mixture weights")
+        try:
+            save_model(
+                tmp_path / "bad_scoring_save.npz",
+                ModelBundle(
+                    axes=np.eye(2, dtype=np.float32),
+                    benign_prior=np.array([0.7, 0.3], dtype=np.float32),
+                    malicious_priors={"fam": np.array([0.2, 0.8], dtype=np.float32)},
+                    config=bad_scoring_config,
+                ),
+            )
+        except ValueError as exc:
+            if "mixture_weights" not in str(exc):
+                raise
+        else:
+            raise ValueError("ModelBundle saving must reject inconsistent mixture weights")
     return {
         "model_format_version": MODEL_FORMAT_VERSION,
         "config_serialization": True,
@@ -469,6 +502,8 @@ def validate_bundle_contracts(required_value: object) -> dict[str, Any]:
         "load_rejects_invalid_cone_axes": True,
         "load_rejects_invalid_prior_arrays": True,
         "save_rejects_invalid_prior_arrays": True,
+        "load_rejects_invalid_scoring_config": True,
+        "save_rejects_invalid_scoring_config": True,
     }
 
 

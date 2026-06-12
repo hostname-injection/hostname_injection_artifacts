@@ -13,6 +13,7 @@ from .cone import ConePartition
 from .encoder import CahoEncoder
 from .calibration import threshold_for_group
 from .model import CCDModel
+from .scoring import mixture_log_weights
 
 
 MODEL_FORMAT_VERSION = "1.2"
@@ -34,6 +35,7 @@ def save_model(path: Path, bundle: ModelBundle) -> None:
     axes = _validate_axes(bundle.axes, bundle.config)
     benign_prior = _validate_prior_vector(bundle.benign_prior, "benign_prior", axes.shape[0])
     names, priors = _validate_malicious_prior_mapping(bundle.malicious_priors, axes.shape[0])
+    _validate_scoring_config(bundle.config, names)
     payload = {
         "axes": axes,
         "benign_prior": benign_prior,
@@ -67,6 +69,7 @@ def load_model(path: Path) -> CCDModel:
         data["malicious_priors"],
         axes.shape[0],
     )
+    _validate_scoring_config(config, names)
     threshold = None
     if "threshold" in data.files:
         threshold = float(data["threshold"][0])
@@ -174,6 +177,26 @@ def _validate_serialized_malicious_priors(
         for i, name in enumerate(validated_names)
     ]
     return validated_names, np.stack(validated_priors, axis=0)
+
+
+def _validate_scoring_config(config: CCDConfig, malicious_names: list[str]) -> None:
+    effective_count = float(config.scoring.effective_count)
+    if not math.isfinite(effective_count) or effective_count <= 0.0:
+        raise ValueError("scoring.effective_count must be finite and positive")
+    weights = dict(config.scoring.mixture_weights or {})
+    if not weights:
+        mixture_log_weights(malicious_names, weights)
+        return
+    weight_names = set(weights)
+    malicious_name_set = set(malicious_names)
+    missing = sorted(malicious_name_set - weight_names)
+    extra = sorted(weight_names - malicious_name_set)
+    if missing or extra:
+        raise ValueError(
+            "scoring.mixture_weights must match malicious_names exactly: "
+            f"missing={missing}, extra={extra}"
+        )
+    mixture_log_weights(malicious_names, weights)
 
 
 def _validate_grouped_thresholds(

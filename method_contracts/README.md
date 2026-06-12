@@ -31,7 +31,8 @@ grouped-threshold explanations for decision inspection, benign-only
 mutating detector state, and model-bundle persistence of axes, priors, config,
 and optional global/grouped calibrated thresholds. Bundle loading and saving
 also reject non-finite or shape-incompatible cone axes and malformed prior
-arrays before a detector can emit scores.
+arrays, invalid effective counts, and mixture weights that do not match the
+serialized malicious priors before a detector can emit scores.
 
 The paper's full deployed training/replay provenance still requires the full
 HIB-Real release and associated run outputs. This checker keeps the public
