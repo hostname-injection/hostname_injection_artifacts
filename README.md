@@ -617,7 +617,9 @@ At scoring or certification time, pass the matching query group file. Add
 `--require-group-thresholds` if every query must have an explicit grouped
 threshold in `calibration.json` or the saved model bundle. The same `--groups`
 file can be supplied to `ccd-explain` so explanation rows use and record the
-same tenant/window threshold as scoring.
+same tenant/window threshold as scoring. The Python `CCDModel.predict(...)`
+API accepts the same `calibration_groups` and `missing_group_threshold`
+arguments for model-level tenant/window decisions.
 
 If you intend to use `--approximate` at inference time, calibrate with it as well:
 

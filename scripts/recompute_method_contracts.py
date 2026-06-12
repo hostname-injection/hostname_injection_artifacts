@@ -350,6 +350,10 @@ def validate_code_path_evidence() -> dict[str, bool]:
     for param in ("calibration_groups", "missing_group_threshold"):
         if param not in explain_signature.parameters:
             raise ValueError(f"CCDModel.explain must expose {param} for grouped decision explanations")
+    predict_signature = inspect.signature(CCDModel.predict)
+    for param in ("calibration_groups", "missing_group_threshold"):
+        if param not in predict_signature.parameters:
+            raise ValueError(f"CCDModel.predict must expose {param} for grouped tenant/window decisions")
     if not callable(calibrate_thresholds_by_group):
         raise ValueError("calibrate_thresholds_by_group must be callable for tenant/window calibration")
     if not callable(threshold_for_group):
@@ -409,6 +413,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "split_conformal_calibration_available": True,
         "grouped_split_conformal_calibration_available": True,
         "tenant_window_threshold_resolution_available": True,
+        "model_predict_grouped_thresholds_available": True,
         "grouped_decision_explanations_available": True,
         "exact_certificate_enumeration_available": True,
         "calibrated_margin_certificate_available": True,

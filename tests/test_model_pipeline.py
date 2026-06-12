@@ -293,6 +293,61 @@ def test_score_empty_inputs():
     assert scores.size == 0
 
 
+def test_predict_applies_grouped_thresholds():
+    class FixedEncoder:
+        def encode(self, texts, batch_size=32, normalize=True):
+            return np.array([[0.0, 1.0] for _ in texts], dtype=np.float32)
+
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=FixedEncoder(),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=0.0,
+        grouped_thresholds={
+            "tenant-a": {"threshold": 3.0},
+            "tenant-b": {"threshold": 0.1},
+        },
+    )
+
+    preds = model.predict(
+        ["same.example", "same.example"],
+        calibration_groups=["tenant-a", "tenant-b"],
+    )
+
+    assert preds.tolist() == [False, True]
+
+
+def test_predict_can_require_grouped_thresholds():
+    class FixedEncoder:
+        def encode(self, texts, batch_size=32, normalize=True):
+            return np.array([[0.0, 1.0] for _ in texts], dtype=np.float32)
+
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=FixedEncoder(),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=0.0,
+        grouped_thresholds={"tenant-a": {"threshold": 3.0}},
+    )
+
+    try:
+        model.predict(
+            ["same.example"],
+            calibration_groups=["tenant-missing"],
+            missing_group_threshold="error",
+        )
+    except KeyError as exc:
+        assert "tenant-missing" in str(exc)
+    else:
+        raise AssertionError("missing grouped threshold should fail when requested")
+
+
 def test_approximate_k_validation():
     config = CCDConfig()
     cones = ConePartition.build(config.cone)

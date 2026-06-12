@@ -258,9 +258,13 @@ class CCDModel:
         batch_size: int = 32,
         normalize: bool = True,
         *,
+        calibration_groups: Optional[Sequence[str]] = None,
+        missing_group_threshold: str = "default",
         approximate: bool = False,
         approximate_k: Optional[int] = None,
     ) -> np.ndarray:
+        if calibration_groups is not None and len(calibration_groups) != len(hostnames):
+            raise ValueError("calibration_groups must have one value per hostname")
         scores = self.score(
             hostnames,
             batch_size=batch_size,
@@ -268,8 +272,17 @@ class CCDModel:
             approximate=approximate,
             approximate_k=approximate_k,
         )
-        threshold = 0.0 if self.threshold is None else self.threshold
-        return scores > threshold
+        if calibration_groups is None:
+            threshold = 0.0 if self.threshold is None else self.threshold
+            return scores > threshold
+        thresholds = np.asarray(
+            [
+                self.threshold_for_group(group, missing=missing_group_threshold)
+                for group in calibration_groups
+            ],
+            dtype=np.float64,
+        )
+        return scores > thresholds
 
     def threshold_for_group(self, group: str, *, missing: str = "default") -> float:
         return threshold_for_group(group, self.threshold, self.grouped_thresholds, missing=missing)
