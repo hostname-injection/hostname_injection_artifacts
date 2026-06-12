@@ -8,6 +8,7 @@ from typing import Callable, Dict, List, Optional, Sequence
 
 
 _PERCENT_RE = re.compile(r"%[0-9A-Fa-f]{2}")
+_PERCENT_RUN_RE = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
 
 # Small confusable map (extensible)
 HOMOGLYPHS = {
@@ -138,8 +139,18 @@ def edit_zero_pad(host: str, rng: random.Random) -> str:
 
 def edit_utf8_percent(host: str, rng: random.Random) -> str:
     # Encode non-ASCII chars to percent-encoded UTF-8 or decode existing
+    decodable_runs = []
+    for match in _PERCENT_RUN_RE.finditer(host):
+        try:
+            raw = bytes(int(part, 16) for part in match.group(0).split("%") if part)
+            decodable_runs.append((match.start(), match.end(), raw.decode("utf-8")))
+        except UnicodeDecodeError:
+            continue
+    if decodable_runs and rng.random() < 0.5:
+        start, end, decoded = rng.choice(decodable_runs)
+        return host[:start] + decoded + host[end:]
     if _PERCENT_RE.search(host) and rng.random() < 0.5:
-        # decode a percent sequence
+        # decode one byte as a mixed-decoding residue
         match = _PERCENT_RE.search(host)
         if match:
             byte = int(match.group(0)[1:], 16)

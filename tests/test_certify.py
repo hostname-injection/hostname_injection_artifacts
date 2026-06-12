@@ -104,6 +104,15 @@ def test_deterministic_single_edit_neighbors_cover_manifest_ops():
     assert "a.com--" in neighbors
 
 
+def test_utf8_percent_neighbors_decode_complete_runs():
+    neighbors = deterministic_single_edit_neighbors(
+        "caf%C3%A9.example",
+        EditModel(edits=["E6_utf8_percent"]),
+    )
+
+    assert "café.example" in neighbors
+
+
 def test_enumerate_edit_ball_includes_origin_and_radius_neighbors():
     edit_model = EditModel(edits=["E5_case"])
     ball = enumerate_edit_ball("ab.com", radius=1, edit_model=edit_model)

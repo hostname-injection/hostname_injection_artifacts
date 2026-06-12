@@ -20,7 +20,7 @@ if str(ROOT) not in sys.path:
 from ccd.augment import DEFAULT_WEIGHTED_BENIGN_WEIGHTS, DEFAULT_WEIGHTED_MALICIOUS_WEIGHTS
 from ccd.benchmark_training import BenchmarkBinaryContrastiveTrainer, BenchmarkCAHOViewDataset, BenchmarkContrastiveTrainer
 from ccd.calibration import calibrate_thresholds_by_group, threshold_for_group
-from ccd.certify import enumerate_edit_ball, randomized_smoothing_certificate
+from ccd.certify import deterministic_single_edit_neighbors, enumerate_edit_ball, randomized_smoothing_certificate
 from ccd.cone import ConePartition
 from ccd.config import CCDConfig, ConeConfig, EncoderConfig
 from ccd.edit_model import DEFAULT_EDITS, EDIT_MANIFEST_VERSION, EditModel
@@ -161,12 +161,19 @@ def validate_edit_manifest(expected: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError(f"edit manifest version mismatch: {EDIT_MANIFEST_VERSION} != {version}")
     if EditModel().version != version:
         raise ValueError("EditModel must expose the deployed edit manifest version")
+    utf8_neighbors = deterministic_single_edit_neighbors(
+        "caf%C3%A9.example",
+        EditModel(edits=["E6_utf8_percent"]),
+    )
+    if "café.example" not in utf8_neighbors:
+        raise ValueError("E6 deterministic closure must decode complete UTF-8 percent runs")
     return {
         "version": version,
         "n_default_edits": len(edit_names),
         "default_edit_names": edit_names,
         "required_prefixes": prefixes,
         "deterministic_closure_available": True,
+        "utf8_percent_run_closure": True,
         "randomized_smoothing_boundary_documented": True,
     }
 

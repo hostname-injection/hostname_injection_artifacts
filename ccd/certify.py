@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import random
+import re
 import unicodedata
 from dataclasses import dataclass
 from statistics import NormalDist
@@ -10,6 +11,9 @@ from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
 import numpy as np
 
 from .edit_model import DEFAULT_EDITS, HOMOGLYPHS, QUOTE_COMMENT_FRAGMENTS, TLD_CONFUSABLES, EditModel
+
+
+_PERCENT_RUN_RE = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
 
 
 def cone_margin(prototypes: np.ndarray, u: np.ndarray) -> Tuple[int, float]:
@@ -64,6 +68,15 @@ def _percent_spans(host: str) -> Iterable[Tuple[int, int, str]]:
             i += 3
         else:
             i += 1
+
+
+def _utf8_percent_runs(host: str) -> Iterable[Tuple[int, int, str]]:
+    for match in _PERCENT_RUN_RE.finditer(host):
+        try:
+            raw = bytes(int(part, 16) for part in match.group(0).split("%") if part)
+            yield match.start(), match.end(), raw.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
 
 
 def _punycode_variants(label: str) -> Set[str]:
@@ -143,6 +156,8 @@ def deterministic_single_edit_neighbors(host: str, edit_model: Optional[EditMode
                 out.add(".".join(padded))
 
     if "E6_utf8_percent" in names:
+        for start, end, decoded in _utf8_percent_runs(host):
+            out.add(host[:start] + decoded + host[end:])
         for start, end, decoded in _percent_spans(host):
             out.add(host[:start] + decoded + host[end:])
         for i, ch in enumerate(host):
