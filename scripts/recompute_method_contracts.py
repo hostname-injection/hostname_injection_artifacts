@@ -31,7 +31,7 @@ from ccd.config import CCDConfig, ConeConfig, EncoderConfig
 from ccd.csv_io import read_malicious_csv_map, write_score_csv
 from ccd.edit_model import DEFAULT_EDITS, EDIT_MANIFEST_VERSION, EditModel
 from ccd.encoder import CahoEncoder
-from ccd.io import MODEL_FORMAT_VERSION, ModelBundle, load_model
+from ccd.io import MODEL_FORMAT_VERSION, ModelBundle, load_model, save_model
 from ccd.line_io import read_parallel_lines
 from ccd.model import CCDModel
 from ccd.preprocess import normalize_hostname, normalization_trace
@@ -394,7 +394,8 @@ def validate_bundle_contracts(required_value: object) -> dict[str, Any]:
     if "grouped_thresholds" not in model_fields:
         raise ValueError("CCDModel must carry optional grouped thresholds")
     with tempfile.TemporaryDirectory() as tmpdir:
-        path = Path(tmpdir) / "bad_model.npz"
+        tmp_path = Path(tmpdir)
+        path = tmp_path / "bad_model.npz"
         config = CCDConfig(cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False))
         payload = {
             "axes": np.eye(2, dtype=np.float32),
@@ -413,6 +414,49 @@ def validate_bundle_contracts(required_value: object) -> dict[str, Any]:
                 raise
         else:
             raise ValueError("ModelBundle loading must reject non-finite calibrated thresholds")
+        bad_axes_path = tmp_path / "bad_axes.npz"
+        bad_axes_payload = {
+            **payload,
+            "axes": np.array([[1.0, 0.0], [float("nan"), 1.0]], dtype=np.float32),
+            "threshold": np.array([0.5], dtype=np.float64),
+        }
+        np.savez(bad_axes_path, **bad_axes_payload)
+        try:
+            load_model(bad_axes_path)
+        except ValueError as exc:
+            if "axes" not in str(exc) or "finite" not in str(exc):
+                raise
+        else:
+            raise ValueError("ModelBundle loading must reject non-finite cone axes")
+        bad_prior_path = tmp_path / "bad_prior.npz"
+        bad_prior_payload = {
+            **payload,
+            "benign_prior": np.array([0.7, float("inf")], dtype=np.float32),
+            "threshold": np.array([0.5], dtype=np.float64),
+        }
+        np.savez(bad_prior_path, **bad_prior_payload)
+        try:
+            load_model(bad_prior_path)
+        except ValueError as exc:
+            if "benign_prior" not in str(exc) or "finite" not in str(exc):
+                raise
+        else:
+            raise ValueError("ModelBundle loading must reject non-finite priors")
+        try:
+            save_model(
+                tmp_path / "bad_save.npz",
+                ModelBundle(
+                    axes=np.eye(2, dtype=np.float32),
+                    benign_prior=np.array([0.7, 0.2], dtype=np.float32),
+                    malicious_priors={"fam": np.array([0.2, 0.8], dtype=np.float32)},
+                    config=config,
+                ),
+            )
+        except ValueError as exc:
+            if "benign_prior" not in str(exc) or "sum to 1.0" not in str(exc):
+                raise
+        else:
+            raise ValueError("ModelBundle saving must reject invalid priors")
     return {
         "model_format_version": MODEL_FORMAT_VERSION,
         "config_serialization": True,
@@ -421,6 +465,9 @@ def validate_bundle_contracts(required_value: object) -> dict[str, Any]:
         "optional_calibrated_threshold_serialization": True,
         "optional_grouped_calibrated_threshold_serialization": True,
         "load_rejects_invalid_calibrated_thresholds": True,
+        "load_rejects_invalid_cone_axes": True,
+        "load_rejects_invalid_prior_arrays": True,
+        "save_rejects_invalid_prior_arrays": True,
     }
 
 

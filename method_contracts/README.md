@@ -24,7 +24,9 @@ calibrated-margin certificates with deterministic enumeration fallback, CAHO
 supervised orbit contrastive training with benign diversity preserved,
 grouped-threshold explanations for decision inspection, benign-only
 `(P_B, tau_alpha)` refresh, and model-bundle persistence of axes, priors,
-config, and optional global/grouped calibrated thresholds.
+config, and optional global/grouped calibrated thresholds. Bundle loading and
+saving also reject non-finite or shape-incompatible cone axes and malformed
+prior arrays before a detector can emit scores.
 
 The paper's full deployed training/replay provenance still requires the full
 HIB-Real release and associated run outputs. This checker keeps the public

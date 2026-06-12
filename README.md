@@ -408,8 +408,8 @@ finite-edit coverage, deterministic certificate closure, calibrated-margin
 certificates with deterministic enumeration fallback, CAHO two-view supervised
 orbit contrastive training plus an L2-normalized binary head with explicit
 AdamW weight decay, benign-only `(P_B, tau_alpha)` refresh, and model bundle
-persistence for config, axes, priors, and global/grouped calibrated thresholds. See
-`method_contracts/README.md`.
+persistence plus validation for config, cone axes, priors, and global/grouped
+calibrated thresholds. See `method_contracts/README.md`.
 
 ## Public-Scope Taxonomy Check
 
@@ -746,6 +746,8 @@ scores = model.score(["example.com"], normalize=True)
   scheme/userinfo/port/path/query/fragment segmentation and decode changes.
 - Benign drift refresh is implemented as a narrow `(P_B, tau_alpha)` update;
   `P_M`, cone axes, encoder config, and scoring config remain fixed.
+- CCD model bundles fail closed on non-finite or shape-incompatible cone axes
+  and malformed prior arrays before scoring or certification.
 - The edit model E1–E12 is implemented in `ccd/edit_model.py`; emitted
   stability certificates can use calibrated-margin bounds and otherwise use
   deterministic finite-edit closure. Certification inputs fail closed on

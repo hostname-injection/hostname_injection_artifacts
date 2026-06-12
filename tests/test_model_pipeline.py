@@ -51,7 +51,7 @@ def test_save_load_roundtrip(tmp_path):
     axes = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
     benign_prior = np.array([0.7, 0.3], dtype=np.float32)
     malicious_priors = {"fam": np.array([0.2, 0.8], dtype=np.float32)}
-    config = CCDConfig()
+    config = CCDConfig(cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False))
 
     bundle = ModelBundle(
         axes=axes,
@@ -73,13 +73,26 @@ def test_save_load_roundtrip(tmp_path):
     assert model.grouped_thresholds == {"tenant-a": {"threshold": 0.73, "num_samples": 2}}
 
 
-def _write_raw_model_bundle(path, *, threshold=None, grouped_thresholds=None):
+def _write_raw_model_bundle(
+    path,
+    *,
+    axes=None,
+    benign_prior=None,
+    malicious_priors=None,
+    malicious_names=None,
+    threshold=None,
+    grouped_thresholds=None,
+):
     config = CCDConfig(cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False))
     payload = {
-        "axes": np.eye(2, dtype=np.float32),
-        "benign_prior": np.array([0.7, 0.3], dtype=np.float32),
-        "malicious_priors": np.array([[0.2, 0.8]], dtype=np.float32),
-        "malicious_names": np.array(["fam"]),
+        "axes": np.eye(2, dtype=np.float32) if axes is None else axes,
+        "benign_prior": np.array([0.7, 0.3], dtype=np.float32)
+        if benign_prior is None
+        else benign_prior,
+        "malicious_priors": np.array([[0.2, 0.8]], dtype=np.float32)
+        if malicious_priors is None
+        else malicious_priors,
+        "malicious_names": np.array(["fam"]) if malicious_names is None else malicious_names,
         "config": np.array([json.dumps(config.to_dict())]),
         "format_version": np.array(["1.2"]),
     }
@@ -115,6 +128,132 @@ def test_load_model_rejects_invalid_grouped_thresholds(tmp_path):
         return
 
     assert False, "Expected ValueError for grouped threshold without threshold value"
+
+
+def test_load_model_rejects_non_finite_axes(tmp_path):
+    path = tmp_path / "bad_axes.npz"
+    axes = np.array([[1.0, 0.0], [float("nan"), 1.0]], dtype=np.float32)
+    _write_raw_model_bundle(path, axes=axes)
+
+    try:
+        load_model(path)
+    except ValueError as exc:
+        assert "axes" in str(exc)
+        assert "finite" in str(exc)
+        return
+
+    assert False, "Expected ValueError for non-finite cone axes"
+
+
+def test_load_model_rejects_axis_shape_mismatch(tmp_path):
+    path = tmp_path / "bad_axis_shape.npz"
+    _write_raw_model_bundle(path, axes=np.eye(3, dtype=np.float32))
+
+    try:
+        load_model(path)
+    except ValueError as exc:
+        assert "axes shape" in str(exc)
+        assert "config" in str(exc)
+        return
+
+    assert False, "Expected ValueError for cone axes that do not match the config"
+
+
+def test_load_model_rejects_non_finite_priors(tmp_path):
+    path = tmp_path / "bad_prior.npz"
+    _write_raw_model_bundle(path, benign_prior=np.array([0.7, float("inf")], dtype=np.float32))
+
+    try:
+        load_model(path)
+    except ValueError as exc:
+        assert "benign_prior" in str(exc)
+        assert "finite" in str(exc)
+        return
+
+    assert False, "Expected ValueError for non-finite serialized priors"
+
+
+def test_load_model_rejects_negative_or_unnormalized_priors(tmp_path):
+    negative_path = tmp_path / "negative_prior.npz"
+    _write_raw_model_bundle(
+        negative_path,
+        malicious_priors=np.array([[-0.2, 1.2]], dtype=np.float32),
+    )
+
+    try:
+        load_model(negative_path)
+    except ValueError as exc:
+        assert "non-negative" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for negative serialized priors")
+
+    unnormalized_path = tmp_path / "unnormalized_prior.npz"
+    _write_raw_model_bundle(
+        unnormalized_path,
+        malicious_priors=np.array([[0.2, 0.7]], dtype=np.float32),
+    )
+
+    try:
+        load_model(unnormalized_path)
+    except ValueError as exc:
+        assert "sum to 1.0" in str(exc)
+        return
+
+    assert False, "Expected ValueError for unnormalized serialized priors"
+
+
+def test_load_model_rejects_malicious_name_prior_mismatch(tmp_path):
+    path = tmp_path / "bad_malicious_shape.npz"
+    _write_raw_model_bundle(
+        path,
+        malicious_priors=np.array([[0.2, 0.8], [0.1, 0.9]], dtype=np.float32),
+        malicious_names=np.array(["fam"]),
+    )
+
+    try:
+        load_model(path)
+    except ValueError as exc:
+        assert "malicious_priors shape" in str(exc)
+        return
+
+    assert False, "Expected ValueError for mismatched malicious names and priors"
+
+
+def test_save_model_rejects_invalid_bundle_arrays(tmp_path):
+    config = CCDConfig(cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False))
+    bad_bundle = ModelBundle(
+        axes=np.eye(2, dtype=np.float32),
+        benign_prior=np.array([0.7, 0.2], dtype=np.float32),
+        malicious_priors={"fam": np.array([0.2, 0.8], dtype=np.float32)},
+        config=config,
+    )
+
+    try:
+        save_model(tmp_path / "bad_model.npz", bad_bundle)
+    except ValueError as exc:
+        assert "benign_prior" in str(exc)
+        assert "sum to 1.0" in str(exc)
+        return
+
+    assert False, "Expected ValueError for invalid ModelBundle priors"
+
+
+def test_save_model_rejects_empty_malicious_priors(tmp_path):
+    config = CCDConfig(cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False))
+    bad_bundle = ModelBundle(
+        axes=np.eye(2, dtype=np.float32),
+        benign_prior=np.array([0.7, 0.3], dtype=np.float32),
+        malicious_priors={},
+        config=config,
+    )
+
+    try:
+        save_model(tmp_path / "empty_malicious.npz", bad_bundle)
+    except ValueError as exc:
+        assert "malicious_priors is empty" in str(exc)
+        return
+
+    assert False, "Expected ValueError for a ModelBundle without malicious priors"
 
 
 def test_calibration_and_p_value():
