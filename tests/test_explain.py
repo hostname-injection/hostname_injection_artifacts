@@ -42,6 +42,24 @@ def test_explain_embeddings_top_cones():
     assert explanations[1]["score"] > 0.0
 
 
+def test_explain_embeddings_reports_normalized_cosine_similarity():
+    model = _simple_model()
+    explanations = model.explain_embeddings(
+        np.array([[0.0, 3.0]], dtype=np.float32),
+        hostnames=["scaled.example"],
+        top_k=1,
+    )
+    unit_explanations = model.explain_embeddings(
+        np.array([[0.0, 1.0]], dtype=np.float32),
+        hostnames=["unit.example"],
+        top_k=1,
+    )
+
+    assert explanations[0]["top_cones"][0]["cone"] == 1
+    assert np.isclose(explanations[0]["top_cones"][0]["similarity"], 1.0)
+    assert np.isclose(explanations[0]["score"], unit_explanations[0]["score"])
+
+
 def test_explain_uses_grouped_thresholds():
     model = _simple_model()
     model.threshold = 0.0

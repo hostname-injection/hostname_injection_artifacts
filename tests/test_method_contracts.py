@@ -30,6 +30,7 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["code_path_evidence"]["tenant_window_threshold_resolution_available"] is True
     assert report["derived"]["code_path_evidence"]["model_predict_grouped_thresholds_available"] is True
     assert report["derived"]["code_path_evidence"]["grouped_decision_explanations_available"] is True
+    assert report["derived"]["code_path_evidence"]["explanations_use_normalized_cone_evidence"] is True
     assert report["derived"]["code_path_evidence"]["calibrated_margin_certificate_available"] is True
     assert report["derived"]["code_path_evidence"]["combined_cmc_then_enumeration_certificate_available"] is True
     assert report["derived"]["code_path_evidence"]["certificate_records_normalizer_and_threshold_scope"] is True

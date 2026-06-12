@@ -350,6 +350,9 @@ def validate_code_path_evidence() -> dict[str, bool]:
     for param in ("calibration_groups", "missing_group_threshold"):
         if param not in explain_signature.parameters:
             raise ValueError(f"CCDModel.explain must expose {param} for grouped decision explanations")
+    explain_embeddings_source = inspect.getsource(CCDModel.explain_embeddings)
+    if "l2_normalize" not in explain_embeddings_source:
+        raise ValueError("CCDModel.explain_embeddings must normalize embeddings before reporting cone evidence")
     predict_signature = inspect.signature(CCDModel.predict)
     for param in ("calibration_groups", "missing_group_threshold"):
         if param not in predict_signature.parameters:
@@ -415,6 +418,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "tenant_window_threshold_resolution_available": True,
         "model_predict_grouped_thresholds_available": True,
         "grouped_decision_explanations_available": True,
+        "explanations_use_normalized_cone_evidence": True,
         "exact_certificate_enumeration_available": True,
         "calibrated_margin_certificate_available": True,
         "combined_cmc_then_enumeration_certificate_available": True,

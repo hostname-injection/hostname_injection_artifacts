@@ -116,6 +116,7 @@ class CCDModel:
 
         if embeddings.ndim == 1:
             embeddings = embeddings.reshape(1, -1)
+        embeddings = l2_normalize(np.asarray(embeddings, dtype=np.float32), axis=1)
         if thresholds is not None and len(thresholds) != len(embeddings):
             raise ValueError("thresholds must have one value per embedding")
         if calibration_groups is not None and len(calibration_groups) != len(embeddings):
