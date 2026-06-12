@@ -54,6 +54,7 @@ class DecisionCertificate:
     checked: int
     max_score_movement: float
     counterexample: Optional[str] = None
+    decision_rule: str = "score > threshold"
 
 
 def _validate_certificate_radius(radius: int) -> None:

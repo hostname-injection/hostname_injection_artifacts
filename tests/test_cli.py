@@ -490,6 +490,8 @@ def test_certify_writes_scope_and_combined_method_args(tmp_path, monkeypatch):
 
     class DummyModel:
         threshold = 0.25
+        config = SimpleNamespace(scoring=SimpleNamespace(effective_count=1.0))
+        cones = SimpleNamespace(config=SimpleNamespace(active_cones=8, num_cones=4096))
         grouped_thresholds = {
             "tenant-a": {"threshold": 0.7},
             "tenant-b": {"threshold": 0.4},
@@ -547,10 +549,14 @@ def test_certify_writes_scope_and_combined_method_args(tmp_path, monkeypatch):
     assert payload["cert_method"] == "combined"
     assert payload["grouped_thresholds_used"] is True
     assert payload["threshold_source"] == "model_bundle_threshold"
+    assert payload["decision_rule"] == "score > threshold"
     assert payload["grouped_thresholds_source"] == "model_bundle_grouped_thresholds"
     assert payload["score_path"]["exact_all_cones"] is True
     assert "all cone axes are scanned exactly" in payload["score_path"]["exact_all_cones_meaning"]
     assert payload["score_path"]["score_statistic"] == "deployed_top_r_cone_sketch"
+    assert payload["score_path"]["active_cones"] == 8
+    assert payload["score_path"]["num_cones"] == 4096
+    assert payload["score_path"]["effective_count"] == 1.0
     assert payload["score_path"]["lsh_bypassed"] is True
     assert payload["normalizer"] == {
         "enabled": True,
@@ -567,6 +573,7 @@ def test_certify_writes_scope_and_combined_method_args(tmp_path, monkeypatch):
     assert payload["certificates"][0]["normalization_trace"]["segmentation"]["path_present"] is True
     assert payload["certificates"][0]["calibration_group"] == "tenant-a"
     assert payload["certificates"][0]["threshold_source"] == "model_bundle_grouped_thresholds"
+    assert payload["certificates"][0]["decision_rule"] == "score > threshold"
     assert payload["certificates"][0]["method"] == "calibrated_margin"
 
 

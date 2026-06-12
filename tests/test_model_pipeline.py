@@ -554,3 +554,53 @@ def test_model_certify_rejects_negative_radius_before_scoring():
         return
 
     assert False, "Expected ValueError for negative certificate radius"
+
+
+def test_model_certify_rejects_invalid_inputs_before_scoring():
+    class FailingEncoder:
+        def encode(self, texts, batch_size=32, normalize=True):
+            raise AssertionError("encoder should not be called for invalid certificate inputs")
+
+    cones = _identity_cones()
+    model = CCDModel(
+        config=CCDConfig(cone=cones.config),
+        encoder=FailingEncoder(),
+        cones=cones,
+        benign_prior=np.array([0.9, 0.1], dtype=np.float32),
+        malicious_priors={"m": np.array([0.1, 0.9], dtype=np.float32)},
+        threshold=0.0,
+    )
+
+    invalid_calls = [
+        lambda: model.certify("example.com", radius=1, threshold=float("nan")),
+        lambda: model.certify("example.com", radius=1, max_nodes=0),
+        lambda: model.certify(
+            "example.com",
+            radius=1,
+            method="calibrated-margin",
+            sketch_lipschitz=-0.1,
+            embedding_rotation_bound=0.1,
+        ),
+        lambda: model.certify(
+            "example.com",
+            radius=1,
+            method="calibrated-margin",
+            sketch_lipschitz=0.1,
+            embedding_rotation_bound=float("inf"),
+        ),
+        lambda: model.certify(
+            "example.com",
+            radius=1,
+            method="calibrated-margin",
+            sketch_lipschitz=0.1,
+            embedding_rotation_bound=0.1,
+            eps=0.0,
+        ),
+    ]
+
+    for call in invalid_calls:
+        try:
+            call()
+        except ValueError:
+            continue
+        raise AssertionError("Expected invalid certificate input to fail before scoring")

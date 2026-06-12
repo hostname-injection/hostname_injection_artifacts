@@ -503,6 +503,7 @@ def cmd_certify(args: argparse.Namespace) -> None:
                 "normalized_hostname": hostname,
             }
         row["threshold_source"] = row_threshold_source
+        row["decision_rule"] = "score > threshold"
         if groups is not None:
             row["calibration_group"] = groups[index]
         certificates.append(row)
@@ -511,6 +512,7 @@ def cmd_certify(args: argparse.Namespace) -> None:
         "radius": args.radius,
         "threshold": threshold,
         "threshold_source": threshold_source,
+        "decision_rule": "score > threshold",
         "grouped_thresholds_source": grouped_thresholds_source,
         "grouped_thresholds_used": groups is not None,
         "cert_method": args.cert_method,
@@ -524,6 +526,12 @@ def cmd_certify(args: argparse.Namespace) -> None:
             "score_statistic": "deployed_top_r_cone_sketch",
             "active_cones": getattr(getattr(model, "cones", None), "config", None).active_cones
             if getattr(getattr(model, "cones", None), "config", None) is not None
+            else None,
+            "num_cones": getattr(getattr(model, "cones", None), "config", None).num_cones
+            if getattr(getattr(model, "cones", None), "config", None) is not None
+            else None,
+            "effective_count": getattr(getattr(model, "config", None), "scoring", None).effective_count
+            if getattr(getattr(model, "config", None), "scoring", None) is not None
             else None,
             "lsh_bypassed": True,
             "approximate": False,

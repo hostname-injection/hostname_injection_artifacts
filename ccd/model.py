@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
+from numbers import Integral
 from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
@@ -323,10 +325,31 @@ class CCDModel:
 
         if method not in {"enumeration", "calibrated-margin", "combined"}:
             raise ValueError("method must be one of: enumeration, calibrated-margin, combined")
-        if radius < 0:
-            raise ValueError("radius must be non-negative")
+        if not isinstance(radius, Integral) or radius < 0:
+            raise ValueError("radius must be a non-negative integer")
+        if method in {"enumeration", "combined"} and (
+            not isinstance(max_nodes, Integral) or max_nodes <= 0
+        ):
+            raise ValueError("max_nodes must be a positive integer")
 
         threshold = float(threshold if threshold is not None else (self.threshold or 0.0))
+        if not math.isfinite(threshold):
+            raise ValueError("threshold must be finite")
+        if method in {"calibrated-margin", "combined"}:
+            if sketch_lipschitz is None or embedding_rotation_bound is None:
+                raise ValueError(
+                    "sketch_lipschitz and embedding_rotation_bound are required "
+                    "for calibrated-margin certification"
+                )
+            sketch_lipschitz = float(sketch_lipschitz)
+            embedding_rotation_bound = float(embedding_rotation_bound)
+            eps = float(eps)
+            if not math.isfinite(sketch_lipschitz) or sketch_lipschitz < 0.0:
+                raise ValueError("sketch_lipschitz must be finite and non-negative")
+            if not math.isfinite(embedding_rotation_bound) or embedding_rotation_bound < 0.0:
+                raise ValueError("embedding_rotation_bound must be finite and non-negative")
+            if not math.isfinite(eps) or eps <= 0.0:
+                raise ValueError("eps must be finite and positive")
         normalizer = normalize_hostname if normalize else (lambda s: s)
 
         def score_one(text: str) -> float:
@@ -339,11 +362,6 @@ class CCDModel:
             return float(scores[0])
 
         if method in {"calibrated-margin", "combined"}:
-            if sketch_lipschitz is None or embedding_rotation_bound is None:
-                raise ValueError(
-                    "sketch_lipschitz and embedding_rotation_bound are required "
-                    "for calibrated-margin certification"
-                )
             margin_cert = certify_by_calibrated_margin(
                 score_one(normalizer(hostname)),
                 threshold,

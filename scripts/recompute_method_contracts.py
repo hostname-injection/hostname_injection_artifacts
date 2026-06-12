@@ -573,6 +573,16 @@ def validate_code_path_evidence() -> dict[str, bool]:
     for param in ("method", "sketch_lipschitz", "embedding_rotation_bound"):
         if param not in certify_signature.parameters:
             raise ValueError(f"CCDModel.certify must expose {param} for CMC/SEC certification")
+    model_certify_source = inspect.getsource(CCDModel.certify)
+    for token in (
+        "threshold must be finite",
+        "max_nodes must be a positive integer",
+        "sketch_lipschitz must be finite and non-negative",
+        "embedding_rotation_bound must be finite and non-negative",
+        "eps must be finite and positive",
+    ):
+        if token not in model_certify_source:
+            raise ValueError("CCDModel.certify must fail closed on invalid certification inputs")
     for certificate_call in (
         lambda: enumerate_edit_ball("ab.com", radius=-1),
         lambda: refresh_model.certify("ab.com", radius=-1),
@@ -588,6 +598,8 @@ def validate_code_path_evidence() -> dict[str, bool]:
     for token in (
         "threshold_source",
         "grouped_thresholds_source",
+        "decision_rule",
+        "effective_count",
         '"normalizer"',
         "ccd.preprocess.normalize_hostname",
         "decode_utf8_percent_runs",
@@ -642,6 +654,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "calibrated_margin_certificate_available": True,
         "combined_cmc_then_enumeration_certificate_available": True,
         "certificate_radius_validation_available": True,
+        "certificate_input_validation_available": True,
         "certificate_records_normalizer_and_threshold_scope": True,
         "exact_score_bypasses_lsh_by_default": True,
         "exact_full_axis_scan_for_deployed_top_r_statistic": True,

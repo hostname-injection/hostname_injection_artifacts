@@ -42,6 +42,7 @@ def test_method_contracts_are_recomputable() -> None:
     assert report["derived"]["code_path_evidence"]["calibrated_margin_certificate_available"] is True
     assert report["derived"]["code_path_evidence"]["combined_cmc_then_enumeration_certificate_available"] is True
     assert report["derived"]["code_path_evidence"]["certificate_radius_validation_available"] is True
+    assert report["derived"]["code_path_evidence"]["certificate_input_validation_available"] is True
     assert report["derived"]["code_path_evidence"]["certificate_records_normalizer_and_threshold_scope"] is True
     assert report["derived"]["code_path_evidence"]["exact_full_axis_scan_for_deployed_top_r_statistic"] is True
     assert report["derived"]["code_path_evidence"]["benign_reference_refresh_available"] is True

@@ -506,6 +506,8 @@ python scripts/recompute_stability_scope_metrics.py
 This validates the published aggregate values and explicitly records that
 decision-stability certificates are scoped to the frozen normalizer, cone
 sketch, score path, threshold, and edit manifest, not downstream sink safety.
+Certificate JSON also records the strict `score > threshold` decision rule and
+the score-path constants used by the certificate.
 See `stability_scope/README.md`.
 
 ## Production-Latency Aggregates
@@ -745,7 +747,9 @@ scores = model.score(["example.com"], normalize=True)
   `P_M`, cone axes, encoder config, and scoring config remain fixed.
 - The edit model E1–E12 is implemented in `ccd/edit_model.py`; emitted
   stability certificates can use calibrated-margin bounds and otherwise use
-  deterministic finite-edit closure.
+  deterministic finite-edit closure. Certification inputs fail closed on
+  non-finite thresholds, invalid bounds, and invalid edit-ball limits before
+  scoring.
 - The CAHO augmentation sets match the paper’s benign/malicious design.
 - Public de-identification reports intentionally do not disclose whether
   private/raw hostnames were duplicated; private-origin grouping checks are used

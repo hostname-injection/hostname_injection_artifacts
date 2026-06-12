@@ -260,6 +260,7 @@ def test_certify_by_enumeration_accepts_stable_decision():
     assert cert.certified is True
     assert cert.prediction is True
     assert cert.counterexample is None
+    assert cert.decision_rule == "score > threshold"
 
 
 def test_certify_by_enumeration_rejects_flip():
