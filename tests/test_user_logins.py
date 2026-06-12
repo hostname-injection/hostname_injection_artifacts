@@ -1,10 +1,14 @@
 import csv
 
+import numpy as np
+
+from ccd.config import CCDConfig, ConeConfig
 from ccd.user_logins import (
     LabelPolicy,
     apply_confidence_filter,
     collect_caho_samples_from_user_logins,
     collect_label_stats_from_user_logins,
+    build_priors_from_user_logins,
     normalize_label,
     parse_confidence,
     resolve_label,
@@ -113,3 +117,29 @@ def test_collect_caho_samples_reservoir(tmp_path):
     assert stats.used_benign == 3
     assert stats.used_malicious == 3
     assert len(samples) == 6
+
+
+def test_build_priors_from_user_logins_requires_both_classes(tmp_path):
+    class DummyEncoder:
+        def encode(self, texts, batch_size=64, normalize=True):
+            return np.array([[1.0, 0.0] for _ in texts], dtype=np.float32)
+
+    rows = [
+        {
+            "USERNAME": "benign.example",
+            "GPT_5_5_IS_DNS_CMD_INJECTION": "B",
+            "CLAUDE_OPUS_4_8_IS_DNS_CMD_INJECTION": "B",
+            "GPT_5_5_DNS_CMD_INJECTION_CONFIDENCE": "0.9",
+            "CLAUDE_OPUS_4_8_DNS_CMD_INJECTION_CONFIDENCE": "0.9",
+        }
+    ]
+    _write_csv(tmp_path / "sample.csv", rows)
+    config = CCDConfig(cone=ConeConfig(dim=2, num_cones=2, active_cones=1, use_lsh=False))
+
+    try:
+        build_priors_from_user_logins(tmp_path, config, encoder=DummyEncoder())
+    except ValueError as exc:
+        assert "malicious row" in str(exc)
+        return
+
+    assert False, "Expected prior training to require at least one malicious row"

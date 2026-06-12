@@ -12,6 +12,7 @@ from .config import CCDConfig
 from .cone import ConePartition
 from .encoder import CahoEncoder
 from .io import ModelBundle
+from .priors import validate_prior_smoothing
 from .preprocess import normalize_hostname
 
 
@@ -193,6 +194,7 @@ def _accumulate_counts(counts: np.ndarray, embeddings: np.ndarray, cones: ConePa
 
 
 def _finalize_prior(counts: np.ndarray, smoothing: float) -> np.ndarray:
+    smoothing = validate_prior_smoothing(smoothing)
     total = float(counts.sum())
     if total == 0.0:
         total = 1.0
@@ -277,6 +279,10 @@ def build_priors_from_user_logins(
 
     stats.used_benign += flush(benign_batch, counts_benign)
     stats.used_malicious += flush(malicious_batch, counts_malicious)
+    if stats.used_benign == 0:
+        raise ValueError("user-login prior training requires at least one benign row")
+    if stats.used_malicious == 0:
+        raise ValueError("user-login prior training requires at least one malicious row")
 
     benign_prior = _finalize_prior(counts_benign, config.prior.smoothing)
     malicious_prior = _finalize_prior(counts_malicious, config.prior.smoothing)

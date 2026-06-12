@@ -35,6 +35,7 @@ from ccd.io import MODEL_FORMAT_VERSION, ModelBundle, load_model, save_model
 from ccd.line_io import read_parallel_lines
 from ccd.model import CCDModel
 from ccd.preprocess import normalize_hostname, normalization_trace
+from ccd.priors import build_benign_prior, build_malicious_priors
 from ccd.scoring import ccd_score_logpriors, mixture_log_weights
 from ccd.train import CAHOTrainer, supcon_loss, supervised_orbit_contrastive_loss
 
@@ -649,6 +650,20 @@ def validate_code_path_evidence() -> dict[str, bool]:
         or refresh_model.grouped_thresholds is not old_grouped
     ):
         raise ValueError("failed grouped refresh must leave P_B, threshold, and grouped thresholds unchanged")
+    for training_call in (
+        lambda: ConePartition.build(cone_config, axes=np.array([[1.0, 0.0], [float("nan"), 1.0]], dtype=np.float32)),
+        lambda: ConePartition.build(ConeConfig(dim=2, num_cones=2, active_cones=3, use_lsh=False)),
+        lambda: build_benign_prior(np.array([[1.0, float("nan")]], dtype=np.float32), cones),
+        lambda: build_benign_prior(np.array([[0.0, 0.0]], dtype=np.float32), cones),
+        lambda: build_malicious_priors({}, cones),
+        lambda: build_malicious_priors({"fam": np.empty((0, 2), dtype=np.float32)}, cones),
+    ):
+        try:
+            training_call()
+        except ValueError:
+            pass
+        else:
+            raise ValueError("cone/prior training paths must reject invalid inputs")
     for score_call in (
         lambda: refresh_model.score_embeddings(np.array([[1.0, float("nan")]], dtype=np.float32)),
         lambda: refresh_model.score_embeddings(np.array([[float("inf"), 0.0]], dtype=np.float32), approximate_k=1),
@@ -704,6 +719,8 @@ def validate_code_path_evidence() -> dict[str, bool]:
     if use_lsh_param is None or use_lsh_param.default is not False:
         raise ValueError("ConePartition.cone_sketch must bypass LSH by default for exact scoring")
     cone_sketch_source = inspect.getsource(ConePartition.cone_sketch)
+    cone_build_source = inspect.getsource(ConePartition.build)
+    prior_source = inspect.getsource(build_benign_prior.__globals__["_coerce_embeddings"])
     nearest_axes_source = inspect.getsource(ConePartition.nearest_axes)
     torch_score_source = inspect.getsource(CCDModel._score_embeddings_torch)
     topk_score_source = inspect.getsource(CCDModel._score_embeddings_topk)
@@ -714,6 +731,10 @@ def validate_code_path_evidence() -> dict[str, bool]:
     torch_kernel_source = inspect.getsource(ccd_score_logpriors.__globals__["ccd_scores_torch"])
     if "nearest_axes" not in cone_sketch_source or "use_lsh=use_lsh" not in cone_sketch_source:
         raise ValueError("ConePartition.cone_sketch must route through nearest_axes with explicit LSH control")
+    if "_validate_config" not in cone_build_source or "_validate_axes" not in cone_build_source:
+        raise ValueError("ConePartition.build must validate cone config and axes before training/scoring")
+    if "cannot be empty" not in prior_source or "must contain only finite values" not in prior_source:
+        raise ValueError("prior construction must reject empty and non-finite training embeddings")
     if "self.axes @ u" not in nearest_axes_source:
         raise ValueError("ConePartition.nearest_axes must support exact full-axis scan fallback")
     for name, source in (
@@ -739,6 +760,8 @@ def validate_code_path_evidence() -> dict[str, bool]:
         "global_score_csv_thresholds_available": True,
         "score_paths_normalize_unit_embeddings": True,
         "score_paths_reject_invalid_embeddings": True,
+        "cone_partition_rejects_invalid_axes": True,
+        "prior_training_rejects_invalid_inputs": True,
         "mixture_weights_normalized": True,
         "split_conformal_calibration_available": True,
         "split_conformal_rejects_non_finite_scores": True,

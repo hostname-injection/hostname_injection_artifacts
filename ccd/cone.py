@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
+import math
+from numbers import Integral
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -71,8 +73,10 @@ class ConePartition:
 
     @classmethod
     def build(cls, config: ConeConfig, axes: Optional[np.ndarray] = None) -> "ConePartition":
+        cls._validate_config(config)
         if axes is None:
             axes = cls._init_axes(config)
+        axes = cls._validate_axes(axes, config)
         axes = l2_normalize(axes)
         lsh = None
         if config.use_lsh:
@@ -95,6 +99,46 @@ class ConePartition:
             # simple spherical kmeans initialization (requires embeddings later)
             raise ValueError("kmeans axis_init requires precomputed axes")
         raise ValueError(f"Unknown axis_init: {config.axis_init}")
+
+    @staticmethod
+    def _validate_config(config: ConeConfig) -> None:
+        for name, value in (
+            ("dim", config.dim),
+            ("num_cones", config.num_cones),
+            ("active_cones", config.active_cones),
+        ):
+            if not isinstance(value, Integral) or int(value) <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        if int(config.active_cones) > int(config.num_cones):
+            raise ValueError("active_cones must be less than or equal to num_cones")
+        temperature = float(config.temperature)
+        if not math.isfinite(temperature) or temperature <= 0.0:
+            raise ValueError("temperature must be finite and positive")
+        if config.use_lsh:
+            for name, value in (
+                ("lsh_tables", config.lsh_tables),
+                ("lsh_bits", config.lsh_bits),
+            ):
+                if not isinstance(value, Integral) or int(value) <= 0:
+                    raise ValueError(f"{name} must be a positive integer when LSH is enabled")
+            if not isinstance(config.lsh_probe_radius, Integral) or int(config.lsh_probe_radius) < 0:
+                raise ValueError("lsh_probe_radius must be a non-negative integer")
+
+    @staticmethod
+    def _validate_axes(axes: np.ndarray, config: ConeConfig) -> np.ndarray:
+        axes = np.asarray(axes, dtype=np.float32)
+        expected_shape = (int(config.num_cones), int(config.dim))
+        if axes.ndim != 2 or axes.shape != expected_shape:
+            raise ValueError(
+                "axes shape must match config cone shape: "
+                f"observed {axes.shape}, expected {expected_shape}"
+            )
+        if not np.isfinite(axes).all():
+            raise ValueError("axes must contain only finite values")
+        norms = np.linalg.norm(axes, axis=1)
+        if not np.isfinite(norms).all() or np.any(norms <= 0.0):
+            raise ValueError("axes rows must have finite non-zero norms")
+        return axes
 
     def nearest_axes(
         self,

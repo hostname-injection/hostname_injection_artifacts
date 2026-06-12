@@ -4,7 +4,7 @@ import numpy as np
 
 from ccd.calibration import calibrate_threshold, conformal_p_value
 from ccd.cone import ConePartition
-from ccd.config import CCDConfig, ConeConfig, EncoderConfig
+from ccd.config import CCDConfig, ConeConfig, EncoderConfig, PriorConfig
 from ccd.encoder import CahoEncoder
 from ccd.edit_model import EditModel
 from ccd.io import ModelBundle, load_model, save_model
@@ -45,6 +45,43 @@ def test_build_priors_prefers_cone():
     malicious_priors = build_malicious_priors({"fam": embeddings}, cones)
     assert benign_prior[0] > benign_prior[1]
     assert malicious_priors["fam"][0] > malicious_priors["fam"][1]
+
+
+def test_build_priors_reject_invalid_training_embeddings():
+    cones = _identity_cones()
+    invalid_calls = [
+        lambda: build_benign_prior(np.empty((0, 2), dtype=np.float32), cones),
+        lambda: build_benign_prior(np.array([[1.0, float("nan")]], dtype=np.float32), cones),
+        lambda: build_benign_prior(np.array([[float("inf"), 0.0]], dtype=np.float32), cones),
+        lambda: build_benign_prior(np.array([[0.0, 0.0]], dtype=np.float32), cones),
+        lambda: build_benign_prior(np.array([[1.0, 0.0, 0.0]], dtype=np.float32), cones),
+    ]
+
+    for call in invalid_calls:
+        try:
+            call()
+        except ValueError:
+            continue
+        raise AssertionError("Expected invalid prior-training embeddings to fail")
+
+
+def test_build_priors_require_valid_malicious_families_and_smoothing():
+    cones = _identity_cones()
+    embeddings = np.array([[1.0, 0.0]], dtype=np.float32)
+    invalid_calls = [
+        lambda: build_malicious_priors({}, cones),
+        lambda: build_malicious_priors({"": embeddings}, cones),
+        lambda: build_malicious_priors({"fam": np.empty((0, 2), dtype=np.float32)}, cones),
+        lambda: build_benign_prior(embeddings, cones, PriorConfig(smoothing=0.0)),
+        lambda: build_benign_prior(embeddings, cones, PriorConfig(smoothing=float("nan"))),
+    ]
+
+    for call in invalid_calls:
+        try:
+            call()
+        except ValueError:
+            continue
+        raise AssertionError("Expected invalid prior-training inputs to fail")
 
 
 def test_save_load_roundtrip(tmp_path):
