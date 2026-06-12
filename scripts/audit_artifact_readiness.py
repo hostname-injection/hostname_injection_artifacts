@@ -224,6 +224,18 @@ def check_badge_basics(manifest: dict[str, Any]) -> list[str]:
         failures.append("kick_the_tires.network_required should be false")
     if kick.get("gpu_required") is not False:
         failures.append("kick_the_tires.gpu_required should be false")
+
+    full_tests = manifest.get("full_tests", {})
+    if not isinstance(full_tests, dict):
+        failures.append("full_tests should be an object")
+    else:
+        if "pytest" not in str(full_tests.get("command", "")):
+            failures.append("full_tests command should run pytest")
+        observed = str(full_tests.get("last_observed", "")).strip().lower()
+        if not observed:
+            failures.append("full_tests.last_observed is missing")
+        elif "passed" not in observed:
+            failures.append("full_tests.last_observed should record a passing pytest result")
     return failures
 
 

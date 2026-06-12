@@ -38,6 +38,8 @@ def test_artifact_manifest_has_claim_scripts_and_required_files() -> None:
     assert requirements["packaging"]["source_package"] is True
     assert requirements["packaging"]["container_required"] is False
     assert requirements["tracking"]["web_tracking_embedded"] is False
+    assert manifest["full_tests"]["command"] == "python -m pytest -q"
+    assert manifest["full_tests"]["last_observed"] == "282 passed, 1 skipped"
     assert (ROOT / manifest["badge_readiness"]).exists()
     assert manifest["claims"]
     claim_text = " ".join(claim["claim"] for claim in manifest["claims"])
@@ -213,6 +215,15 @@ def test_ieee_sp_requirements_reject_missing_public_infrastructure() -> None:
     failures = readiness.check_ieee_sp_requirements(manifest)
 
     assert "public research infrastructure support should be marked true" in failures
+
+
+def test_badge_basics_rejects_missing_full_test_observation() -> None:
+    manifest = json.loads((ROOT / "ARTIFACT_MANIFEST.json").read_text(encoding="utf-8"))
+    manifest["full_tests"]["last_observed"] = ""
+
+    failures = readiness.check_badge_basics(manifest)
+
+    assert "full_tests.last_observed is missing" in failures
 
 
 def test_ieee_sp_requirements_reject_missing_functional_badge_aspect() -> None:

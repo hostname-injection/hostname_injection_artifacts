@@ -137,7 +137,7 @@ python3 scripts/recompute_stability_scope_metrics.py
 python3 scripts/build_artifact_archive.py --dry-run
 ```
 
-Observed status: the pytest suite passed (`217 passed, 1 skipped`), the public
+Observed status: the pytest suite passed (`282 passed, 1 skipped`), the public
 bundle validator passed with 32 archived files, the release gate passed with 150
 public sample rows, the same gate passed from an extracted bundle copy, and the
 artifact smoke and readiness audit passed, including portability, privacy, and
