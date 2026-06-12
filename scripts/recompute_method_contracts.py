@@ -30,7 +30,7 @@ from ccd.encoder import CahoEncoder
 from ccd.io import MODEL_FORMAT_VERSION, ModelBundle
 from ccd.line_io import read_parallel_lines
 from ccd.model import CCDModel
-from ccd.preprocess import normalize_hostname
+from ccd.preprocess import normalize_hostname, normalization_trace
 from ccd.scoring import ccd_score_logpriors, mixture_log_weights
 from ccd.train import CAHOTrainer, supcon_loss, supervised_orbit_contrastive_loss
 
@@ -392,6 +392,15 @@ def validate_code_path_evidence() -> dict[str, bool]:
         raise ValueError("normalizer must decode complete UTF-8 percent runs before IDNA round-trip")
     if normalize_hostname("%FF.example", idna_roundtrip=False) != "ÿ.example":
         raise ValueError("normalizer must retain mixed percent-decoding residue fallback")
+    normalizer_trace = normalization_trace("https://user:pw@caf%C3%A9.Example:443/path?x=1#frag")
+    if normalizer_trace["normalized_hostname"] != "café.example":
+        raise ValueError("normalizer trace must agree with normalize_hostname output")
+    segmentation = normalizer_trace.get("segmentation", {})
+    for key in ("userinfo_present", "port_present", "path_present", "query_present", "fragment_present"):
+        if segmentation.get(key) is not True:
+            raise ValueError(f"normalizer trace must record URL-like segmentation: {key}")
+    if normalizer_trace.get("percent_decode_changed") is not True:
+        raise ValueError("normalizer trace must record percent/UTF-8 decode changes")
     if not callable(ccd_score_logpriors):
         raise ValueError("ccd_score_logpriors must be callable")
     if not callable(mixture_log_weights):
@@ -541,6 +550,7 @@ def validate_code_path_evidence() -> dict[str, bool]:
     return {
         "eq1_logsumexp_score_path_available": True,
         "normalizer_decodes_utf8_percent_runs": True,
+        "normalizer_trace_records_url_segments": True,
         "raw_artifact_csv_roundtrip_available": True,
         "score_paths_normalize_unit_embeddings": True,
         "mixture_weights_normalized": True,

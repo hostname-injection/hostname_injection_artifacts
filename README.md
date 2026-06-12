@@ -726,6 +726,8 @@ scores = model.score(["example.com"], normalize=True)
   `S(q) = log sum_k pi_k exp(n0 * (H(q; P_B) - H(q; P_M,k)))`.
 - The deployed normalizer decodes valid UTF-8 percent runs before Unicode/IDNA
   normalization, while retaining a byte-residue fallback for malformed runs.
+  Certificate output includes a per-row normalization trace for URL-like
+  scheme/userinfo/port/path/query/fragment segmentation and decode changes.
 - Benign drift refresh is implemented as a narrow `(P_B, tau_alpha)` update;
   `P_M`, cone axes, encoder config, and scoring config remain fixed.
 - The edit model E1–E12 is implemented in `ccd/edit_model.py`; emitted

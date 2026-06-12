@@ -552,9 +552,12 @@ def test_certify_writes_scope_and_combined_method_args(tmp_path, monkeypatch):
         "decode_percent": True,
         "decode_utf8_percent_runs": True,
         "idna_roundtrip": True,
+        "per_certificate_trace": True,
     }
     assert payload["edit_manifest"]["version"] == "Eraw-public-v2"
     assert payload["certificates"][0]["normalized_hostname"] == "www.example.com"
+    assert payload["certificates"][0]["normalization_trace"]["segmentation"]["scheme"] == "http"
+    assert payload["certificates"][0]["normalization_trace"]["segmentation"]["path_present"] is True
     assert payload["certificates"][0]["calibration_group"] == "tenant-a"
     assert payload["certificates"][0]["threshold_source"] == "model_bundle_grouped_thresholds"
     assert payload["certificates"][0]["method"] == "calibrated_margin"

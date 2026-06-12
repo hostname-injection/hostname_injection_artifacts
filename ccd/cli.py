@@ -22,7 +22,7 @@ from .cone import ConePartition
 from .encoder import CahoEncoder
 from .augment import CAHOAugmenter, AugmentConfig, WeightedAugmentConfig
 from .edit_model import EditModel
-from .preprocess import normalize_hostname
+from .preprocess import normalize_hostname, normalization_trace
 from .priors import build_benign_prior, build_malicious_priors
 from .train import CAHODataset, CAHOTrainer, ContrastiveTrainer, Sample
 import numpy as np
@@ -488,7 +488,17 @@ def cmd_certify(args: argparse.Namespace) -> None:
         )
         row = asdict(cert)
         row["hostname"] = hostname
-        row["normalized_hostname"] = normalize_hostname(hostname) if not args.no_normalize else hostname
+        if not args.no_normalize:
+            trace = normalization_trace(hostname)
+            row["normalized_hostname"] = trace["normalized_hostname"]
+            row["normalization_trace"] = trace
+        else:
+            row["normalized_hostname"] = hostname
+            row["normalization_trace"] = {
+                "enabled": False,
+                "raw_input": hostname,
+                "normalized_hostname": hostname,
+            }
         row["threshold_source"] = row_threshold_source
         if groups is not None:
             row["calibration_group"] = groups[index]
@@ -523,6 +533,7 @@ def cmd_certify(args: argparse.Namespace) -> None:
             "decode_percent": True if not args.no_normalize else None,
             "decode_utf8_percent_runs": True if not args.no_normalize else None,
             "idna_roundtrip": True if not args.no_normalize else None,
+            "per_certificate_trace": not args.no_normalize,
         },
         "edit_manifest": {
             "version": edit_manifest.version,
